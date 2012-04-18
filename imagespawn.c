@@ -341,6 +341,28 @@ void handle_youtube(char *url) {
 	free(curl.data);
 }
 
+void handle_stats(char *data) {
+	sqlite3_stmt *stmt;
+	char *sqlquery = "SELECT count(id) FROM url", msg[256];
+	int count = 0, row;
+	
+	// Fix warning
+	data = NULL;
+	
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW)
+			count  = sqlite3_column_int(stmt, 0);
+	}
+	
+	sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Got %d url on database", count);
+	raw_socket(sockfd, msg);
+	
+	/* Clearing */
+	sqlite3_finalize(stmt);
+}
 
 /*
  * Misc
@@ -439,6 +461,17 @@ void handle_private_message(char *data) {
 		}
 		
 	} else printf("[-] Host <%s> is not admin\n", remote);
+}
+
+void handle_message(char *data) {
+	char *message;
+	
+	message = data;
+	while(*message && *message != ':')
+		message++;
+	
+	if(!strncmp(++message, ".stats", 6))
+		handle_stats(data);
 }
 
 /*
@@ -634,8 +667,11 @@ int main(void) {
 				handle_url(nick, trueurl);
 				
 				free(trueurl);
+				
+				continue;
 			}
 			
+			handle_message(data + 1);
 			continue;
 		}
 		
