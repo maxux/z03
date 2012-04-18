@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <sqlite3.h>
 #include "imagespawn.h"
+#include "bot.h"
 
 int sockfd;
 sqlite3 *sqlite_db;

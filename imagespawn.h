@@ -1,20 +1,10 @@
 #ifndef __HEADER_IMAGESPAWN_H	
 	#define __HEADER_IMAGESPAWN_H
 	
-	#define MAXBUFF		4096
+	#define MAXBUFF			4096
 	
-	#define IRC_NICK	"sp0wimg"
-	#define IRC_REALNAME	"Image Logger"
-	#define IRC_USERNAME	"sp0wimg"
-	#define IRC_CHANNEL	"#test"
-	
-	#define IRC_ADMIN_HOST	"Maxux!maxux@maxux.net"
-	
-	#define IRC_NICKSERV		1
-	#define IRC_NICKSERV_PASS	"pwnd_azerty"
-	
-	#define OUTPUT_PATH	"/var/www/perso/imagespawn/"
-	#define CURL_USERAGENT	"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1; spawnimg) Gecko/20100101 Firefox/9.0.1"
+	#define OUTPUT_PATH		"/var/www/perso/imagespawn/data/"
+	#define CURL_USERAGENT		"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1; spawnimg) Gecko/20100101 Firefox/9.0.1"
 	
 	#define SQL_DATABASE_FILE	"sp0wimg.sqlite3"
 	
