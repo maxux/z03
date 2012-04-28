@@ -69,9 +69,10 @@ char * trim(char *str, unsigned int len) {
 		*write++ = *read++;
 	
 	/* After */
-	write--;
 	while(isspace(*write))
-		*write-- = '\0';
+		write--;
+		
+	*write-- = '\0';
 	
 	return str;
 }
