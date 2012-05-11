@@ -37,6 +37,6 @@
 	int handle_url_dispatch(char *url);
 	int handle_url_image(char *url, curl_data_t *curl);
 	
-	int url_extract_title(char *body, char *title, size_t maxsize);
+	char * url_extract_title(char *body, char *title);
 	void handle_url_title(char *url);
 #endif
