@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -72,7 +73,7 @@ char * trim(char *str, unsigned int len) {
 	while(isspace(*write))
 		write--;
 		
-	*write-- = '\0';
+	*write = '\0';
 	
 	return str;
 }
@@ -195,6 +196,10 @@ int handle_url(char *nick, char *url) {
 	int row, id = -1, hit = 0;
 	char skip_analyse = 0;
 	
+	struct tm * timeinfo;
+	time_t ts = 0;
+	char timestring[64];
+	
 	printf("[+] URL Parser: %s\n", url);
 		
 	if(strlen(url) > 256) {
@@ -206,15 +211,16 @@ int handle_url(char *nick, char *url) {
 	/*
 	 *   Quering database
 	 */
-	sqlquery = sqlite3_mprintf("SELECT id, nick, hit FROM url WHERE url = '%q'", url);
+	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q'", url);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
 			id  = sqlite3_column_int(stmt, 0);
-			_op  = sqlite3_column_text(stmt, 1);
-			hit  = sqlite3_column_int(stmt, 2);
+			_op = sqlite3_column_text(stmt, 1);
+			hit = sqlite3_column_int(stmt, 2);
+			ts  = sqlite3_column_int(stmt, 3);
 			
 			strncpy(op, (char*) _op, sizeof(op));
 			op[sizeof(op) - 1] = '\0';
@@ -227,7 +233,11 @@ int handle_url(char *nick, char *url) {
 		if(strncmp(nick, op, strlen(op))) {
 			skip_analyse = 1;
 			
-			sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Repost, OP is %s, hit %d times.", anti_hl(op), hit + 1);
+			timeinfo = localtime(&ts);
+			sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+			
+			sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Repost, OP is %s (%s), hit %d times.", anti_hl(op), timestring, hit + 1);
+			
 			raw_socket(sockfd, msg);
 			
 		} else skip_analyse = 0;
@@ -237,7 +247,7 @@ int handle_url(char *nick, char *url) {
 		
 	} else {
 		printf("[+] URL Parser: New url, inserting...\n");
-		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit) VALUES ('%q', '%q', 1)", nick, url);
+		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time) VALUES ('%q', '%q', 1, %d)", nick, url, time(NULL));
 	}
 	
 	if(!db_simple_query(sqlite_db, sqlquery))
@@ -256,9 +266,10 @@ int handle_url(char *nick, char *url) {
 
 int handle_url_dispatch(char *url) {
 	curl_data_t curl;
-	char title[256];
-	char request[384];
+	char *title = NULL;
+	char request[512];
 	unsigned int i;
+	char *sqlquery;
 	
 	if(curl_download(url, &curl))
 		return 1;
@@ -283,11 +294,19 @@ int handle_url_dispatch(char *url) {
 		}
 		
 		/* Extract title */
-		if(url_extract_title(curl.data, title, sizeof(title))) {
+		if((title = url_extract_title(curl.data, title)) != NULL) {
 			decode_html_entities_utf8(title, NULL);
 			
 			sprintf(request, "PRIVMSG " IRC_CHANNEL " :URL: %s", title);
 			raw_socket(sockfd, request);
+			
+			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
+			if(!db_simple_query(sqlite_db, sqlquery))
+				printf("[-] URL Parser: cannot update db\n");
+			
+			/* Clearing */
+			sqlite3_free(sqlquery);
+			free(title);
 			
 		} else printf("[-] URL: Cannot extract title\n");
 		
@@ -297,17 +316,6 @@ int handle_url_dispatch(char *url) {
 	}
 	
 	free(curl.data);
-	
-	return 0;
-}
-
-int handle_url_html(char *url, char *nick) {
-	nick = NULL;
-	
-	// if(((youtube = strstr(url, "youtube.com/")) || (youtube = strstr(url, "youtu.be/"))) && (youtube - url) < 15) {
-		handle_url_title(url);
-		// return 0;
-	// }
 	
 	return 0;
 }
@@ -340,7 +348,7 @@ int handle_url_image(char *url, curl_data_t *curl) {
 	return 0;
 }
 
-int url_extract_title(char *body, char *title, size_t maxsize) {
+char * url_extract_title(char *body, char *title) {
 	char *read, *write;
 	unsigned int len;
 	
@@ -352,40 +360,17 @@ int url_extract_title(char *body, char *title, size_t maxsize) {
 			write++;
 		
 		len = write - read - 7;
-		
-		if(len > maxsize)
-			len = maxsize;
+		title = (char*) malloc(sizeof(char) * len + 1);
 		
 		/* Copying title */
 		strncpy(title, read + 7, len);
 		title[len] = '\0';
 		
 		/* Stripping carriege return */
-		trim(title, len);
-		printf("<%s>\n", title);
+		trim(title, strlen(title));
+		printf("[+] Title: <%s>\n", title);
 		
-		printf("[+] Title: %s\n", title);
-		
-	} else return 0;
+	} else return NULL;
 	
-	return 1;
-}
-
-void handle_url_title(char *url) {
-	curl_data_t curl;
-	char title[256];
-	char request[384];
-	
-	curl_download(url, &curl);
-	// printf("%s\n", curl.data);
-
-	if(curl.length && url_extract_title(curl.data, title, sizeof(title))) {
-		decode_html_entities_utf8(title, NULL);
-		
-		sprintf(request, "PRIVMSG " IRC_CHANNEL " :URL: %s", title);
-		raw_socket(sockfd, request);
-		
-	} else printf("[-] URL Title: Cannot extract url\n");
-	
-	free(curl.data);
+	return title;
 }
