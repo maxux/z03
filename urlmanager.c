@@ -267,9 +267,8 @@ int handle_url(char *nick, char *url) {
 int handle_url_dispatch(char *url) {
 	curl_data_t curl;
 	char *title = NULL;
-	char request[512];
-	unsigned int i;
-	char *sqlquery;
+	unsigned int i, len;
+	char *sqlquery, *request;;
 	
 	if(curl_download(url, &curl))
 		return 1;
@@ -297,7 +296,10 @@ int handle_url_dispatch(char *url) {
 		if((title = url_extract_title(curl.data, title)) != NULL) {
 			decode_html_entities_utf8(title, NULL);
 			
-			sprintf(request, "PRIVMSG " IRC_CHANNEL " :URL: %s", title);
+			len = strlen(title) + 256;
+			request = (char*) malloc(sizeof(char) * len);
+			
+			snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL: %s", title);
 			raw_socket(sockfd, request);
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
@@ -307,6 +309,7 @@ int handle_url_dispatch(char *url) {
 			/* Clearing */
 			sqlite3_free(sqlquery);
 			free(title);
+			free(request);
 			
 		} else printf("[-] URL: Cannot extract title\n");
 		
