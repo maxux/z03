@@ -75,6 +75,10 @@ char * trim(char *str, unsigned int len) {
 		
 	*write = '\0';
 	
+	/* Removing double spaces */
+	while((read = strstr(str, "  ")))
+		strcpy(read, read + 1);
+	
 	return str;
 }
 
@@ -87,7 +91,7 @@ char *extract_url(char *url) {
 	int i = 0;
 	char *out;
 	
-	while(*(url + i) && *(url + i) != ' ')
+	while(*(url + i) && *(url + i) != ' ' && *(url + i) != ')')
 		i++;
 	
 	if(!(out = (char*) malloc(sizeof(char) * i + 1)))
@@ -233,8 +237,11 @@ int handle_url(char *nick, char *url) {
 		if(strncmp(nick, op, strlen(op))) {
 			skip_analyse = 1;
 			
-			timeinfo = localtime(&ts);
-			sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+			if(ts != 0) {
+				timeinfo = localtime(&ts);
+				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+				
+			} else strcpy(timestring, "unknown");
 			
 			sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Repost, OP is %s (%s), hit %d times.", anti_hl(op), timestring, hit + 1);
 			
@@ -355,7 +362,7 @@ char * url_extract_title(char *body, char *title) {
 	char *read, *write;
 	unsigned int len;
 	
-	if((read = strstr(body, "<title>"))) {
+	if((read = strstr(body, "<title>")) || (read = strstr(body, "<TITLE>"))) {
 		write = read + 7;
 		
 		/* Calculing length */

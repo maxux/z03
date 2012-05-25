@@ -20,8 +20,10 @@ int sockfd;
 
 void handle_stats(char *data) {
 	sqlite3_stmt *stmt;
-	char *sqlquery = "SELECT count(id) FROM url", msg[256];
-	int count = 0, row;
+	char *sqlquery = "SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) FROM url;";
+	char msg[256];
+	int count = 0, cnick = 0, chits = 0;
+	int row;
 	
 	// Fix warning
 	data = NULL;
@@ -30,11 +32,14 @@ void handle_stats(char *data) {
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW)
-			count  = sqlite3_column_int(stmt, 0);
+		if(row == SQLITE_ROW) {
+			count = sqlite3_column_int(stmt, 0);
+			cnick = sqlite3_column_int(stmt, 1);
+			chits = sqlite3_column_int(stmt, 2);
+		}
 	}
 	
-	sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Got %d url on database", count);
+	sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Got %d url on database for %d nicks and %d total hits", count, cnick, chits);
 	raw_socket(sockfd, msg);
 	
 	/* Clearing */
