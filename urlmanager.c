@@ -83,7 +83,11 @@ char * trim(char *str, unsigned int len) {
 }
 
 char * anti_hl(char *nick) {
-	nick[strlen(nick) - 1] = '_';
+	char temp[64];
+	
+	strcpy(temp, nick);
+	sprintf(nick, "%c\ufeff%s", *temp, temp + 1);
+	
 	return nick;
 }
 
@@ -375,6 +379,9 @@ char * url_extract_title(char *body, char *title) {
 		/* Copying title */
 		strncpy(title, read + 7, len);
 		title[len] = '\0';
+		
+		if(strlen(title) > 450)
+			strcpy(title + 440, " [...]");
 		
 		/* Stripping carriege return */
 		trim(title, strlen(title));
