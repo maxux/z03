@@ -7,6 +7,10 @@ ifneq "$(GCC)" ""
     CC = $(GCC)-gcc
 endif
 
+ifneq "$(DEBUG)" ""
+	CFLAGS += -D__DEBUG__
+endif
+
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 

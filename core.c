@@ -10,57 +10,115 @@
 #include <netdb.h>
 #include <curl/curl.h>
 #include <ctype.h>
-#include "imagespawn.h"
 #include "bot.h"
+#include "core.h"
+#include "actions.h"
 #include "entities.h"
 #include "database.h"
 #include "urlmanager.h"
 
+request_t __request[] = {
+	{.match = ".weather",  .callback = action_weather},
+	{.match = ".ping",     .callback = action_ping},
+	{.match = ".time",     .callback = action_time},
+	{.match = ".rand",     .callback = action_random},
+	{.match = ".stats",    .callback = action_stats},
+	{.match = ".chart",    .callback = action_chart},
+	{.match = ".help",     .callback = action_help},
+};
+
+unsigned int __request_count = sizeof(__request) / sizeof(request_t);
+
 int sockfd;
 
-void handle_stats(char *data) {
-	sqlite3_stmt *stmt;
-	char *sqlquery = "SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) FROM url;";
-	char msg[256];
-	int count = 0, cnick = 0, chits = 0;
-	int row;
-	
-	// Fix warning
-	data = NULL;
-	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
-	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			count = sqlite3_column_int(stmt, 0);
-			cnick = sqlite3_column_int(stmt, 1);
-			chits = sqlite3_column_int(stmt, 2);
-		}
-	}
-	
-	sprintf(msg, "PRIVMSG " IRC_CHANNEL " :Got %d url on database for %d nicks and %d total hits", count, cnick, chits);
-	raw_socket(sockfd, msg);
-	
-	/* Clearing */
-	sqlite3_finalize(stmt);
-}
-
-/*
- * Misc
- */
-void debug(char *d) {
-	int i;
-	
-	for(i = 0; i < 100; i++)
-		printf("%c ", (unsigned char) *(d + i));
-	
-	printf("\n");
+void diep(char *str) {
+	perror(str);
+	exit(EXIT_FAILURE);
 }
 
 /*
  * Chat Handling
  */
+
+int nick_length_check(char *nick, char *channel) {
+	char raw[128];
+	
+	if(strlen(nick) > NICK_MAX_LENGTH) {
+		printf("<> Nick too long\n");
+		
+		/* Ban Nick */
+		sprintf(raw, "MODE %s +b %s!*@*", channel, nick);
+		raw_socket(sockfd, raw);
+		
+		/* Kick Nick */
+		sprintf(raw, "KICK %s %s :Nick too long (limit: %d). Please change your nick.", channel, nick, NICK_MAX_LENGTH);
+		raw_socket(sockfd, raw);
+		
+		return 1;
+	}
+	
+	return 0;
+}
+
+int pre_handle(char *data, char *nick, size_t nick_size) {
+	extract_nick(data, nick, nick_size);
+	
+	/* Check Nick Length */
+	if(nick_length_check(nick, IRC_CHANNEL))
+		return 0;
+	
+	/* More Stuff Here */
+	
+	return 0;
+}
+
+void handle_nick(char *data) {
+	char *nick = data;
+	unsigned int i = 0;
+	
+	
+	while(*(nick + i) && *(nick + i) != ':')
+		nick++;
+	
+	/* Skipping ':' */
+	nick++;
+	
+	/* Check Nick Length */
+	if(nick_length_check(nick, IRC_CHANNEL))
+		return;
+	
+	/* More Stuff Here */
+}
+
+void handle_join(char *data) {
+	char nick[32];
+	
+	extract_nick(data, nick, sizeof(nick));
+	
+	/* Check Nick Length */
+	if(nick_length_check(nick, IRC_CHANNEL))
+		return;
+}
+
+char * match_prefix(char *data, char *match) {
+	size_t size;
+	
+	size = strlen(match);
+	if(!strncmp(data, match, size)) {
+		/* Arguments */
+		if(*(data + size) == ' ')
+			return data + size + 1;
+		
+		/* No arguments */
+		else if(*(data + size) == '\0')
+			return data + size;
+		
+		/* Not exact match */
+		else return NULL;
+		
+	} else return NULL;
+}
+
 void handle_private_message(char *data) {
 	char remote[128], *request;
 	char *diff = NULL;
@@ -85,15 +143,32 @@ void handle_private_message(char *data) {
 	} else printf("[-] Host <%s> is not admin\n", remote);
 }
 
-void handle_message(char *data) {
-	char *message;
+int handle_message(char *message, char *nick) {
+	char chan[32];
+	char *content, *temp;
+	unsigned int i;
+	char *url, *trueurl;
 	
-	message = data;
-	while(*message && *message != ':')
-		message++;
+	content = extract_chan(message, chan, sizeof(chan));
 	
-	if(!strncmp(++message, ".stats", 6))
-		handle_stats(data);
+	for(i = 0; i < __request_count; i++) {
+		if((temp = match_prefix(content, __request[i].match))) {
+			__request[i].callback(chan, temp);
+			return 0;
+		}
+	}
+	
+	if((url = strstr(message, "http://")) || (url = strstr(message, "https://"))) {
+		if((trueurl = extract_url(url))) {
+			// extract_nick(data + 1, nick, sizeof(nick));
+			handle_url(nick, trueurl);
+			
+			free(trueurl);
+			
+		} else fprintf(stderr, "[-] URL: Cannot extact url\n");		
+	}
+	
+	return 1;
 }
 
 /*
@@ -170,7 +245,9 @@ int read_socket(int sockfd, char *data, char *next) {
 			}
 		}
 		
-		rlen = recv(sockfd, buff, MAXBUFF, 0);
+		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) < 0)
+			diep("recv");
+			
 		buff[rlen] = '\0';
 	}
 	
@@ -186,6 +263,21 @@ char *skip_server(char *data) {
 			return data + i + 1;
 	
 	return NULL;
+}
+
+char *extract_chan(char *data, char *destination, size_t size) {
+	size_t len = 0;
+	size_t max = 0;
+	
+	while(*(data + len) && *(data + len) != ' ')
+		len++;
+	
+	max = (len > size) ? size : len;
+	strncpy(destination, data, max);
+	
+	destination[max] = '\0';
+	
+	return data + len + 2;
 }
 
 size_t extract_nick(char *data, char *destination, size_t size) {
@@ -206,7 +298,7 @@ size_t extract_nick(char *data, char *destination, size_t size) {
 int main(void) {
 	char *data = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
 	char *next = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
-	char *request, *url, *trueurl, nick[32];
+	char *request, nick[32];
 	
 	printf("[+] Core: Starting...\n");
 	
@@ -214,7 +306,7 @@ int main(void) {
 	if(!db_sqlite_parse(sqlite_db))
 		return 1;
 	
-	sockfd = init_irc_socket("192.168.20.1", 6667);
+	sockfd = init_irc_socket(IRC_SERVER, IRC_PORT);
 	
 	while(1) {
 		read_socket(sockfd, data, next);
@@ -262,22 +354,19 @@ int main(void) {
 				raw_socket(sockfd, "JOIN " IRC_CHANNEL);
 		}
 		
+		if(!strncmp(request, "JOIN", 4)) {
+			handle_join(data + 1);
+			continue;
+		}
+		
+		if(!strncmp(request, "NICK", 4)) {
+			handle_nick(data + 1);
+			continue;
+		}
+		
 		if(!strncmp(request, "PRIVMSG #", 9)) {
-			if((url = strstr(request + 8, "http://")) || (url = strstr(request + 8, "https://"))) {
-				if(!(trueurl = extract_url(url))) {
-					fprintf(stderr, "[-] URL: Cannot extact url\n");
-					continue;
-				}
-				
-				extract_nick(data + 1, nick, sizeof(nick));
-				handle_url(nick, trueurl);
-				
-				free(trueurl);
-				
-				continue;
-			}
-			
-			handle_message(data + 1);
+			pre_handle(data + 1, nick, sizeof(nick));
+			handle_message(skip_server(request), nick);	
 			continue;
 		}
 		

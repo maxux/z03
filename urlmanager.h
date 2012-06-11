@@ -17,9 +17,17 @@
 	typedef struct curl_data_t {
 		char *data;
 		size_t length;
+		long code;
 		enum document_type_t type;
 		
 	} curl_data_t;
+	
+	typedef enum repost_type_t {
+		URL_MATCH,
+		CHECKSUM_MATCH,
+		TITLE_MATCH,
+		
+	} repost_type_t;
 	
 	char *extract_url(char *url);
 	
@@ -34,7 +42,7 @@
 	char * repost();
 	
 	int handle_url(char *nick, char *url);
-	int handle_url_dispatch(char *url);
+	int handle_url_dispatch(char *url, char *post_nick);
 	int handle_url_image(char *url, curl_data_t *curl);
 	
 	char * url_extract_title(char *body, char *title);

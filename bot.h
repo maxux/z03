@@ -1,13 +1,27 @@
 #ifndef __IMAGESPAWN_BOT_HEADER
 	#define __IMAGESPAWN_BOT_HEADER
 	
-	#define IRC_NICK		"bot nick"
-	#define IRC_REALNAME		"bot realname"
-	#define IRC_USERNAME		"bot username"
-	#define IRC_CHANNEL		"#chan"
+	#define IRC_SERVER		"192.168.20.1"
+	#define IRC_PORT		6667
 	
-	#define IRC_ADMIN_HOST		"nick!username@host"
+	#define IRC_REALNAME		"Zoé"
+	#define IRC_USERNAME		"z03"
 	
-	#define IRC_NICKSERV		1
-	#define IRC_NICKSERV_PASS	"password"
+	#ifdef __DEBUG__
+		#define IRC_NICK		"z03`test"
+		#define IRC_CHANNEL		"#test"
+		#define IRC_NICKSERV		0
+		#define IRC_NICKSERV_PASS	""
+
+	#else
+		#define IRC_NICK		"z03"
+		#define IRC_CHANNEL		"#inpres"
+		#define IRC_NICKSERV		1
+		#define IRC_NICKSERV_PASS	"xxxxxxxxxxxx"
+	#endif
+	
+	#define IRC_ADMIN_HOST		"Maxux!maxux@maxux.net"
+	
+	/* Modules */
+	#define NICK_MAX_LENGTH		15
 #endif

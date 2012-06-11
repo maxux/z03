@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <sqlite3.h>
-#include "imagespawn.h"
+#include "core.h"
 #include "bot.h"
 #include "database.h"
 
@@ -76,4 +76,15 @@ int db_sqlite_parse(sqlite3 *db) {
 	printf("[+] SQLite: url parsed: %d rows returned\n", i);
 	
 	return 1;
+}
+
+unsigned int db_sqlite_num_rows(sqlite3_stmt *stmt) {
+	unsigned int nbrows = 0;
+	
+	while(sqlite3_step(stmt) != SQLITE_DONE)
+		nbrows++;
+	
+	sqlite3_reset(stmt);
+	
+	return nbrows;
 }
