@@ -1,3 +1,22 @@
+/* z03 - small bot with some network features - url handling/mirroring/management
+ * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +37,7 @@
 #include "entities.h"
 #include "database.h"
 #include "urlmanager.h"
+#include "ircmisc.h"
 
 
 char *__host_ignore[] = {NULL
@@ -25,73 +45,6 @@ char *__host_ignore[] = {NULL
 	"paste.maxux.net/",
 	"git.maxux.net/" */
 };
-
-char * clean_filename(char *file) {
-	int i = 0;
-	
-	while(*(file + i)) {
-		if(*(file + i) == ':' || *(file + i) == '/' || *(file + i) == '#' || *(file + i) == '?')
-			*(file + i) = '_';
-		
-		i++;
-	}
-	
-	return file;
-}
-
-char * trim(char *str, unsigned int len) {
-	char *read, *write;
-	unsigned int i;
-	
-	read  = str;
-	write = str;
-	
-	/* Strip \n */
-	for(i = 0; i < len; i++) {
-		if(*read != '\n') {
-			*write = *read;
-			write++;
-		}
-		
-		read++;
-	}
-	
-	/* New line limit */
-	*write = '\0';
-	
-	/* Trim spaces before/after */
-	read  = str;
-	write = str;
-	
-	/* Before */
-	while(isspace(*read))
-		read++;
-	
-	/* Copy */
-	while(*read)
-		*write++ = *read++;
-	
-	/* After */
-	while(isspace(*write))
-		write--;
-		
-	*write = '\0';
-	
-	/* Removing double spaces */
-	while((read = strstr(str, "  ")))
-		strcpy(read, read + 1);
-	
-	return str;
-}
-
-char * anti_hl(char *nick) {
-	char temp[64];
-	
-	strcpy(temp, nick);
-	sprintf(nick, "%c\ufeff%s", *temp, temp + 1);
-	
-	return nick;
-}
 
 char *extract_url(char *url) {
 	int i = 0;
@@ -342,7 +295,8 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 
 int handle_url_dispatch(char *url, char *post_nick) {
 	curl_data_t curl;
-	char *title = NULL;
+	char *title = NULL, *stripped = NULL;
+	char *strcode;
 	unsigned int len;
 	// unsigned char i;
 	char *sqlquery, *request;
@@ -386,14 +340,19 @@ int handle_url_dispatch(char *url, char *post_nick) {
 			len = strlen(title) + 256;
 			request = (char*) malloc(sizeof(char) * len);
 			
+			if(curl.code == 404)
+				strcode = " (Error 404)";
+				
+			else strcode = "";
+			
 			/* Check Title Repost */
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q'", title);
+			/* sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q'", title);
 			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
 			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 				if(row == SQLITE_ROW) {
-					/* Skip repost from same nick */
+					// Skip repost from same nick
 					nick   = sqlite3_column_text(stmt, 1);
 					if(!strcmp((char *) nick, post_nick))
 						continue;
@@ -411,15 +370,19 @@ int handle_url_dispatch(char *url, char *post_nick) {
 				break;
 			}
 			
-			/* Clearing */
+			// Clearing
 			sqlite3_free(sqlquery);
 			sqlite3_finalize(stmt);
-			
+			*/
 			
 			/* Notify Title */
 			if(notif_it) {
-				snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL: %s", title);
+				stripped = anti_hl_each_words(title, strlen(title));
+				
+				snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL%s: %s", strcode, stripped);
 				raw_socket(sockfd, request);
+				
+				free(stripped);
 			}
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
@@ -430,9 +393,6 @@ int handle_url_dispatch(char *url, char *post_nick) {
 			sqlite3_free(sqlquery);
 			free(title);
 			free(request);
-			
-			
-			
 			
 		} else printf("[-] URL: Cannot extract title\n");
 		

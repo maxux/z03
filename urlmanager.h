@@ -36,9 +36,6 @@
 	
 	int curl_download(char *url, curl_data_t *data);
 	
-	char * clean_filename(char *file);
-	char * trim(char *str, unsigned int len);
-	char * anti_hl(char *nick);
 	char * repost();
 	
 	int handle_url(char *nick, char *url);

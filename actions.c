@@ -1,3 +1,22 @@
+/* z03 - small bot with some network features - irc channel bot actions
+ * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ */
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -198,10 +217,11 @@ void action_stats(char *chan, char *args) {
 
 void action_chart(char *chan, char *args) {
 	sqlite3_stmt *stmt;
-	int nbrows, row, i;
+	int nbrows = 0, row, i;
 	char *sqlquery;
 	
-	int *values, lines = 5;
+	char *days = NULL;
+	int *values = NULL, lines = 6;
 	char **chart, first_date[32], last_date[32];
 	char temp[512];
 	
@@ -214,29 +234,43 @@ void action_chart(char *chan, char *args) {
 	} else last_chart_request = time(NULL);
 	
 	/* Working */
-	args     = NULL;
-	sqlquery = "SELECT count(id), date(time, 'unixepoch') d FROM url WHERE time > 0 GROUP BY d LIMIT 30;";
+	args     = NULL;	            
+	sqlquery = "SELECT count(id), date(time, 'unixepoch') d, strftime('%w', time, 'unixepoch') w FROM url WHERE time > 0 GROUP BY d ORDER BY d DESC LIMIT 31";
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
+	/* sqlite3_column_int auto-finalize */
 	nbrows = db_sqlite_num_rows(stmt);
 	values = (int*) malloc(sizeof(int) * nbrows);
+	days   = (char*) malloc(sizeof(char) * nbrows);
 	
-	i = 0;
+	printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
+	
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	
+	i = nbrows - 1;
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
-			values[i++] = sqlite3_column_int(stmt, 0);
+			values[i] = sqlite3_column_int(stmt, 0);	/* count value */
+			days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
 			
-			if(i == 1)
+			printf("[ ] Action: Chart: Day %s (url %d) is %d\n", sqlite3_column_text(stmt, 1), values[i], days[i]);
+			
+			if(i == 0)
 				strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
 				
-			else if(i == nbrows)
+			else if(i == nbrows - 1)
 				strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
+			
+			i--;
 		}
 	}
 	
-	chart = ascii_chart(values, nbrows, lines);
+	sqlite3_finalize(stmt);
+	
+	chart = ascii_chart(values, nbrows, lines, days);
 	
 	/* Chart Title */
 	snprintf(temp, sizeof(temp), "PRIVMSG %s :Chart: urls per day since %s to %s", chan, first_date, last_date);
