@@ -380,6 +380,7 @@ int handle_url_dispatch(char *url, char *post_nick) {
 				stripped = anti_hl_each_words(title, strlen(title));
 				
 				snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL%s: %s", strcode, stripped);
+				// snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL%s: %s", strcode, title);
 				raw_socket(sockfd, request);
 				
 				free(stripped);

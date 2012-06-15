@@ -23,6 +23,44 @@
 #include <ctype.h>
 #include "ircmisc.h"
 
+inline short utf8_charlen(unsigned char c) {
+	if(c < 0x80)
+		return 1;         /* 0xxxxxxx */
+		
+	if((c & 0xe0) == 0xc0)
+		return 2;         /* 110xxxxx */
+		
+	if((c & 0xf0) == 0xe0)
+		return 3;         /* 1110xxxx */
+		
+	if((c & 0xf8)==0xf0 && (c <= 0xf4))
+		return 4;         /* 11110xxx */
+		
+	return 0; /* invalid UTF8 */
+}
+
+inline size_t chrcpy_utf8(char *dst, char *src) {
+	short i, j;
+	
+	i = utf8_charlen(*src);
+	
+	for(j = i; i >= 0; i--)
+		dst[i] = src[i];
+	
+	return j;
+}
+
+void debug(char *data, size_t len) {
+	unsigned int i;
+	
+	printf("[ ] Dump: ");
+	
+	for(i = 0; i < len; i++)
+		printf("%02x ", (unsigned char) data[i]);
+	
+	printf("\n");
+}
+
 char * clean_filename(char *file) {
 	int i = 0;
 	
@@ -48,7 +86,8 @@ char * anti_hl(char *nick) {
 char * anti_hl_each_words(char *str, size_t len) {
 	char *stripped = NULL, *useme = str;
 	int i = 0, allocation;
-	char temp[1024];
+	char *read, *write;
+	int s;
 	
 	while(*useme) {
 		if(*(useme++) == ' ')
@@ -62,25 +101,36 @@ char * anti_hl_each_words(char *str, size_t len) {
 	
 	/* \ufeff is 3 bytes length */
 	stripped  = (char*) malloc(sizeof(char) * allocation);
-	*stripped = '\0';
+	bzero(stripped, allocation);
 	
-	useme = str;
-	while(sscanf(useme, "%s%n", temp, &i) == 1) {
-		useme += i;
-		
-		if(i > 2) {
-			strncat(stripped, temp, 2);	/* Copy 2 first bytes */
-			strcat(stripped, "\ufeff");	/* Inserting anti-hl */
-			strcat(stripped, temp + 2);	/* Copy the end */
-			strcat(stripped, " ");		/* Appending space */
+	read  = str;
+	write = stripped;
+	
+	// debug(read, strlen(read));
+	
+	while(*read) {
+		s = chrcpy_utf8(write, read);
+		write += s;
 			
-		} else {
-			strcat(stripped, temp);
-			strcat(stripped, " ");			
-		}
+		if(*read == ' ' && *(read + 1)) {
+			// Copy Space
+			*write = *read++;
+			
+			// Copy next char
+			s = chrcpy_utf8(write, read);
+			write += s;
+			read  += s;
+			
+			// Copy special char (3 bytes)
+			sprintf(write, "\ufeff");
+			write += 3;
+			
+		} else read += s;
 		
 		// printf("<%s>\n", stripped);
 	}
+	
+	// debug(stripped, allocation);
 	
 	printf("[.] AntiHL: <%s>\n", stripped);
 	
