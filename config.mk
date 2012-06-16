@@ -1,9 +1,13 @@
-EXEC = z03-bot
+CORE_EXEC = z03-bot
+LIB_EXEC  = libz03.so
 
 # flags
-VERSION = 1.0
-CFLAGS  = -W -Wall -O2 -pipe -ansi -pedantic -std=gnu99 -g # -D__DEBUG__
-LDFLAGS = -lcurl -lsqlite3 -lcrypto -lssl -lm
+EXTRA_CFLAGS = # -D__DEBUG__
 
-# CC = cc
+CORE_CFLAGS  = -W -Wall -O2 -pipe -std=gnu99 -g
+CORE_LDFLAGS = -lsqlite3 -rdynamic
 
+LIB_CFLAGS   = -fpic -W -Wall -O2 -pipe -g -ansi -pedantic -std=gnu99
+LIB_LDFLAGS  = -ldl -lcurl -lcrypto -lssl -lm -shared
+
+CC = i686-pc-linux-gnu-gcc

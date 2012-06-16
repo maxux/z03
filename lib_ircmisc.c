@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "ircmisc.h"
+#include "lib_ircmisc.h"
 
 inline short utf8_charlen(unsigned char c) {
 	if(c < 0x80)

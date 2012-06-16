@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include "lib_chart.h"
 
 // SQLite, 0 = Sunday
 char *__chart_days[] = {"D ", "L ", "M ", "M ", "J ", "V ", "S "};

@@ -23,9 +23,9 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <sqlite3.h>
-#include "core.h"
 #include "bot.h"
-#include "database.h"
+#include "core_init.h"
+#include "core_database.h"
 
 sqlite3 *sqlite_db;
 

@@ -17,7 +17,7 @@
 		#define IRC_NICK		"z03"
 		#define IRC_CHANNEL		"#inpres"
 		#define IRC_NICKSERV		1
-		#define IRC_NICKSERV_PASS	"xxxxxxxxxxxx"
+		#define IRC_NICKSERV_PASS	"z03_passwd"
 	#endif
 	
 	#define IRC_ADMIN_HOST		"Maxux!maxux@maxux.net"

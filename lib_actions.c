@@ -21,11 +21,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "core.h"
-#include "actions.h"
 #include "bot.h"
-#include "database.h"
-#include "chart.h"
+#include "core_init.h"
+#include "core_database.h"
+#include "lib_core.h"
+#include "lib_actions.h"
+#include "lib_chart.h"
 
 time_t last_chart_request = 0;
 char *weather_url = "curl -s 'http://www.meteobelgium.be/service/city/city.php?zone=0&stationid=%d&language=en' | grep 'class=\"degre' | tr '<' '>' | awk -F '>' '{ print $3 }'";
@@ -273,7 +274,7 @@ void action_chart(char *chan, char *args) {
 	chart = ascii_chart(values, nbrows, lines, days);
 	
 	/* Chart Title */
-	snprintf(temp, sizeof(temp), "PRIVMSG %s :Chart: urls per day since %s to %s", chan, first_date, last_date);
+	snprintf(temp, sizeof(temp), "PRIVMSG %s :Chart: urls per day from %s to %s", chan, first_date, last_date);
 	raw_socket(sockfd, temp);
 	
 	/* Chart data */
@@ -281,4 +282,7 @@ void action_chart(char *chan, char *args) {
 		snprintf(temp, sizeof(temp), "PRIVMSG %s :%s", chan, *(chart + i));
 		raw_socket(sockfd, temp);
 	}
+	
+	free(values);
+	free(days);
 }

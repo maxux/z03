@@ -1,7 +1,5 @@
-#ifndef __HEADER_IMAGESPAWN_H	
-	#define __HEADER_IMAGESPAWN_H
-	
-	#define MAXBUFF			4096
+#ifndef __Z03_LIB_CORE_H
+	#define __Z03_LIB_CORE_H
 	
 	#define OUTPUT_PATH		"/var/www/perso/imagespawn/data/"
 	// #define OUTPUT_PATH		"/tmp/spawn/"
@@ -15,12 +13,7 @@
 	extern unsigned int __request_count;
 	extern request_t __request[];
 	
-	extern int sockfd;
-	
-	int init_irc_socket(char *server, int port);
-	void raw_socket(int sockfd, char *message);
-	int read_socket(int sockfd, char *data, char *next);
-	char *skip_server(char *data);
+	void main_core(char *data, char *request);
 	
 	char *extract_chan(char *data, char *destination, size_t size);
 	size_t extract_nick(char *data, char *destination, size_t size);

@@ -32,12 +32,13 @@
 #include <ctype.h>
 #include <sqlite3.h>
 #include <openssl/sha.h>
-#include "core.h"
 #include "bot.h"
-#include "entities.h"
-#include "database.h"
-#include "urlmanager.h"
-#include "ircmisc.h"
+#include "core_init.h"
+#include "core_database.h"
+#include "lib_core.h"
+#include "lib_entities.h"
+#include "lib_urlmanager.h"
+#include "lib_ircmisc.h"
 
 
 char *__host_ignore[] = {NULL
