@@ -35,6 +35,7 @@
 #include "core_database.h"
 
 int sockfd;
+global_core_t global_core;
 
 void diep(char *str) {
 	perror(str);
@@ -71,6 +72,9 @@ void loadlib(codemap_t *codemap) {
 		fprintf(stderr, "[-] Core Lib: dlsym: %s\n", error);
 		exit(EXIT_FAILURE);
 	}
+	
+	global_core.rehash_time = time(NULL);
+	global_core.rehash_count++;
 	
 	printf("[+] Core Lib: library loaded !\n");
 }
@@ -208,6 +212,11 @@ int main(void) {
 		.main     = NULL,
 	};
 	
+	/* Initializing global variables */
+	global_core.startup_time = time(NULL);
+	global_core.rehash_count = 0;
+	
+	/* Loading dynamic code */
 	loadlib(&codemap);
 	
 	printf("[+] Core: Loading...\n");

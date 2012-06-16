@@ -40,6 +40,7 @@
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
 
+#define _GNU_SOURCE
 
 char *__host_ignore[] = {NULL
 	/* "www.maxux.net/",
@@ -48,12 +49,19 @@ char *__host_ignore[] = {NULL
 };
 
 char *extract_url(char *url) {
-	int i = 0;
+	int i = 0, braks = 0;
 	char *out;
 	
 	// TODO: Matching (xxx)
-	while(*(url + i) && *(url + i) != ' ' && *(url + i) != ')')
+	while(*(url + i) && *(url + i) != ' ' && !braks) {
+		/* if(*(url + i) != '(')
+			braks++;
+		
+		else if(*(url + i) != ')')
+			braks--; */
+			
 		i++;
+	}
 	
 	if(!(out = (char*) malloc(sizeof(char) * i + 1)))
 		return NULL;
@@ -86,7 +94,7 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 		}
 		
 		/* ignoring anything else */
-		curl->type = UNKNOWN;
+		curl->type = UNKNOWN_TYPE;
 		printf("[-] CURL/Header: unknown mime type, reject it.\n");
 		
 		return 0;
@@ -122,9 +130,10 @@ int curl_download(char *url, curl_data_t *data) {
 	
 	curl = curl_easy_init();
 	
-	data->data   = NULL;
-	data->type   = UNKNOWN;
-	data->length = 0;
+	data->data    = NULL;
+	data->type    = UNKNOWN_TYPE;
+	data->length  = 0;
+	data->charset = UNKNOWN_CHARSET;
 	
 	if(curl) {
 		curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -149,6 +158,11 @@ int curl_download(char *url, curl_data_t *data) {
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: HTTP_REPONSE_CODE: %ld\n", data->code);
+		
+		if(data->type == TEXT_HTML) {
+			data->charset = url_extract_charset(data->data);
+			printf("[ ] CURL: CHARSET: %d\n", data->charset);
+		}
 		
 		curl_easy_cleanup(curl);
 		
@@ -181,7 +195,7 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 		break;
 		
 		case TITLE_MATCH:
-			snprintf(msg, sizeof(msg), "PRIVMSG %s :Repost (title match), OP is %s (%s), hit %d times. URL waz: %s", chan, anti_hl(op), timestring, hit + 1, url);
+			snprintf(msg, sizeof(msg), "PRIVMSG %s :(title match on database, OP is %s, at %s. URL waz: %s)", chan, anti_hl(op), timestring, url);
 		break;
 	}
 
@@ -211,7 +225,7 @@ void check_round_count() {
 	sqlite3_finalize(stmt);
 }
 
-int handle_url(char *nick, char *url) {
+int handle_url(ircmessage_t *message, char *url) {
 	sqlite3_stmt *stmt;
 	char *sqlquery, op[48];
 	const unsigned char *_op = NULL;
@@ -233,8 +247,10 @@ int handle_url(char *nick, char *url) {
 	 *   Quering database
 	 */
 	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q'", url);
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL) {
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+		return 1;
+	}
 	
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
@@ -251,9 +267,9 @@ int handle_url(char *nick, char *url) {
 	/* Updating Database */
 	if(id > -1) {
 		/* Repost ! */
-		if(strncmp(nick, op, strlen(op))) {
+		if(strncmp(message->nick, op, strlen(op))) {
 			skip_analyse = 1;
-			handle_repost(URL_MATCH, NULL, IRC_CHANNEL, op, ts, hit);
+			handle_repost(URL_MATCH, NULL, message->chan, op, ts, hit);
 			
 		} else skip_analyse = 0;
 		
@@ -262,7 +278,7 @@ int handle_url(char *nick, char *url) {
 		
 	} else {
 		printf("[+] URL Parser: New url, inserting...\n");
-		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time) VALUES ('%q', '%q', 1, %d)", nick, url, time(NULL));
+		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time) VALUES ('%q', '%q', 1, %d)", message->nick, url, time(NULL));
 	}
 	
 	if(!db_simple_query(sqlite_db, sqlquery))
@@ -277,7 +293,7 @@ int handle_url(char *nick, char *url) {
 	/*
 	 *   Dispatching url handling if not a repost
 	 */
-	return (!skip_analyse) ? handle_url_dispatch(url, op) : 0;
+	return (!skip_analyse) ? handle_url_dispatch(url, op, message) : 0;
 }
 
 char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
@@ -294,7 +310,7 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 	return sha1_char;
 }
 
-int handle_url_dispatch(char *url, char *post_nick) {
+int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message) {
 	curl_data_t curl;
 	char *title = NULL, *stripped = NULL;
 	char *strcode;
@@ -309,7 +325,6 @@ int handle_url_dispatch(char *url, char *post_nick) {
 	const unsigned char *sqlurl = NULL, *nick = NULL;
 	time_t ts = 0;
 	int hit = -1, row;
-	char notif_it = 1;
 	
 	
 	if(curl_download(url, &curl))
@@ -319,7 +334,7 @@ int handle_url_dispatch(char *url, char *post_nick) {
 	printf("[+] Downloaded Type  : %d\n", curl.type);
 	// printf("%s\n", curl.data);
 	
-	if(!curl.length || curl.type == UNKNOWN) {
+	if(!curl.length || curl.type == UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
 		free(curl.data);
 		return 2;
@@ -336,8 +351,6 @@ int handle_url_dispatch(char *url, char *post_nick) {
 		
 		/* Extract title */
 		if((title = url_extract_title(curl.data, title)) != NULL) {
-			decode_html_entities_utf8(title, NULL);
-			
 			len = strlen(title) + 256;
 			request = (char*) malloc(sizeof(char) * len);
 			
@@ -346,8 +359,17 @@ int handle_url_dispatch(char *url, char *post_nick) {
 				
 			else strcode = "";
 			
+			/* Notify Title */
+			stripped = anti_hl_each_words(title, strlen(title), curl.charset);
+			decode_html_entities_utf8(stripped, NULL);
+			
+			snprintf(request, len, "PRIVMSG %s :URL%s: %s", message->chan, strcode, stripped);
+			raw_socket(sockfd, request);
+			
 			/* Check Title Repost */
-			/* sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q'", title);
+			// redecoding entities for clear title update
+			decode_html_entities_utf8(title, NULL);
+			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q'", title);
 			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
@@ -363,9 +385,7 @@ int handle_url_dispatch(char *url, char *post_nick) {
 					hit    = sqlite3_column_int(stmt, 3);
 					
 					if(curl.code == 200)
-						handle_repost(TITLE_MATCH, (char *) sqlurl, IRC_CHANNEL, (char *) nick, ts, hit);
-					
-					notif_it = 0;
+						handle_repost(TITLE_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
 				}
 				
 				break;
@@ -374,18 +394,6 @@ int handle_url_dispatch(char *url, char *post_nick) {
 			// Clearing
 			sqlite3_free(sqlquery);
 			sqlite3_finalize(stmt);
-			*/
-			
-			/* Notify Title */
-			if(notif_it) {
-				stripped = anti_hl_each_words(title, strlen(title));
-				
-				snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL%s: %s", strcode, stripped);
-				// snprintf(request, len, "PRIVMSG " IRC_CHANNEL " :URL%s: %s", strcode, title);
-				raw_socket(sockfd, request);
-				
-				free(stripped);
-			}
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
 			if(!db_simple_query(sqlite_db, sqlquery))
@@ -393,6 +401,8 @@ int handle_url_dispatch(char *url, char *post_nick) {
 			
 			/* Clearing */
 			sqlite3_free(sqlquery);
+			
+			free(stripped);
 			free(title);
 			free(request);
 			
@@ -426,7 +436,7 @@ int handle_url_dispatch(char *url, char *post_nick) {
 					ts     = sqlite3_column_int(stmt, 2);
 					hit    = sqlite3_column_int(stmt, 3);
 					
-					handle_repost(CHECKSUM_MATCH, (char *) sqlurl, IRC_CHANNEL, (char *) nick, ts, hit);
+					handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
 				}
 				
 				break;
@@ -474,7 +484,7 @@ char * url_extract_title(char *body, char *title) {
 	char *read, *write;
 	unsigned int len;
 	
-	if((read = strstr(body, "<title>")) || (read = strstr(body, "<TITLE>"))) {
+	if((read = strcasestr(body, "<title>"))) {
 		write = read + 7;
 		
 		/* Calculing length */
@@ -498,4 +508,28 @@ char * url_extract_title(char *body, char *title) {
 	} else return NULL;
 	
 	return title;
+}
+
+charset_t url_extract_charset(char *body) {
+	char *charset, *limit;
+	
+	if((limit = strcasestr(body, "</head>"))) {
+		if((charset = strcasestr(body, "charset="))) {
+			if(charset > limit || strlen(charset) < 12)
+				return UNKNOWN_CHARSET;
+			
+			/* Skipping beginning */
+			charset += 8;
+			
+			if(!strncasecmp(charset, "iso-8859-1", 10) || !strncasecmp(charset + 1, "iso-8859-1", 10))
+				return ISO_8859;
+			
+			if(!strncasecmp(charset, "utf-8", 5) || !strncasecmp(charset + 1, "utf-8", 5))
+				return UTF_8;
+			
+			printf("[ ] Charset: Unknown: <%s>\n", charset);
+		}
+	}
+	
+	return UNKNOWN_CHARSET;
 }

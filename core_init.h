@@ -1,6 +1,8 @@
 #ifndef __Z03_CORE_INIT_H
 	#define __Z03_CORE_INIT_H
 	
+	#include <time.h>
+	
 	#define MAXBUFF			4096
 	
 	typedef struct codemap_t {
@@ -21,7 +23,16 @@
 		
 	} ircmessage_t;
 	
+	typedef struct global_core_t {
+		time_t startup_time;
+		
+		time_t rehash_time;
+		unsigned int rehash_count;
+		
+	} global_core_t;
+	
 	extern int sockfd;
+	extern global_core_t global_core;
 	
 	int init_irc_socket(char *server, int port);
 	void raw_socket(int sockfd, char *message);

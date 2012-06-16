@@ -15,4 +15,5 @@
 	void action_help(char *chan, char *args);
 	void action_stats(char *chan, char *args);
 	void action_chart(char *chan, char *args);
+	void action_uptime(char *chan, char *args);
 #endif

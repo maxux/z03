@@ -5,22 +5,7 @@
 	#define CURL_MAX_SIZE		20 * 1024 * 1024	/* 20 Mo */
 	
 	/* Title Host ignore */
-	extern char *__host_ignore[];	
-	
-	typedef enum document_type_t {
-		UNKNOWN,
-		TEXT_HTML,
-		IMAGE_ALL
-		
-	} document_type_t;
-	
-	typedef struct curl_data_t {
-		char *data;
-		size_t length;
-		long code;
-		enum document_type_t type;
-		
-	} curl_data_t;
+	extern char *__host_ignore[];
 	
 	typedef enum repost_type_t {
 		URL_MATCH,
@@ -28,6 +13,30 @@
 		TITLE_MATCH,
 		
 	} repost_type_t;
+	
+	
+	typedef enum document_type_t {
+		UNKNOWN_TYPE,
+		TEXT_HTML,
+		IMAGE_ALL
+		
+	} document_type_t;
+	
+	typedef enum charset_t {
+		UNKNOWN_CHARSET,
+		UTF_8,
+		ISO_8859
+		
+	} charset_t;
+	
+	typedef struct curl_data_t {
+		char *data;
+		size_t length;
+		long code;
+		enum document_type_t type;
+		enum charset_t charset;
+		
+	} curl_data_t;
 	
 	char *extract_url(char *url);
 	
@@ -38,10 +47,15 @@
 	
 	char * repost();
 	
-	int handle_url(char *nick, char *url);
-	int handle_url_dispatch(char *url, char *post_nick);
+	int handle_url(ircmessage_t *message, char *url);
+	int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message);
 	int handle_url_image(char *url, curl_data_t *curl);
 	
 	char * url_extract_title(char *body, char *title);
+	enum charset_t url_extract_charset(char *body);
+	
 	void handle_url_title(char *url);
+	
+	// GNU Fix
+	extern char * strcasestr(const char *, const char *);
 #endif

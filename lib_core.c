@@ -45,6 +45,7 @@ request_t __request[] = {
 	{.match = ".rand",     .callback = action_random},
 	{.match = ".stats",    .callback = action_stats},
 	{.match = ".chart",    .callback = action_chart},
+	{.match = ".uptime",   .callback = action_uptime},
 	{.match = ".help",     .callback = action_help},
 };
 
@@ -57,7 +58,7 @@ int nick_length_check(char *nick, char *channel) {
 	char raw[128];
 	
 	if(strlen(nick) > NICK_MAX_LENGTH) {
-		printf("<> Nick too long\n");
+		printf("[-] Nick too long\n");
 		
 		/* Ban Nick */
 		sprintf(raw, "MODE %s +b %s!*@*", channel, nick);
@@ -73,11 +74,17 @@ int nick_length_check(char *nick, char *channel) {
 	return 0;
 }
 
-int pre_handle(char *data, char *nick, size_t nick_size) {
-	extract_nick(data, nick, nick_size);
+int pre_handle(char *data, ircmessage_t *message) {
+	// Extracting Nick
+	extract_nick(data, message->nick, sizeof(message->nick));
+	
+	// Extracting Message Chan
+	data = skip_server(data);
+	data = skip_server(data);
+	extract_chan(data, message->chan, sizeof(message->chan));
 	
 	/* Check Nick Length */
-	if(nick_length_check(nick, IRC_CHANNEL))
+	if(nick_length_check(message->nick, message->chan))
 		return 0;
 	
 	/* More Stuff Here */
@@ -143,35 +150,32 @@ void irc_kick(char *chan, char *nick, char *reason) {
 }
 
 void handle_private_message(char *data) {
-	printf("Delayed private message support\n");
+	printf("[ ] Delayed private message support: %s\n", data);
 }
 
-int handle_message(char *message, char *nick) {
-	char chan[32];
+int handle_message(char *data, ircmessage_t *message) {
 	char *content, *temp;
 	unsigned int i;
 	char *url, *trueurl;
 	
-	content = extract_chan(message, chan, sizeof(chan));
+	content = skip_server(data) + 1;
 	
 	/* Special Check for BELL */
-	if(strchr(message, '\x07')) {
-		irc_kick(chan, nick, "Please, do not use BELL on this chan, fucking biatch !");
+	if(strchr(data, '\x07')) {
+		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
 		return 0;
 	}
 	
 	for(i = 0; i < __request_count; i++) {
 		if((temp = match_prefix(content, __request[i].match))) {
-			__request[i].callback(chan, temp);
+			__request[i].callback(message->chan, temp);
 			return 0;
 		}
 	}
 	
-	if((url = strstr(message, "http://")) || (url = strstr(message, "https://"))) {
+	if((url = strstr(data, "http://")) || (url = strstr(data, "https://"))) {
 		if((trueurl = extract_url(url))) {
-			// extract_nick(data + 1, nick, sizeof(nick));
-			handle_url(nick, trueurl);
-			
+			handle_url(message, trueurl);
 			free(trueurl);
 			
 		} else fprintf(stderr, "[-] URL: Cannot extact url\n");		
@@ -214,7 +218,7 @@ size_t extract_nick(char *data, char *destination, size_t size) {
 }
 
 void main_core(char *data, char *request) {
-	char nick[32];
+	ircmessage_t message;
 
 	if(!strncmp(data, "PING", 4)) {
 		data[1] = 'O';		/* pOng */
@@ -248,8 +252,8 @@ void main_core(char *data, char *request) {
 	}
 	
 	if(!strncmp(request, "PRIVMSG #", 9)) {
-		pre_handle(data + 1, nick, sizeof(nick));
-		handle_message(skip_server(request), nick);	
+		pre_handle(data + 1, &message);
+		handle_message(skip_server(request), &message);	
 		return;
 	}
 	

@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "core_init.h"
+#include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
 
 inline short utf8_charlen(unsigned char c) {
@@ -29,14 +31,33 @@ inline short utf8_charlen(unsigned char c) {
 		
 	if((c & 0xe0) == 0xc0)
 		return 2;         /* 110xxxxx */
-		
+
 	if((c & 0xf0) == 0xe0)
 		return 3;         /* 1110xxxx */
 		
-	if((c & 0xf8)==0xf0 && (c <= 0xf4))
+	if((c & 0xf8) == 0xf0 && (c <= 0xf4))
 		return 4;         /* 11110xxx */
 		
 	return 0; /* invalid UTF8 */
+}
+
+char * iso8859_utf8(char *iso, char *utf) {
+	unsigned char *in = (unsigned char *) iso;
+	unsigned char *out = (unsigned char *) utf;
+	
+	while(*in) {
+		if(!(*in < 0x80)) {
+			printf("Converting %c (%d)\n", *in, *in);
+			
+			*out++ = 0xc2 + (*in > 0xbf);
+			*out++ = (*in++ & 0x3f) + 0x80;
+			
+		} else *out++ = *in++;
+	}
+	
+	*out = '\0';
+	
+	return utf;
 }
 
 inline size_t chrcpy_utf8(char *dst, char *src) {
@@ -78,52 +99,64 @@ char * anti_hl(char *nick) {
 	char temp[64];
 	
 	strcpy(temp, nick);
-	sprintf(nick, "%c\ufeff%s", *temp, temp + 1);
+	sprintf(nick, "%c\u200b%s", *temp, temp + 1);
 	
 	return nick;
 }
 
-char * anti_hl_each_words(char *str, size_t len) {
-	char *stripped = NULL, *useme = str;
-	int i = 0, allocation;
+void anti_hl_append(char **write, char **read) {
+	int s;
+	
+	// Copy next char
+	s = chrcpy_utf8(*write, *read);
+	*write += s;
+	*read  += s;
+	
+	// Copy special char (3 bytes)
+	sprintf(*write, "\u200b");
+	*write += 3;
+}
+
+char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
+	char *stripped = NULL, *convert = NULL;
+	int allocation;
 	char *read, *write;
 	int s;
 	
-	while(*useme) {
-		if(*(useme++) == ' ')
-			i++;
-	}
-	
-	printf("[.] AntiHL: Found %d spaces occurence\n", i);
-	
-	allocation = (len + (i * 3)) + 8;
+	/* \u200b is 3 bytes length, str is normally not long, just allocating 3x */
+	allocation = ((len * 3) + 8);
 	printf("[.] AntiHL: Allocating: %u bytes (original: %u)\n", allocation, len);
 	
-	/* \ufeff is 3 bytes length */
-	stripped  = (char*) malloc(sizeof(char) * allocation);
+	stripped = (char*) malloc(sizeof(char) * allocation);
 	bzero(stripped, allocation);
 	
-	read  = str;
+	/* Checking if string is probably an iso string */
+	if(charset == ISO_8859) {
+		// Let's converting it...
+		convert = (char*) malloc(sizeof(char) * allocation);
+		iso8859_utf8(str, convert);		
+		read = convert;
+		
+	} else read  = str;
+	
 	write = stripped;
 	
 	// debug(read, strlen(read));
 	
+	// Escape first word
+	if(*read && *read != '&')
+		anti_hl_append(&write, &read);
+	
 	while(*read) {
 		s = chrcpy_utf8(write, read);
 		write += s;
-			
-		if(*read == ' ' && *(read + 1)) {
+		
+		// If space, and next is valid, and next is not space (avoid ' - ')
+		// Skip if contains & (html entities)
+		if(*read == ' ' && *(read + 1) && *(read + 1) != '&' && *(read + 2) && *(read + 2) != ' ') {
 			// Copy Space
 			*write = *read++;
-			
-			// Copy next char
-			s = chrcpy_utf8(write, read);
-			write += s;
-			read  += s;
-			
-			// Copy special char (3 bytes)
-			sprintf(write, "\ufeff");
-			write += 3;
+			anti_hl_append(&write, &read);
 			
 		} else read += s;
 		
@@ -133,6 +166,9 @@ char * anti_hl_each_words(char *str, size_t len) {
 	// debug(stripped, allocation);
 	
 	printf("[.] AntiHL: <%s>\n", stripped);
+	
+	/* Freeing "convert", should be NULL if not converted */
+	free(convert);
 	
 	return stripped;
 }
@@ -180,4 +216,30 @@ char * trim(char *str, unsigned int len) {
 		strcpy(read, read + 1);
 	
 	return str;
+}
+
+char * time_elapsed(time_t time) {
+	char *output = (char*) malloc(sizeof(char) * 64);
+	unsigned int days, hours, min;
+	
+	if(time < 60) {
+		sprintf(output, "%lu seconds", time);
+		return output;
+	}
+	
+	days  = time / (24 * 60 * 60);
+	time %= (24 * 60 * 60);
+	
+	hours = time / (60 * 60);
+	time %= (60 * 60);
+	
+	min   = time / 60;
+	time %= 60;
+	
+	if(!days)
+		sprintf(output, "%02u:%02u", hours, min);
+		
+	else sprintf(output, "%u days, %02u:%02u", days, hours, min);
+	
+	return output;
 }

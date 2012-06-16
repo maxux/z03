@@ -10,6 +10,11 @@
 		
 	} request_t;
 	
+	typedef struct global_lib_t {
+		void *dummy;
+		
+	} global_lib_t;
+	
 	extern unsigned int __request_count;
 	extern request_t __request[];
 	
@@ -20,8 +25,8 @@
 	
 	int nick_length_check(char *nick, char *channel);
 	
-	int pre_handle(char *data, char *nick, size_t nick_size);
-	int handle_message(char *message, char *nick);
+	int pre_handle(char *data, ircmessage_t *message);
+	int handle_message(char *data, ircmessage_t *message);
 	void handle_nick(char *data);
 	void handle_join(char *data);
 #endif

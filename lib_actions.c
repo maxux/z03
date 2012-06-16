@@ -25,8 +25,10 @@
 #include "core_init.h"
 #include "core_database.h"
 #include "lib_core.h"
+#include "lib_urlmanager.h"
 #include "lib_actions.h"
 #include "lib_chart.h"
+#include "lib_ircmisc.h"
 
 time_t last_chart_request = 0;
 char *weather_url = "curl -s 'http://www.meteobelgium.be/service/city/city.php?zone=0&stationid=%d&language=en' | grep 'class=\"degre' | tr '<' '>' | awk -F '>' '{ print $3 }'";
@@ -285,4 +287,22 @@ void action_chart(char *chan, char *args) {
 	
 	free(values);
 	free(days);
+}
+
+void action_uptime(char *chan, char *args) {
+	time_t now;
+	char message[256];
+	char *uptime, *rehash;
+	
+	now  = time(NULL);
+	args = NULL;
+	
+	uptime = time_elapsed(now - global_core.startup_time);
+	rehash = time_elapsed(now - global_core.rehash_time);
+	
+	sprintf(message, "PRIVMSG %s :Bot uptime: %s (rehashed %d times, rehash uptime: %s)", chan, uptime, global_core.rehash_count, rehash);
+	raw_socket(sockfd, message);
+	
+	free(uptime);
+	free(rehash);
 }
