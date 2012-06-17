@@ -293,7 +293,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	/*
 	 *   Dispatching url handling if not a repost
 	 */
-	return (!skip_analyse) ? handle_url_dispatch(url, op, message) : 0;
+	return (!skip_analyse) ? handle_url_dispatch(url, message) : 0;
 }
 
 char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
@@ -310,7 +310,7 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 	return sha1_char;
 }
 
-int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message) {
+int handle_url_dispatch(char *url, ircmessage_t *message) {
 	curl_data_t curl;
 	char *title = NULL, *stripped = NULL;
 	char *strcode;
@@ -377,7 +377,8 @@ int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message) {
 				if(row == SQLITE_ROW) {
 					// Skip repost from same nick
 					nick   = sqlite3_column_text(stmt, 1);
-					if(!strcmp((char *) nick, post_nick))
+					
+					if(!strcmp((char *) nick, message->nick))
 						continue;
 					
 					sqlurl = sqlite3_column_text(stmt, 0);
@@ -429,7 +430,8 @@ int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message) {
 				if(row == SQLITE_ROW) {
 					/* Skip repost from same nick */
 					nick   = sqlite3_column_text(stmt, 1);
-					if(!strcmp((char *) nick, post_nick))
+					
+					if(!strcmp((char *) nick, message->nick))
 						continue;
 						
 					sqlurl = sqlite3_column_text(stmt, 0);

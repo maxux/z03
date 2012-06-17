@@ -48,7 +48,7 @@
 	char * repost();
 	
 	int handle_url(ircmessage_t *message, char *url);
-	int handle_url_dispatch(char *url, char *post_nick, ircmessage_t *message);
+	int handle_url_dispatch(char *url, ircmessage_t *message);
 	int handle_url_image(char *url, curl_data_t *curl);
 	
 	char * url_extract_title(char *body, char *title);
