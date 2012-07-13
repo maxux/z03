@@ -25,14 +25,17 @@
 	typedef enum charset_t {
 		UNKNOWN_CHARSET,
 		UTF_8,
-		ISO_8859
+		ISO_8859,
+		WIN_1252
 		
 	} charset_t;
 	
 	typedef struct curl_data_t {
 		char *data;
+		size_t http_length;
 		size_t length;
 		long code;
+		char *http_type;
 		enum document_type_t type;
 		enum charset_t charset;
 		

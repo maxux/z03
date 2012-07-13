@@ -1,5 +1,5 @@
 /* z03 - small bot with some network features - url handling/mirroring/management
- * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -74,6 +74,7 @@ char *extract_url(char *url) {
 
 size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	curl_data_t *curl = (curl_data_t*) userdata;
+	size_t len;
 	
 	if(!(size * nmemb))
 		return 0;
@@ -95,9 +96,25 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 		
 		/* ignoring anything else */
 		curl->type = UNKNOWN_TYPE;
-		printf("[-] CURL/Header: unknown mime type, reject it.\n");
 		
-		return 0;
+		// Freeing previously malloc (if multiple content-type, memory leak)
+		free(curl->http_type);
+		
+		len = strlen(ptr + 14);
+		curl->http_type = (char*) malloc(sizeof(char) * len + 1);
+		
+		strcpy(curl->http_type, ptr + 14);
+		curl->http_type[len - 2] = '\0';
+		
+		printf("[-] CURL/Header: unhandled mime type: <%s>\n", curl->http_type);
+	}
+	
+	if(!strncmp(ptr, "Content-Length: ", 16) || !strncmp(ptr, "Content-length: ", 16)) {
+		curl->http_length = atoll(ptr + 16);
+		printf("[+] CURL/Header: length %d bytes\n", curl->http_length);
+		
+		if(curl->http_length > CURL_MAX_SIZE)
+			return 0;
 	}
 
 	/* Return required by libcurl */
@@ -111,7 +128,8 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	prev = curl->length;
 	curl->length += (size * nmemb);
 	
-	if(curl->length > CURL_MAX_SIZE)
+	// Do not download if too large or a unhandled mime
+	if(curl->length > CURL_MAX_SIZE || curl->http_type)
 		return 0;
 	
 	/* Resize data */
@@ -130,10 +148,12 @@ int curl_download(char *url, curl_data_t *data) {
 	
 	curl = curl_easy_init();
 	
-	data->data    = NULL;
-	data->type    = UNKNOWN_TYPE;
-	data->length  = 0;
-	data->charset = UNKNOWN_CHARSET;
+	data->data        = NULL;
+	data->type        = UNKNOWN_TYPE;
+	data->length      = 0;
+	data->charset     = UNKNOWN_CHARSET;
+	data->http_length = 0;
+	data->http_type   = NULL;
 	
 	if(curl) {
 		curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -159,9 +179,12 @@ int curl_download(char *url, curl_data_t *data) {
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: HTTP_REPONSE_CODE: %ld\n", data->code);
 		
+		if(!data->data)
+			return 1;
+		
 		if(data->type == TEXT_HTML) {
 			data->charset = url_extract_charset(data->data);
-			printf("[ ] CURL: CHARSET: %d\n", data->charset);
+			printf("[ ] CURL: charset: %d\n", data->charset);
 		}
 		
 		curl_easy_cleanup(curl);
@@ -313,7 +336,7 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 int handle_url_dispatch(char *url, ircmessage_t *message) {
 	curl_data_t curl;
 	char *title = NULL, *stripped = NULL;
-	char *strcode;
+	char *strcode, temp[256];
 	unsigned int len;
 	// unsigned char i;
 	char *sqlquery, *request;
@@ -328,13 +351,13 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 	
 	
 	if(curl_download(url, &curl))
-		return 1;
+		printf("[-] Warning: special download\n");
 		
 	printf("[+] Downloaded Length: %d\n", curl.length);
 	printf("[+] Downloaded Type  : %d\n", curl.type);
 	// printf("%s\n", curl.data);
 	
-	if(!curl.length || curl.type == UNKNOWN_TYPE) {
+	if(!curl.length && curl.type != UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
 		free(curl.data);
 		return 2;
@@ -369,18 +392,14 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 			/* Check Title Repost */
 			// redecoding entities for clear title update
 			decode_html_entities_utf8(title, NULL);
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q'", title);
+			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q' AND nick != '%q' LIMIT 1", title, message->nick);
 			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
 			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 				if(row == SQLITE_ROW) {
 					// Skip repost from same nick
-					nick   = sqlite3_column_text(stmt, 1);
-					
-					if(!strcmp((char *) nick, message->nick))
-						continue;
-					
+					nick   = sqlite3_column_text(stmt, 1);					
 					sqlurl = sqlite3_column_text(stmt, 0);
 					ts     = sqlite3_column_int(stmt, 2);
 					hit    = sqlite3_column_int(stmt, 3);
@@ -410,6 +429,13 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 		} else printf("[-] URL: Cannot extract title\n");
 		
 	} else if(curl.type == IMAGE_ALL) {
+		if(curl.http_length > CURL_MAX_SIZE) {
+			sprintf(temp, "PRIVMSG %s :(Warning: image size: %u Mo)", message->chan, curl.http_length / 1024 / 1024);
+			raw_socket(sockfd, temp);
+			
+			return 1;
+		}
+			
 		if(!handle_url_image(url, &curl)) {
 			/* Calculing data checksum */
 			SHA1((unsigned char *) curl.data, curl.length, sha1_hexa);
@@ -448,6 +474,12 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 			sqlite3_free(sqlquery);
 			sqlite3_finalize(stmt);
 		}
+		
+	} else if(curl.type == UNKNOWN_TYPE) {
+		snprintf(temp, sizeof(temp), "PRIVMSG %s :Content: %s (%.2f Mo)", message->chan, curl.http_type, (double) curl.http_length / 1024 / 1024);
+		raw_socket(sockfd, temp);
+		
+		free(curl.http_type);
 	}
 	
 	free(curl.data);
@@ -528,6 +560,9 @@ charset_t url_extract_charset(char *body) {
 			
 			if(!strncasecmp(charset, "utf-8", 5) || !strncasecmp(charset + 1, "utf-8", 5))
 				return UTF_8;
+			
+			if(!strncasecmp(charset, "windows-1252", 5) || !strncasecmp(charset + 1, "windows-1252", 5))
+				return WIN_1252;
 			
 			printf("[ ] Charset: Unknown: <%s>\n", charset);
 		}
