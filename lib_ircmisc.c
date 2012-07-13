@@ -1,5 +1,5 @@
 /* z03 - small bot with some network features - irc miscallinious functions (anti highlights, ...)
- * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,9 +21,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <iconv.h>
 #include "core_init.h"
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
+
+typedef struct iconv_data_t {
+	iconv_t ic;
+	
+	const char *inchar;      // input charset
+	const char *outchar;     // output charset
+	char *instr;             // input string
+	size_t insize;	         // input string length
+	char *outstr;            // output string
+	char *__outstr;          // internal output string save pointer
+	size_t outsize;          // output string length
+	
+} iconv_data_t;
 
 inline short utf8_charlen(unsigned char c) {
 	if(c < 0x80)
@@ -39,25 +53,6 @@ inline short utf8_charlen(unsigned char c) {
 		return 4;         /* 11110xxx */
 		
 	return 0; /* invalid UTF8 */
-}
-
-char * iso8859_utf8(char *iso, char *utf) {
-	unsigned char *in = (unsigned char *) iso;
-	unsigned char *out = (unsigned char *) utf;
-	
-	while(*in) {
-		if(!(*in < 0x80)) {
-			printf("Converting %c (%d)\n", *in, *in);
-			
-			*out++ = 0xc2 + (*in > 0xbf);
-			*out++ = (*in++ & 0x3f) + 0x80;
-			
-		} else *out++ = *in++;
-	}
-	
-	*out = '\0';
-	
-	return utf;
 }
 
 inline size_t chrcpy_utf8(char *dst, char *src) {
@@ -117,11 +112,39 @@ void anti_hl_append(char **write, char **read) {
 	*write += 3;
 }
 
+size_t iconvit(iconv_data_t *ico) {
+	size_t result = ico->outsize;
+	
+	// Saving current output buffer
+	ico->__outstr = ico->outstr;
+	
+	printf("[+] iconv: converting from %s to %s...\n", ico->inchar, ico->outchar);
+	
+	// Opening iconv handler
+	if((ico->ic = iconv_open(ico->outchar, ico->inchar)) == (iconv_t) -1) {
+		perror("[-] iconv_open");
+		return 0;
+	}
+	
+	if(iconv(ico->ic, &ico->instr, &ico->insize, &ico->outstr, &ico->outsize) == (size_t) -1) {
+		perror("[-] iconv");
+		return 0;
+	}
+	
+	iconv_close(ico->ic);
+	
+	// Writing end of line
+	result -= ico->outsize;
+	ico->__outstr[result] = '\0';
+	
+	return result;
+}
+
 char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	char *stripped = NULL, *convert = NULL;
-	int allocation;
+	int allocation, s;
 	char *read, *write;
-	int s;
+	iconv_data_t iconvme;
 	
 	/* \u200b is 3 bytes length, str is normally not long, just allocating 3x */
 	allocation = ((len * 3) + 8);
@@ -131,12 +154,30 @@ char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	bzero(stripped, allocation);
 	
 	/* Checking if string is probably an iso string */
-	if(charset == ISO_8859) {
-		// Let's converting it...
+	if(charset != UNKNOWN_CHARSET && charset != UTF_8) {
 		convert = (char*) malloc(sizeof(char) * allocation);
-		iso8859_utf8(str, convert);		
-		read = convert;
 		
+		iconvme.outchar = "utf-8";
+		iconvme.instr   = str;
+		iconvme.insize  = strlen(str);
+		iconvme.outstr  = convert;
+		iconvme.outsize = allocation;
+		
+		switch(charset) {
+			case WIN_1252:
+				iconvme.inchar = "windows-1252";
+			break;
+			
+			case ISO_8859:
+			default:
+				iconvme.inchar = "iso-8859-1";
+		}
+		
+		if(!iconvit(&iconvme))
+			return NULL;
+			
+		read = convert;
+
 	} else read  = str;
 	
 	write = stripped;

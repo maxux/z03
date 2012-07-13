@@ -1,5 +1,5 @@
 /* z03 - small bot with some network features - irc channel bot actions
- * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,70 +29,14 @@
 #include "lib_actions.h"
 #include "lib_chart.h"
 #include "lib_ircmisc.h"
+#include "lib_weather.h"
 
 time_t last_chart_request = 0;
-char *weather_url = "curl -s 'http://www.meteobelgium.be/service/city/city.php?zone=0&stationid=%d&language=en' | grep 'class=\"degre' | tr '<' '>' | awk -F '>' '{ print $3 }'";
-
-weather_station_t weather_id[] = {
-	{.id = 29,  .ref = "liege",   .name = "Thier-à-Liège"},
-	{.id = 96,  .ref = "slins",   .name = "Slins"},
-	{.id = 125, .ref = "oupeye",  .name = "Oupeye"},
-	{.id = 14,  .ref = "lille",   .name = "Lille (France)"},
-	{.id = 77,  .ref = "knokke",  .name = "Knokke"},
-	{.id = 80,  .ref = "seraing", .name = "Boncelles (Seraing)"},
-	{.id = 106, .ref = "namur",   .name = "Floriffoux (Namur)"},
-	{.id = 48,  .ref = "spa",     .name = "Spa"},
-};
-
-char * weather_read_data(char *buffer, size_t size, int id) {
-	FILE *fp;
-	char cmdline[256];
-	
-	/* Building command line */
-	sprintf(cmdline, weather_url, weather_id[id].id);
-	
-	fp = popen(cmdline, "r");
-	if(!fp) {
-		perror("popen");
-		return NULL;
-	}
-	
-	if(fgets(buffer, size, fp) == NULL)
-		strcpy(buffer, "(unknown)");
-	
-	fclose(fp);
-	
-	return buffer;
-}
-
-char * weather_station_list() {
-	char *list;
-	unsigned int i, len = 0;
-	
-	for(i = 0; i < sizeof(weather_id) / sizeof(weather_station_t); i++)
-		len += strlen(weather_id[i].ref) + 1;
-	
-	list = (char*) malloc(sizeof(char) * len + 1);
-	if(!list)
-		return NULL;
-	
-	*list = '\0';
-	
-	for(i = 0; i < sizeof(weather_id) / sizeof(weather_station_t); i++) {
-		strcat(list, weather_id[i].ref);
-		strcat(list, " ");
-	}
-	
-	/* Remove last space */
-	*(list + len - 1) = '\0';
-	
-	return list;
-}
 
 void action_weather(char *chan, char *args) {
-	char cmdline[256], buffer[512], *list;
+	char cmdline[256], *list;
 	unsigned int i;
-	int id = 0;	// Default: Oupeye
+	int id = 0;	// default
 	
 	/* Checking arguments */
 	if(*args) {
@@ -102,7 +46,7 @@ void action_weather(char *chan, char *args) {
 			if(!list)
 				return;
 				
-			sprintf(cmdline, "PRIVMSG %s :Station list: %s (Default: %s)", chan, list, weather_id[id].ref);
+			sprintf(cmdline, "PRIVMSG %s :Station list: %s (Default: %s)", chan, list, weather_stations[id].ref);
 			raw_socket(sockfd, cmdline);
 			
 			free(list);
@@ -111,18 +55,20 @@ void action_weather(char *chan, char *args) {
 		}
 		
 		/* Searching station */
-		for(i = 0; i < sizeof(weather_id) / sizeof(weather_station_t); i++) {
-			if(!strcmp(args, weather_id[i].ref)) {
+		for(i = 0; i < weather_stations_count; i++) {
+			if(!strcmp(args, weather_stations[i].ref)) {
 				id = i;
 				break;
 			}
 		}
 	}
 	
-	if(weather_read_data(buffer, sizeof(buffer), id)) {
+	weather_handle(chan, (weather_stations + id));
+	
+	/* if(weather_read_data(buffer, sizeof(buffer), id)) {
 		sprintf(cmdline, "PRIVMSG %s :%s: %s", chan, weather_id[id].name, buffer);
 		raw_socket(sockfd, cmdline);
-	}
+	} */
 }
 
 void action_ping(char *chan, char *args) {

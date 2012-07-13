@@ -1,5 +1,5 @@
 /* z03 - small bot with some network features
- * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * Author: Daniel Maxime (root@maxux.net)
  * Contributor: Darky, mortecouille, RaphaelJ, somic, ghilan
  * 
  * This program is free software; you can redistribute it and/or modify

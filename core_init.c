@@ -1,5 +1,5 @@
 /* z03 - small bot with some network features
- * Author: Daniel Maxime (maxux.unix@gmail.com)
+ * Author: Daniel Maxime (root@maxux.net)
  * Contributor: Darky, mortecouille, RaphaelJ, somic, ghilan
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -30,6 +30,8 @@
 #include <netdb.h>
 #include <ctype.h>
 #include <dlfcn.h>
+#include <signal.h>
+#include <execinfo.h>
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
@@ -40,6 +42,40 @@ global_core_t global_core;
 void diep(char *str) {
 	perror(str);
 	exit(EXIT_FAILURE);
+}
+
+int signal_intercept(int signal, void (*function)(int)) {
+	struct sigaction sig;
+	int ret;
+	
+	/* Building empty signal set */
+	sigemptyset(&sig.sa_mask);
+	
+	/* Building Signal */
+	sig.sa_handler	 = function;
+	sig.sa_flags	 = 0;
+	
+	/* Installing Signal */
+	if((ret = sigaction(signal, &sig, NULL)) == -1)
+		perror("sigaction");
+	
+	return ret;
+}
+
+void sighandler(int signal) {
+	void *array[32];
+	size_t size;
+
+	switch(signal) {
+		case SIGSEGV:
+			raw_socket(sockfd, "PRIVMSG " IRC_CHANNEL " :[System] Segmentation fault");
+			
+			size = backtrace(array, 32);
+			backtrace_symbols_fd(array, size, 2);
+			
+			exit(EXIT_FAILURE);
+		break;
+	}
 }
 
 void loadlib(codemap_t *codemap) {
@@ -215,6 +251,8 @@ int main(void) {
 	/* Initializing global variables */
 	global_core.startup_time = time(NULL);
 	global_core.rehash_count = 0;
+	
+	signal_intercept(SIGSEGV, sighandler);
 	
 	/* Loading dynamic code */
 	loadlib(&codemap);
