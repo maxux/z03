@@ -9,4 +9,7 @@
 	void action_stats(char *chan, char *args);
 	void action_chart(char *chan, char *args);
 	void action_uptime(char *chan, char *args);
+	void action_backlog_url(char* chan, char *args);
+	void action_seen(char *chan, char *args);
+	void action_somafm(char *chan, char *args);
 #endif

@@ -30,8 +30,10 @@
 #include "lib_chart.h"
 #include "lib_ircmisc.h"
 #include "lib_weather.h"
+#include "lib_somafm.h"
 
 time_t last_chart_request = 0;
+time_t last_backurl_request = 0;
 
 void action_weather(char *chan, char *args) {
 	char cmdline[256], *list;
@@ -46,7 +48,7 @@ void action_weather(char *chan, char *args) {
 			if(!list)
 				return;
 				
-			sprintf(cmdline, "PRIVMSG %s :Station list: %s (Default: %s)", chan, list, weather_stations[id].ref);
+			sprintf(cmdline, "PRIVMSG %s :Stations list: %s (Default: %s)", chan, list, weather_stations[id].ref);
 			raw_socket(sockfd, cmdline);
 			
 			free(list);
@@ -76,9 +78,6 @@ void action_ping(char *chan, char *args) {
 	struct tm * timeinfo;
 	char buffer[128];
 	
-	/* Fix Warnings */
-	args = NULL;
-	
 	time(&t);
 	timeinfo = localtime(&t);
 	
@@ -90,9 +89,6 @@ void action_time(char *chan, char *args) {
 	time_t rawtime;
 	struct tm * timeinfo;
 	char buffer[128], out[256];
-	
-	/* Fix Warnings */
-	args = NULL;
 
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
@@ -123,9 +119,6 @@ void action_help(char *chan, char *args) {
 	char list[1024];
 	unsigned int i;
 	
-	/* Fix Warnings */
-	args = NULL;
-	
 	sprintf(list, "PRIVMSG %s :Commands: ", chan);
 	
 	for(i = 0; i < __request_count; i++) {
@@ -142,9 +135,6 @@ void action_stats(char *chan, char *args) {
 	char msg[256];
 	int count = 0, cnick = 0, chits = 0;
 	int row;
-	
-	/* Fix Warnings */
-	args = NULL;
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
@@ -241,8 +231,7 @@ void action_uptime(char *chan, char *args) {
 	char *uptime, *rehash;
 	
 	now  = time(NULL);
-	args = NULL;
-	
+		
 	uptime = time_elapsed(now - global_core.startup_time);
 	rehash = time_elapsed(now - global_core.rehash_time);
 	
@@ -251,4 +240,120 @@ void action_uptime(char *chan, char *args) {
 	
 	free(uptime);
 	free(rehash);
+}
+
+void action_backlog_url(char *chan, char *args) {
+	sqlite3_stmt *stmt;
+	char *sqlquery = "SELECT id, url, nick FROM url ORDER BY id DESC LIMIT 5";
+	char *message;
+	const unsigned char *row_url, *row_nick;
+	char *url_nick;
+	int row, url_id;
+	size_t len;
+	char temp[256];
+	
+	/* Flood Protection */
+	if(time(NULL) - (60 * 10) < last_backurl_request) {
+		snprintf(temp, sizeof(temp), "PRIVMSG %s :Avoiding flood, bitch !", chan);
+		raw_socket(sockfd, temp);
+		return;
+		
+	} else last_backurl_request = time(NULL);
+	
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW) {
+			url_id   = sqlite3_column_int(stmt, 0);
+			row_url  = sqlite3_column_text(stmt, 1);
+			row_nick = sqlite3_column_text(stmt, 2);
+			url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 1);
+			strcpy(url_nick, (char*) row_nick);
+			
+			len = strlen((char*) row_url) * strlen(url_nick) + 64;
+			message = (char*) malloc(sizeof(char) * len);
+			
+			snprintf(message, len, "PRIVMSG %s :<%s> URL %d: %s", chan, anti_hl(url_nick), url_id, row_url);
+			raw_socket(sockfd, message);
+			
+			free(url_nick);
+		}
+	}
+	
+	/* Clearing */
+	sqlite3_finalize(stmt);
+}
+
+void action_seen(char *chan, char *args) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	const unsigned char *message;
+	char *output;
+	time_t timestamp;
+	int row, len;
+	struct tm * timeinfo;
+	char buffer[128];
+	
+	if(!*args)
+		return;
+	
+	sqlquery = sqlite3_mprintf("SELECT timestamp, message FROM logs WHERE chan = '%q' AND nick = '%q' ORDER BY timestamp DESC LIMIT 1", chan, args);
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW) {
+			timestamp = sqlite3_column_int(stmt, 0);
+			message   = sqlite3_column_text(stmt, 1);
+			
+			len = strlen((char*) message) + 64;
+			output = (char*) malloc(sizeof(char) * len);
+			
+			timeinfo = localtime(&timestamp);
+			strftime(buffer, sizeof(buffer), "%A %d %B %X %Y", timeinfo);
+			
+			snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s", chan, buffer, anti_hl(args), message);
+			raw_socket(sockfd, output);
+			
+			free(output);
+		}
+	}
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
+}
+
+void action_somafm(char *chan, char *args) {
+	char cmdline[256], *list;
+	unsigned int i;
+	int id = 0;	// default
+	
+	/* Checking arguments */
+	if(*args) {
+		/* Building List */
+		if(!strcmp(args, "list")) {
+			list = somafm_station_list();
+			if(!list)
+				return;
+				
+			sprintf(cmdline, "PRIVMSG %s :Stations list: %s (Default: %s)", chan, list, somafm_stations[id].ref);
+			raw_socket(sockfd, cmdline);
+			
+			free(list);
+			
+			return;
+		}
+		
+		/* Searching station */
+		for(i = 0; i < somafm_stations_count; i++) {
+			if(!strcmp(args, somafm_stations[i].ref)) {
+				id = i;
+				break;
+			}
+		}
+	}
+	
+	somafm_handle(chan, (somafm_stations + id));
 }

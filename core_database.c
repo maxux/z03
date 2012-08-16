@@ -35,12 +35,16 @@ sqlite3 *sqlite_db;
 sqlite3 * db_sqlite_init() {
 	sqlite3 *db;
 	
-	printf("[+] SQLite: Initializing <%s>\n", SQL_DATABASE_FILE);
+	printf("[+] SQLite: loading <%s>\n", SQL_DATABASE_FILE);
 	
 	if(sqlite3_open(SQL_DATABASE_FILE, &db) != SQLITE_OK) {
 		fprintf(stderr, "[+] SQLite: cannot open sqlite databse: <%s>\n", sqlite3_errmsg(db));
 		return NULL;
 	}
+	
+	sqlite3_busy_timeout(db, 10000);
+	
+	printf("[+] SQLite: database loaded\n");
 	
 	return db;
 }
@@ -106,4 +110,15 @@ unsigned int db_sqlite_num_rows(sqlite3_stmt *stmt) {
 	sqlite3_finalize(stmt);
 	
 	return nbrows;
+}
+
+int db_sqlite_close(sqlite3 *db) {
+	int err;
+	
+	if((err = sqlite3_close(db)) != SQLITE_OK) {
+		fprintf(stderr, "[-] SQLite: cannot close database: %s\n", sqlite3_errmsg(db));
+		
+	} else printf("[+] SQLite: database closed.\n");
+	
+	return err;
 }

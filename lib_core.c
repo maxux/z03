@@ -37,6 +37,7 @@
 #include "lib_actions.h"
 #include "lib_entities.h"
 #include "lib_urlmanager.h"
+#include "lib_logs.h"
 
 request_t __request[] = {
 	{.match = ".weather",  .callback = action_weather},
@@ -45,7 +46,10 @@ request_t __request[] = {
 	{.match = ".rand",     .callback = action_random},
 	{.match = ".stats",    .callback = action_stats},
 	{.match = ".chart",    .callback = action_chart},
+	{.match = ".backurl",  .callback = action_backlog_url},
 	{.match = ".uptime",   .callback = action_uptime},
+	{.match = ".seen",     .callback = action_seen},
+	{.match = ".somafm",   .callback = action_somafm},
 	{.match = ".help",     .callback = action_help},
 };
 
@@ -159,6 +163,9 @@ int handle_message(char *data, ircmessage_t *message) {
 	char *url, *trueurl;
 	
 	content = skip_server(data) + 1;
+	
+	/* Saving log */
+	log_privmsg(message->chan, message->nick, content);
 	
 	/* Special Check for BELL */
 	if(strchr(data, '\x07')) {

@@ -144,7 +144,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 
 int curl_download(char *url, curl_data_t *data) {
 	CURL *curl;
-	CURLcode res;
+	// CURLcode res;
 	
 	curl = curl_easy_init();
 	
@@ -174,7 +174,8 @@ int curl_download(char *url, curl_data_t *data) {
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
-		res = curl_easy_perform(curl);
+		// res = curl_easy_perform(curl);
+		curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: HTTP_REPONSE_CODE: %ld\n", data->code);

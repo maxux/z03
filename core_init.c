@@ -83,9 +83,9 @@ void loadlib(codemap_t *codemap) {
 	
 	/* Unloading previously loaded lib */
 	if(codemap->handler) {
-		printf("[+] Core Lib: unloading...\n");
+		printf("[+] Core: unlinking library...\n");
 		if(dlclose(codemap->handler)) {
-			fprintf(stderr, "[-] Core Lib: %s\n", dlerror());
+			fprintf(stderr, "[-] Core: %s\n", dlerror());
 			return;
 		}
 			
@@ -94,25 +94,25 @@ void loadlib(codemap_t *codemap) {
 	}
 	
 	/* Loading new library */
-	printf("[+] Core Lib: linking library...\n");
+	printf("[+] Core: linking library...\n");
 	
 	codemap->handler = dlopen(codemap->filename, RTLD_NOW);
 	if(!codemap->handler) {
-		fprintf(stdout, "[-] Core Lib: dlopen: %s\n", dlerror());
+		fprintf(stdout, "[-] Core: dlopen: %s\n", dlerror());
 		exit(EXIT_FAILURE);
 	}
 	
 	/* Linking flags */
 	codemap->main = dlsym(codemap->handler, "main_core");
 	if((error = dlerror()) != NULL) {
-		fprintf(stderr, "[-] Core Lib: dlsym: %s\n", error);
+		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
 		exit(EXIT_FAILURE);
 	}
 	
 	global_core.rehash_time = time(NULL);
 	global_core.rehash_count++;
 	
-	printf("[+] Core Lib: library loaded !\n");
+	printf("[+] Core: library linked\n");
 }
 
 void core_handle_private_message(char *data, codemap_t *codemap) {
@@ -137,6 +137,11 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 			if(!strncmp(request, ".rehash", 7)) {
 				printf("[+] Core: rehashing code...\n");
 				loadlib(codemap);
+				
+			} else if(!strncmp(request, ".reloadsql", 10)) {
+				printf("[+] Core: reloading sql database...\n");
+				if(!db_sqlite_close(sqlite_db))
+					db_sqlite_init();
 				
 			} else raw_socket(sockfd, request);
 		}
@@ -231,6 +236,9 @@ int read_socket(int sockfd, char *data, char *next) {
 		
 		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) < 0)
 			diep("recv");
+		
+		if(rlen == 0)
+			printf("[ ] Core: Nothing read from socket, looping.\n");
 			
 		buff[rlen] = '\0';
 	}
