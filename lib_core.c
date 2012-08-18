@@ -50,6 +50,8 @@ request_t __request[] = {
 	{.match = ".uptime",   .callback = action_uptime},
 	{.match = ".seen",     .callback = action_seen},
 	{.match = ".somafm",   .callback = action_somafm},
+	{.match = ".dns",      .callback = action_dns},
+	{.match = ".count",    .callback = action_count},
 	{.match = ".help",     .callback = action_help},
 };
 

@@ -284,3 +284,14 @@ char * time_elapsed(time_t time) {
 	
 	return output;
 }
+
+char * short_trim(char *str) {
+	size_t len = strlen(str);
+	
+	while(isspace(*(str + len - 1)))
+		len--;
+	
+	*(str + len) = '\0';
+		
+	return str;
+}

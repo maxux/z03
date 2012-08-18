@@ -79,6 +79,8 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	if(!(size * nmemb))
 		return 0;
 	
+	printf("[ ] CURL/Header: %s", ptr);
+	
 	if(!strncmp(ptr, "Content-Type: ", 14) || !strncmp(ptr, "Content-type: ", 14)) {
 		if(!strncmp(ptr + 14, "image/", 6)) {
 			printf("[+] CURL/Header: image mime type detected\n");
@@ -93,6 +95,8 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 			
 			return size * nmemb;
 		}
+		
+		printf("[ ] CURL/Header: %s", ptr);
 		
 		/* ignoring anything else */
 		curl->type = UNKNOWN_TYPE;
@@ -112,9 +116,6 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	if(!strncmp(ptr, "Content-Length: ", 16) || !strncmp(ptr, "Content-length: ", 16)) {
 		curl->http_length = atoll(ptr + 16);
 		printf("[+] CURL/Header: length %d bytes\n", curl->http_length);
-		
-		if(curl->http_length > CURL_MAX_SIZE)
-			return 0;
 	}
 
 	/* Return required by libcurl */
@@ -124,6 +125,9 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	curl_data_t *curl = (curl_data_t*) userdata;
 	size_t prev;
+	
+	if(curl->http_length > CURL_MAX_SIZE)
+		return 0;
 	
 	prev = curl->length;
 	curl->length += (size * nmemb);
@@ -144,7 +148,6 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 
 int curl_download(char *url, curl_data_t *data) {
 	CURL *curl;
-	// CURLcode res;
 	
 	curl = curl_easy_init();
 	
@@ -171,11 +174,11 @@ int curl_download(char *url, curl_data_t *data) {
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, CURL_USERAGENT);
 		
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
 		// res = curl_easy_perform(curl);
-		curl_easy_perform(curl);
+		data->curlcode = curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: HTTP_REPONSE_CODE: %ld\n", data->code);
@@ -211,11 +214,11 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 
 	switch(type) {
 		case URL_MATCH:
-			sprintf(msg, "PRIVMSG %s :Repost (url match), OP is %s (%s), hit %d times.", chan, anti_hl(op), timestring, hit + 1);
+			sprintf(msg, "PRIVMSG %s :(url match, OP is %s (%s), hit %d times)", chan, anti_hl(op), timestring, hit + 1);
 		break;
 		
 		case CHECKSUM_MATCH:
-			snprintf(msg, sizeof(msg), "PRIVMSG %s :Repost (checksum match), OP is %s (%s), hit %d times. URL waz: %s", chan, anti_hl(op), timestring, hit + 1, url);
+			snprintf(msg, sizeof(msg), "PRIVMSG %s :(checksum match, OP is %s (%s), hit %d times. URL waz: %s)", chan, anti_hl(op), timestring, hit + 1, url);
 		break;
 		
 		case TITLE_MATCH:
@@ -254,8 +257,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	char *sqlquery, op[48];
 	const unsigned char *_op = NULL;
 	int row, id = -1, hit = 0;
-	char skip_analyse = 0;
-	
+	char match = 0;
 	time_t ts = 0;
 	
 	
@@ -290,12 +292,10 @@ int handle_url(ircmessage_t *message, char *url) {
 	
 	/* Updating Database */
 	if(id > -1) {
-		/* Repost ! */
-		if(strncmp(message->nick, op, strlen(op))) {
-			skip_analyse = 1;
+		if(strcmp(op, message->nick))
 			handle_repost(URL_MATCH, NULL, message->chan, op, ts, hit);
 			
-		} else skip_analyse = 0;
+		match = 1;
 		
 		printf("[+] URL Parser: URL already on database, updating...\n");
 		sqlquery = sqlite3_mprintf("UPDATE url SET hit = hit + 1 WHERE id = %d", id);
@@ -317,7 +317,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	/*
 	 *   Dispatching url handling if not a repost
 	 */
-	return (!skip_analyse) ? handle_url_dispatch(url, message) : 0;
+	return handle_url_dispatch(url, message, match);
 }
 
 char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
@@ -334,12 +334,11 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 	return sha1_char;
 }
 
-int handle_url_dispatch(char *url, ircmessage_t *message) {
+int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	curl_data_t curl;
 	char *title = NULL, *stripped = NULL;
 	char *strcode, temp[256];
 	unsigned int len;
-	// unsigned char i;
 	char *sqlquery, *request;
 	sqlite3_stmt *stmt;
 	
@@ -361,6 +360,15 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 	if(!curl.length && curl.type != UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
 		free(curl.data);
+		return 2;
+	}
+	
+	// Write error occure on data file
+	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
+		snprintf(temp, sizeof(temp), "PRIVMSG %s :URL (Error %d): %s", message->chan, curl.curlcode, curl_easy_strerror(curl.curlcode));
+		raw_socket(sockfd, temp);
+		
+		free(curl.data);		
 		return 2;
 	}
 
@@ -405,7 +413,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 					ts     = sqlite3_column_int(stmt, 2);
 					hit    = sqlite3_column_int(stmt, 3);
 					
-					if(curl.code == 200)
+					if(curl.code == 200 && !already_match)
 						handle_repost(TITLE_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
 				}
 				
@@ -465,7 +473,8 @@ int handle_url_dispatch(char *url, ircmessage_t *message) {
 					ts     = sqlite3_column_int(stmt, 2);
 					hit    = sqlite3_column_int(stmt, 3);
 					
-					handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
+					if(!already_match)
+						handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
 				}
 				
 				break;

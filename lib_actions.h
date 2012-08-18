@@ -12,4 +12,6 @@
 	void action_backlog_url(char* chan, char *args);
 	void action_seen(char *chan, char *args);
 	void action_somafm(char *chan, char *args);
+	void action_dns(char *chan, char *args);
+	void action_count(char *chan, char *args);
 #endif

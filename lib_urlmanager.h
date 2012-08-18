@@ -1,6 +1,7 @@
 #ifndef __IMAGESPAWN_URL
 	#define __IMAGESPAWN_URL
 	
+	#include <curl/curl.h>
 	#define CURL_USERAGENT		"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1; spawnimg) Gecko/20100101 Firefox/9.0.1"
 	#define CURL_MAX_SIZE		20 * 1024 * 1024	/* 20 Mo */
 	
@@ -38,6 +39,7 @@
 		char *http_type;
 		enum document_type_t type;
 		enum charset_t charset;
+		CURLcode curlcode;
 		
 	} curl_data_t;
 	
@@ -51,7 +53,7 @@
 	char * repost();
 	
 	int handle_url(ircmessage_t *message, char *url);
-	int handle_url_dispatch(char *url, ircmessage_t *message);
+	int handle_url_dispatch(char *url, ircmessage_t *message, char already_match);
 	int handle_url_image(char *url, curl_data_t *curl);
 	
 	char * url_extract_title(char *body, char *title);

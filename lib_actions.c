@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <time.h>
 #include "bot.h"
 #include "core_init.h"
@@ -293,21 +297,28 @@ void action_seen(char *chan, char *args) {
 	time_t timestamp;
 	int row, len;
 	struct tm * timeinfo;
-	char buffer[128];
+	char buffer[64], found = 0;
 	
 	if(!*args)
 		return;
 	
+	/* Trim last spaces */
+	short_trim(args);
+	
 	sqlquery = sqlite3_mprintf("SELECT timestamp, message FROM logs WHERE chan = '%q' AND nick = '%q' ORDER BY timestamp DESC LIMIT 1", chan, args);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+		fprintf(stderr, "[-] Action/Seen: SQL Error\n");
 	
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
+			found = 1;
+			
 			timestamp = sqlite3_column_int(stmt, 0);
 			message   = sqlite3_column_text(stmt, 1);
 			
-			len = strlen((char*) message) + 64;
+			printf("[ ] Action/Seen: message: <%s>\n", message);
+			
+			len = strlen((char*) message) + strlen(args) + sizeof(buffer) + 16;
 			output = (char*) malloc(sizeof(char) * len);
 			
 			timeinfo = localtime(&timestamp);
@@ -318,6 +329,13 @@ void action_seen(char *chan, char *args) {
 			
 			free(output);
 		}
+	}
+	
+	if(!found) {
+		output = (char*) malloc(sizeof(char) * 128);
+		snprintf(output, 128, "PRIVMSG %s :No match found for <%s>", chan, args);
+		raw_socket(sockfd, output);
+		free(output);
 	}
 	
 	/* Clearing */
@@ -356,4 +374,69 @@ void action_somafm(char *chan, char *args) {
 	}
 	
 	somafm_handle(chan, (somafm_stations + id));
+}
+
+void action_dns(char *chan, char *args) {
+	struct hostent *he;
+	char reply[256];
+	char *ipbuf;
+	
+	if(!*args)
+		return;
+		
+	if((he = gethostbyname(args)) == NULL) {
+		sprintf(reply, "PRIVMSG %s :Cannot resolve host", chan);
+		raw_socket(sockfd, reply);
+		return;
+	}
+	
+	
+	ipbuf = inet_ntoa(*((struct in_addr *)he->h_addr_list[0]));
+	
+	snprintf(reply, sizeof(reply), "PRIVMSG %s :%s -> %s", chan, args, ipbuf);
+	raw_socket(sockfd, reply);
+}
+
+void action_count(char *chan, char *args) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	char output[256];
+	int row, count1, count2;
+	char found = 0;
+	
+	if(!*args)
+		return;
+	
+	/* Trim last spaces */
+	short_trim(args);
+	
+	sqlquery = sqlite3_mprintf("SELECT COUNT(id) as match, (SELECT COUNT(id) FROM logs WHERE chan = '%q') as total FROM logs WHERE nick = '%q' AND chan = '%q';", chan, args, chan);
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] Action/Count: SQL Error\n");
+	
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW) {
+			count1 = sqlite3_column_int(stmt, 0);
+			count2 = sqlite3_column_int(stmt, 1);
+			
+			if(count1)
+				found = 1;
+			
+			printf("[ ] Action/Count: %d / %d\n", count1, count2);
+			
+			if(count1 && count2) {
+				snprintf(output, sizeof(output), "PRIVMSG %s :Got %d lines for <%s>, which is %.2f%% of the %d total lines", chan, count1, anti_hl(args), ((float) count1 / count2) * 100, count2);
+				raw_socket(sockfd, output);
+			}
+		}
+	}
+	
+	if(!found) {
+		snprintf(output, sizeof(output), "PRIVMSG %s :No match found for <%s>", chan, args);
+		raw_socket(sockfd, output);
+	}
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
 }
