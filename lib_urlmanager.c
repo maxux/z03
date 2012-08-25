@@ -126,14 +126,14 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	curl_data_t *curl = (curl_data_t*) userdata;
 	size_t prev;
 	
-	if(curl->http_length > CURL_MAX_SIZE)
+	if(!curl->forcedl && curl->http_length > CURL_MAX_SIZE)
 		return 0;
 	
 	prev = curl->length;
 	curl->length += (size * nmemb);
 	
 	// Do not download if too large or a unhandled mime
-	if(curl->length > CURL_MAX_SIZE || curl->http_type)
+	if(!curl->forcedl && (curl->length > CURL_MAX_SIZE || curl->http_type))
 		return 0;
 	
 	/* Resize data */
@@ -146,7 +146,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	return size * nmemb;
 }
 
-int curl_download(char *url, curl_data_t *data) {
+int curl_download(char *url, curl_data_t *data, char forcedl) {
 	CURL *curl;
 	
 	curl = curl_easy_init();
@@ -157,6 +157,9 @@ int curl_download(char *url, curl_data_t *data) {
 	data->charset     = UNKNOWN_CHARSET;
 	data->http_length = 0;
 	data->http_type   = NULL;
+	data->forcedl     = forcedl;
+	
+	printf("[+] CURL: %s\n", url);
 	
 	if(curl) {
 		curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -350,7 +353,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	int hit = -1, row;
 	
 	
-	if(curl_download(url, &curl))
+	if(curl_download(url, &curl, 0))
 		printf("[-] Warning: special download\n");
 		
 	printf("[+] Downloaded Length: %d\n", curl.length);

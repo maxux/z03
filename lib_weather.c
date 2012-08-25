@@ -1,3 +1,22 @@
+/* z03 - small bot with some network features - irc miscallinious functions (anti highlights, ...)
+ * Author: Daniel Maxime (root@maxux.net)
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <libxml/HTMLparser.h>
@@ -109,7 +128,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	/* Downloading page */
 	sprintf(temp, __weather_internal_station_url[station->type], station->id);
 	
-	if(curl_download(temp, &curl))
+	if(curl_download(temp, &curl, 0))
 		return 1;
 	
 	if(!curl.length)
@@ -123,6 +142,9 @@ int weather_handle(char *chan, weather_station_t *station) {
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//ul[@class='arrow']/li", ctx);
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
+		snprintf(temp, sizeof(temp), "PRIVMSG %s :Station information are currently unavailable.", chan);
+		raw_socket(sockfd, temp);
+		
 		printf("[-] XPath: No values\n");
 		goto freeme;
 	}

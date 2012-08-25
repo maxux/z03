@@ -14,4 +14,7 @@
 	void action_somafm(char *chan, char *args);
 	void action_dns(char *chan, char *args);
 	void action_count(char *chan, char *args);
+	void action_known(char *chan, char *args);
+	void action_url(char *chan, char *args);
+	void action_google(char *chan, char *args);
 #endif

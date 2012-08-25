@@ -40,6 +40,7 @@
 		enum document_type_t type;
 		enum charset_t charset;
 		CURLcode curlcode;
+		char forcedl;
 		
 	} curl_data_t;
 	
@@ -48,7 +49,7 @@
 	size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata);
 	size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata);
 	
-	int curl_download(char *url, curl_data_t *data);
+	int curl_download(char *url, curl_data_t *data, char forcedl);
 	
 	char * repost();
 	

@@ -29,4 +29,6 @@
 	int handle_message(char *data, ircmessage_t *message);
 	void handle_nick(char *data);
 	void handle_join(char *data);
+	
+	void irc_kick(char *chan, char *nick, char *reason);
 #endif

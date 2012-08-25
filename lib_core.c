@@ -38,6 +38,7 @@
 #include "lib_entities.h"
 #include "lib_urlmanager.h"
 #include "lib_logs.h"
+#include "lib_ircmisc.h"
 
 request_t __request[] = {
 	{.match = ".weather",  .callback = action_weather},
@@ -52,6 +53,9 @@ request_t __request[] = {
 	{.match = ".somafm",   .callback = action_somafm},
 	{.match = ".dns",      .callback = action_dns},
 	{.match = ".count",    .callback = action_count},
+	{.match = ".known",    .callback = action_known},
+	{.match = ".url",      .callback = action_url},
+	{.match = ".google",   .callback = action_google},
 	{.match = ".help",     .callback = action_help},
 };
 
@@ -117,13 +121,64 @@ void handle_nick(char *data) {
 }
 
 void handle_join(char *data) {
-	char nick[32];
+	char *nick = NULL, *username, *host = NULL, *chan;
+	char *sqlquery, *list;
+	char output[256];
+	// curl_data_t curl;
+	// whois_t *whois;
 	
-	extract_nick(data, nick, sizeof(nick));
+	chan = skip_header(data);
 	
-	/* Check Nick Length */
-	if(nick_length_check(nick, IRC_CHANNEL))
-		return;
+	// extract_nick(data, nick, sizeof(nick));
+	if(irc_extract_userdata(data, &nick, &username, &host)) {
+		/* Check Nick Length */
+		if(nick_length_check(nick, IRC_CHANNEL))
+			return;
+			
+		printf("[+] Lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
+		
+		/* Insert to db */
+		sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host) VALUES ('%q', '%q', '%q')", nick, username, host);
+	
+		if(db_simple_query(sqlite_db, sqlquery)) {
+			if((list = irc_knownuser(nick, host))) {
+				snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, nick, host, list);
+				raw_socket(sockfd, output);
+				free(list);
+			}
+		} else printf("[-] Lib/Join: cannot update db, probably because nick already exists.\n");
+			
+		/* Clearing */
+		sqlite3_free(sqlquery);
+	
+		free(username);
+	
+	} else printf("[-] Lib/Join: Extract data info failed\n");
+	
+	/* Tor Detection */
+	/*
+	if(!curl_download("http://torstatus.blutmagie.de/ip_list_exit.php", &curl, 1)) {
+		whois = irc_whois(nick);
+		snprintf(output, sizeof(output), "%s\n", whois->ip);
+		
+		printf("[ ] Lib/Join: connected from <%s>\n", whois->ip);
+		
+		// Detecting tor ip
+		if(strstr(curl.data, output)) {
+			snprintf(output, sizeof(output), "MODE %s +b *!*@%s", chan, host);
+			raw_socket(sockfd, output);
+			
+			irc_kick(chan, nick, "Tor is not allowed on this channel");
+		
+		} else printf("[ ] Lib/Join: no tor ip detected\n");
+		
+		free(curl.data);
+		
+	} else printf("[-] Lib/Join: cannot download tor list\n");
+	*/
+	
+	free(host);
+	free(nick);
 }
 
 char * match_prefix(char *data, char *match) {
@@ -238,6 +293,9 @@ void main_core(char *data, char *request) {
 	if(!strncmp(request, "376", 3)) {
 		if(IRC_NICKSERV)
 			raw_socket(sockfd, "PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
+		
+		/* if(IRC_OPER)
+			raw_socket(sockfd, "OPER " IRC_NICK " " IRC_OPER_PASS); */
 		
 		else raw_socket(sockfd, "JOIN " IRC_CHANNEL);
 		

@@ -33,8 +33,10 @@
 #include "lib_actions.h"
 #include "lib_chart.h"
 #include "lib_ircmisc.h"
+
 #include "lib_weather.h"
 #include "lib_somafm.h"
+#include "lib_google.h"
 
 time_t last_chart_request = 0;
 time_t last_backurl_request = 0;
@@ -248,11 +250,11 @@ void action_uptime(char *chan, char *args) {
 
 void action_backlog_url(char *chan, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery = "SELECT id, url, nick FROM url ORDER BY id DESC LIMIT 5";
+	char *sqlquery = "SELECT url, nick, title FROM url ORDER BY id DESC LIMIT 5";
 	char *message;
-	const unsigned char *row_url, *row_nick;
+	const unsigned char *row_url, *row_nick, *row_title;
 	char *url_nick;
-	int row, url_id;
+	int row;
 	size_t len;
 	char temp[256];
 	
@@ -269,19 +271,25 @@ void action_backlog_url(char *chan, char *args) {
 	
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
-			url_id   = sqlite3_column_int(stmt, 0);
-			row_url  = sqlite3_column_text(stmt, 1);
-			row_nick = sqlite3_column_text(stmt, 2);
-			url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 1);
+			row_url   = sqlite3_column_text(stmt, 0);
+			row_nick  = sqlite3_column_text(stmt, 1);
+			row_title = sqlite3_column_text(stmt, 2);
+			
+			url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
 			strcpy(url_nick, (char*) row_nick);
 			
-			len = strlen((char*) row_url) * strlen(url_nick) + 64;
-			message = (char*) malloc(sizeof(char) * len);
+			if(!row_title)
+				row_title = "(No title)";
 			
-			snprintf(message, len, "PRIVMSG %s :<%s> URL %d: %s", chan, anti_hl(url_nick), url_id, row_url);
+			len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
+			message = (char*) malloc(sizeof(char) * len + 1);
+				
+			snprintf(message, len, "PRIVMSG %s :<%s> [%s] %s", chan, anti_hl(url_nick), row_url, row_title);
+			
 			raw_socket(sockfd, message);
 			
 			free(url_nick);
+			free(message);
 		}
 	}
 	
@@ -366,7 +374,7 @@ void action_somafm(char *chan, char *args) {
 		
 		/* Searching station */
 		for(i = 0; i < somafm_stations_count; i++) {
-			if(!strcmp(args, somafm_stations[i].ref)) {
+			if(!strncmp(args, somafm_stations[i].ref, strlen(somafm_stations[i].ref))) {
 				id = i;
 				break;
 			}
@@ -439,4 +447,77 @@ void action_count(char *chan, char *args) {
 	/* Clearing */
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
+}
+
+void action_known(char *chan, char *args) {
+	char *list;
+	char output[256];
+	whois_t *whois;
+		
+	if(!*args)
+		return;
+	
+	short_trim(args);
+	
+	if((whois = irc_whois(args))) {
+		if((list = irc_knownuser(args, whois->host))) {
+			snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, anti_hl(args), whois->host, list);
+			
+			free(list);
+			whois_free(whois);
+			
+		} else snprintf(output, sizeof(output), "PRIVMSG %s :<%s> has no previous known host", chan, anti_hl(args));
+		
+	} else snprintf(output, sizeof(output), "PRIVMSG %s :<%s> is not connected", chan, args);
+	
+	raw_socket(sockfd, output);
+}
+
+void action_url(char *chan, char *args) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	char *output, *title, *url;
+	int row, len;
+	
+	if(!*args)
+		return;
+	
+	/* Trim last spaces */
+	short_trim(args);
+	
+	sqlquery = sqlite3_mprintf("SELECT url, title FROM url WHERE url LIKE '%%%q%%' OR title LIKE '%%%q%%' ORDER BY time DESC LIMIT 5;", args, args);
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] Action/URL: SQL Error\n");
+	
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW) {
+			url   = (char*) sqlite3_column_text(stmt, 0);
+			title = (char*) sqlite3_column_text(stmt, 1);
+			
+			if(!title)
+				title = "Unknown title";
+				
+			len = strlen(url) + strlen(title) + 64;
+			output = (char*) malloc(sizeof(char) * len);
+				
+			snprintf(output, len, "PRIVMSG %s :%s (%s)", chan, url, title);
+			raw_socket(sockfd, output);
+			
+			free(output);
+		}
+	}
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
+}
+
+void action_google(char *chan, char *args) {
+	if(!*args)
+		return;
+	
+	/* Trim last spaces */
+	short_trim(args);
+	
+	google_search(chan, args);
 }

@@ -31,6 +31,12 @@
 		
 	} global_core_t;
 	
+	typedef struct whois_t {
+		char *host;
+		char *ip;
+		
+	} whois_t;
+	
 	extern int sockfd;
 	extern global_core_t global_core;
 	

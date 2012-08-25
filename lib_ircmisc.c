@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <iconv.h>
 #include "core_init.h"
+#include "core_database.h"
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
 
@@ -293,5 +294,201 @@ char * short_trim(char *str) {
 	
 	*(str + len) = '\0';
 		
+	return str;
+}
+
+char * irc_mstrncpy(char *src, size_t len) {
+	char *str;
+	
+	if(!(str = (char*) malloc(sizeof(char) * len + 1)))
+		return NULL;
+	
+	strncpy(str, src, len);
+	str[len] = '\0';
+	
+	return str;
+}
+
+int irc_extract_userdata(char *data, char **nick, char **username, char **host) {
+	char *match;
+	
+	/* Extract Nick */
+	if(!(match = strchr(data, '!')))
+		return 0;
+	
+	*nick = irc_mstrncpy(data, match - data);
+	data = match + 1;
+	
+	/* Extract Username */
+	if(!(match = strchr(match, '@'))) {
+		free(*nick);
+		return 0;
+	}
+	
+	*username = irc_mstrncpy(data, match - data);
+	data = match + 1;
+	
+	/* Extract Host */
+	if(!(match = strchr(match, ' '))) {
+		free(*nick);
+		free(*username);
+		return 0;
+	}
+	
+	*host = irc_mstrncpy(data, match - data);
+	
+	return 1;
+}
+
+char * string_index(char *str, unsigned int index) {
+	unsigned int i;
+	char *match;
+	
+	for(i = 0; i < index; i++) {
+		if(!(match = strchr(str, ' ')))
+			return NULL;
+		
+		str = match + 1;
+	}
+	
+	if(strlen(str) > 0) {
+		if((match = strchr(str, ' '))) {
+			match = irc_mstrncpy(str, match - str);
+			
+		} else match = irc_mstrncpy(str, strlen(str));
+		
+		printf("[+] Index: <%s>\n", match);
+		
+		return match;
+		
+	} else return NULL;
+}
+
+char * irc_knownuser(char *nick, char *host) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	size_t size = 0, nicklen;
+	char *thisnick, *nicklist = NULL;
+	int row;
+	
+	/* Init List */
+	nicklist = (char*) malloc(sizeof(char));
+	*nicklist = '\0';
+	
+	nicklen = strlen(nick);
+	
+	/* Query database */
+	sqlquery = sqlite3_mprintf("SELECT nick FROM hosts WHERE host = '%q';", host);
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] Action/Count: SQL Error\n");
+	
+	/* Building list */
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if(row == SQLITE_ROW) {
+			thisnick = (char*) sqlite3_column_text(stmt, 0);
+			
+			// Skipping same name
+			if(!strncmp(thisnick, nick, nicklen))
+				continue;
+			
+			printf("[ ] Action/known: appending: <%s>\n", thisnick);
+			
+			size += strlen((char*) thisnick) + 3;
+			nicklist = (char*) realloc(nicklist, size);
+			
+			strcat(nicklist, thisnick);
+			strcat(nicklist, ", ");
+		}
+	}
+	
+	if(size == 0) {
+		free(nicklist);
+		return NULL;
+		
+	} else nicklist[strlen(nicklist) - 2] = '\0';	
+	
+	return nicklist;
+}
+
+char * skip_header(char *data) {
+	char *match;
+	
+	if((match = strchr(data + 1, ':')))
+		return match + 1;
+		
+	else return NULL;
+}
+
+whois_t * whois_init() {
+	whois_t *whois;
+	
+	whois = (whois_t*) malloc(sizeof(whois));
+	
+	whois->host = NULL;
+	whois->ip   = NULL;
+	
+	return whois;
+}
+
+void whois_free(whois_t *whois) {
+	if(whois) {
+		free(whois->host);
+		free(whois->ip);
+	}
+	
+	free(whois);
+}
+
+whois_t * irc_whois(char *nick) {
+	char *data = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
+	char *next = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
+	char *request, temp[128];
+	whois_t *whois;
+	
+	// Init
+	*data = '\0';
+	*next = '\0';
+	if(!(whois = whois_init()))
+		return NULL;
+	
+	snprintf(temp, sizeof(temp), "WHOIS %s", nick);
+	raw_socket(sockfd, temp);
+	
+	printf("[+] Misc: whois request: %s\n", nick);
+	
+	while(1) {
+		read_socket(sockfd, data, next);
+		printf("[ ] IRC: >> %s\n", data);
+		
+		if((request = skip_server(data)) == NULL) {
+			printf("[-] IRC: Something wrong with protocol...\n");
+			continue;
+		}
+		
+		if(!strncmp(request, "311", 3)) {
+			whois->host = string_index(request, 4);
+			
+		} else if(!strncmp(request, "378", 3)) {
+			whois->ip = string_index(request, 7);
+			
+		} else if(!strncmp(request, "318", 3))
+			break;
+	}
+	
+	printf("[+] Misc: end of whois\n");
+	
+	return whois;
+}
+
+char * space_encode(char *str) {
+	char *new = str;
+	
+	while(*new) {
+		if(*new == ' ')
+			*new = '+';
+			
+		new++;
+	}
+	
 	return str;
 }
