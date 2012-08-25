@@ -61,6 +61,7 @@
 	enum charset_t url_extract_charset(char *body);
 	
 	void handle_url_title(char *url);
+	char * shurl(char *url);
 	
 	// GNU Fix
 	extern char * strcasestr(const char *, const char *);

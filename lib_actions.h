@@ -16,5 +16,6 @@
 	void action_count(char *chan, char *args);
 	void action_known(char *chan, char *args);
 	void action_url(char *chan, char *args);
+	void action_goo(char *chan, char *args);
 	void action_google(char *chan, char *args);
 #endif

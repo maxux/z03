@@ -55,6 +55,7 @@ request_t __request[] = {
 	{.match = ".count",    .callback = action_count},
 	{.match = ".known",    .callback = action_known},
 	{.match = ".url",      .callback = action_url},
+	{.match = ".goo",      .callback = action_goo},
 	{.match = ".google",   .callback = action_google},
 	{.match = ".help",     .callback = action_help},
 };

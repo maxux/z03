@@ -31,15 +31,16 @@
 #include "lib_actions.h"
 #include "lib_ircmisc.h"
 
-int google_search(char *chan, char *search) {
+int google_search(char *chan, char *search, int max) {
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
 	xmlNode *node = NULL;
 	int i, x;
 	curl_data_t curl;
-	char *url, *baseurl = "https://www.google.be/search?hl=fr&q=";
-	char answer[512];
+	char *url;
+	char answer[512], *nurl;
+	char *baseurl = "https://www.google.com/search?hl=en&q=";
 	
 	url = (char*) malloc(sizeof(char) * strlen(search) + strlen(baseurl) + 8);
 	sprintf(url, "%s%s", baseurl, space_encode(search));
@@ -56,13 +57,27 @@ int google_search(char *chan, char *search) {
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//a[@class='l']", ctx);
 	
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		x = (xpathObj->nodesetval->nodeNr > 3) ? 3 : xpathObj->nodesetval->nodeNr;
+		x = (xpathObj->nodesetval->nodeNr > max) ? max : xpathObj->nodesetval->nodeNr;
+		
+		// Cleaning this url
+		free(url);
 		
 		for(i = 0; i < x; i++) {
 			node = xpathObj->nodesetval->nodeTab[i];
-			snprintf(answer, sizeof(answer), "PRIVMSG %s :%d) %s: %s", chan, i + 1, (char *) xmlNodeGetContent(node), (char *) xmlGetProp(node, (unsigned char *) "href"));
+			nurl = (char *) xmlGetProp(node, (unsigned char *) "href");
+			
+			if(!(url = shurl(nurl))) {
+				printf("[-] Google: failed to shurl\n");
+				continue;
+			}
+			
+			snprintf(answer, sizeof(answer), "PRIVMSG %s :%d) %s: %s", chan, i + 1, (char *) xmlNodeGetContent(node), url);
 			raw_socket(sockfd, answer);
-		}	
+			
+			free(url);
+		}
+		
+		url = NULL;
 		
 	} else {
 		snprintf(answer, sizeof(answer), "PRIVMSG %s :No match found.", chan);

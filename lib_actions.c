@@ -512,6 +512,16 @@ void action_url(char *chan, char *args) {
 	sqlite3_finalize(stmt);
 }
 
+void action_goo(char *chan, char *args) {
+	if(!*args)
+		return;
+	
+	/* Trim last spaces */
+	short_trim(args);
+	
+	google_search(chan, args, 1);
+}
+
 void action_google(char *chan, char *args) {
 	if(!*args)
 		return;
@@ -519,5 +529,5 @@ void action_google(char *chan, char *args) {
 	/* Trim last spaces */
 	short_trim(args);
 	
-	google_search(chan, args);
+	google_search(chan, args, 3);
 }

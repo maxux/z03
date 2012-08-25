@@ -184,7 +184,7 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 		data->curlcode = curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
-		printf("[ ] CURL: HTTP_REPONSE_CODE: %ld\n", data->code);
+		printf("[ ] CURL: code: %ld\n", data->code);
 		
 		if(!data->data)
 			return 1;
@@ -550,6 +550,10 @@ char * url_extract_title(char *body, char *title) {
 		
 		/* Stripping carriege return */
 		trim(title, strlen(title));
+		
+		if(!strlen(title))
+			return NULL;
+			
 		printf("[+] Title: <%s>\n", title);
 		
 	} else return NULL;
@@ -582,4 +586,32 @@ charset_t url_extract_charset(char *body) {
 	}
 	
 	return UNKNOWN_CHARSET;
+}
+
+char * shurl(char *url) {
+	char *baseurl = "http://x.maxux.net/index.php?url=", *request;
+	curl_data_t curl;
+	size_t len;
+	
+	len = (strlen(baseurl) + strlen(url)) + 8;
+	request = (char*) malloc(sizeof(char) * len);
+	
+	sprintf(request, "%s%s", baseurl, url);
+	
+	if(curl_download(request, &curl, 0) || !curl.length) {
+		free(request);
+		return NULL;
+	}
+	
+	if(curl.length > len)
+		curl.length = len - 1;
+	
+	strncpy(request, curl.data, curl.length);
+	request[curl.length] = '\0';
+	
+	free(curl.data);
+	
+	printf("[+] Shurl: <%s>\n", request);
+	
+	return request;
 }
