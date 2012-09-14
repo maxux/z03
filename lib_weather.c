@@ -37,6 +37,7 @@ weather_station_t weather_stations[] = {
 	{.id = 125, .ref = "oupeye",  .type = STATION_STATION, .name = "Oupeye"},
 	{.id = 14,  .ref = "lille",   .type = STATION_METAR,   .name = "Lille (France)"},
 	{.id = 77,  .ref = "knokke",  .type = STATION_STATION, .name = "Knokke"},
+	{.id = 1,   .ref = "bxl",     .type = STATION_STATION, .name = "Bruxelles"},
 	{.id = 80,  .ref = "seraing", .type = STATION_STATION, .name = "Boncelles (Seraing)"},
 	{.id = 106, .ref = "namur",   .type = STATION_STATION, .name = "Floriffoux (Namur)"},
 	{.id = 48,  .ref = "spa",     .type = STATION_STATION, .name = "Spa"},
@@ -142,7 +143,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//ul[@class='arrow']/li", ctx);
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		snprintf(temp, sizeof(temp), "PRIVMSG %s :Station information are currently unavailable.", chan);
+		snprintf(temp, sizeof(temp), "PRIVMSG %s :Station information is currently unavailable.", chan);
 		raw_socket(sockfd, temp);
 		
 		printf("[-] XPath: No values\n");

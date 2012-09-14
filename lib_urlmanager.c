@@ -72,6 +72,45 @@ char *extract_url(char *url) {
 	return out;
 }
 
+char *curl_gethost(char *url) {
+	char *buffer, *match, *left;
+	
+	/* Extracting Host */
+	if((match = strstr(url, "//"))) {
+		/* Skipping // */
+		match += 2;
+		
+		if(!(left = strchr(match, '/')))
+			return NULL;
+		
+		buffer = (char*) malloc(sizeof(char) * (left - match) + 1);
+		snprintf(buffer, left - match + 1, "%s", match);
+		
+		return buffer;
+		
+	} else return NULL;
+}
+
+char *curl_useragent(char *url) {
+	char *host, *useragent;
+	
+	useragent = CURL_USERAGENT;
+	
+	/* Checking host */
+	if((host = curl_gethost(url))) {
+		printf("[+] CURL/Init: host is <%s>\n", host);
+		
+		if(!strcmp(host, "t.co"))
+			useragent = CURL_USERAGENT_LEGACY;
+			
+		free(host);
+	}
+	
+	printf("[+] CURL/UserAgent: <%s>\n", useragent);
+	
+	return useragent;
+}
+
 size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	curl_data_t *curl = (curl_data_t*) userdata;
 	size_t len;
@@ -83,20 +122,20 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	
 	if(!strncmp(ptr, "Content-Type: ", 14) || !strncmp(ptr, "Content-type: ", 14)) {
 		if(!strncmp(ptr + 14, "image/", 6)) {
-			printf("[+] CURL/Header: image mime type detected\n");
+			printf("[+] CURL/Header: <image> mime type detected\n");
 			curl->type = IMAGE_ALL;
 			
 			return size * nmemb;
 		}
 		
 		if(!strncmp(ptr + 14, "text/html", 9)) {
-			printf("[+] CURL/Header: text/html mime type detected\n");
+			printf("[+] CURL/Header: <text/html> mime type detected\n");
 			curl->type = TEXT_HTML;
 			
 			return size * nmemb;
 		}
 		
-		printf("[ ] CURL/Header: %s", ptr);
+		printf("[ ] CURL/Header: <%s>", ptr);
 		
 		/* ignoring anything else */
 		curl->type = UNKNOWN_TYPE;
@@ -148,6 +187,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 
 int curl_download(char *url, curl_data_t *data, char forcedl) {
 	CURL *curl;
+	char *useragent = CURL_USERAGENT;
 	
 	curl = curl_easy_init();
 	
@@ -160,6 +200,8 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 	data->forcedl     = forcedl;
 	
 	printf("[+] CURL: %s\n", url);
+	
+	useragent = curl_useragent(url);
 	
 	if(curl) {
 		curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -175,12 +217,11 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 		
 		curl_easy_setopt(curl, CURLOPT_HEADER, 0);
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_easy_setopt(curl, CURLOPT_USERAGENT, CURL_USERAGENT);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
 		
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
-		// res = curl_easy_perform(curl);
 		data->curlcode = curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));

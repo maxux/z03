@@ -3,6 +3,7 @@
 	
 	#include <curl/curl.h>
 	#define CURL_USERAGENT		"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:9.0.1; spawnimg) Gecko/20100101 Firefox/9.0.1"
+	#define CURL_USERAGENT_LEGACY	"curl/7.25.0 (i686-pc-linux-gnu) libcurl/7.25.0"
 	#define CURL_MAX_SIZE		20 * 1024 * 1024	/* 20 Mo */
 	
 	/* Title Host ignore */

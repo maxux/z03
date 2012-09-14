@@ -83,6 +83,7 @@ void action_ping(char *chan, char *args) {
 	time_t t;
 	struct tm * timeinfo;
 	char buffer[128];
+	(void) args;
 	
 	time(&t);
 	timeinfo = localtime(&t);
@@ -95,6 +96,7 @@ void action_time(char *chan, char *args) {
 	time_t rawtime;
 	struct tm * timeinfo;
 	char buffer[128], out[256];
+	(void) args;
 
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
@@ -124,6 +126,7 @@ void action_random(char *chan, char *args) {
 void action_help(char *chan, char *args) {
 	char list[1024];
 	unsigned int i;
+	(void) args;
 	
 	sprintf(list, "PRIVMSG %s :Commands: ", chan);
 	
@@ -141,6 +144,7 @@ void action_stats(char *chan, char *args) {
 	char msg[256];
 	int count = 0, cnick = 0, chits = 0;
 	int row;
+	(void) args;
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
@@ -169,6 +173,7 @@ void action_chart(char *chan, char *args) {
 	int *values = NULL, lines = 6;
 	char **chart, first_date[32], last_date[32];
 	char temp[512];
+	(void) args;
 	
 	/* Flood Protection */
 	if(time(NULL) - (60 * 10) < last_chart_request) {
@@ -178,8 +183,7 @@ void action_chart(char *chan, char *args) {
 		
 	} else last_chart_request = time(NULL);
 	
-	/* Working */
-	args     = NULL;	            
+	/* Working */          
 	sqlquery = "SELECT count(id), date(time, 'unixepoch') d, strftime('%w', time, 'unixepoch') w FROM url WHERE time > 0 GROUP BY d ORDER BY d DESC LIMIT 31";
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
@@ -235,6 +239,7 @@ void action_uptime(char *chan, char *args) {
 	time_t now;
 	char message[256];
 	char *uptime, *rehash;
+	(void) args;
 	
 	now  = time(NULL);
 		
@@ -257,6 +262,7 @@ void action_backlog_url(char *chan, char *args) {
 	int row;
 	size_t len;
 	char temp[256];
+	(void) args;
 	
 	/* Flood Protection */
 	if(time(NULL) - (60 * 10) < last_backurl_request) {
@@ -279,7 +285,7 @@ void action_backlog_url(char *chan, char *args) {
 			strcpy(url_nick, (char*) row_nick);
 			
 			if(!row_title)
-				row_title = "(No title)";
+				row_title = (unsigned char*) "(No title)";
 			
 			len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
 			message = (char*) malloc(sizeof(char) * len + 1);
@@ -418,7 +424,7 @@ void action_count(char *chan, char *args) {
 	/* Trim last spaces */
 	short_trim(args);
 	
-	sqlquery = sqlite3_mprintf("SELECT COUNT(id) as match, (SELECT COUNT(id) FROM logs WHERE chan = '%q') as total FROM logs WHERE nick = '%q' AND chan = '%q';", chan, args, chan);
+	sqlquery = sqlite3_mprintf("SELECT COUNT(*) as match, (SELECT COUNT(*) FROM logs WHERE chan = '%q') as total FROM logs WHERE nick = '%q' AND chan = '%q';", chan, args, chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] Action/Count: SQL Error\n");
 	
