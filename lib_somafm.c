@@ -36,6 +36,8 @@ somafm_station_t somafm_stations[] = {
 	{.ref = "poptron",        .name = "PopTron"},
 	{.ref = "groovesalad",    .name = "Groove Salad"},
 	{.ref = "indiepop",       .name = "Indie Pop Rocks!"},
+	{.ref = "sonicuniverse",  .name = "Sonic Universe"},
+	{.ref = "dubstep",        .name = "Dub Step Beyond"},
 };
 
 unsigned int somafm_stations_count = sizeof(somafm_stations) / sizeof(somafm_station_t);

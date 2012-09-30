@@ -121,6 +121,9 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	printf("[ ] CURL/Header: %s", ptr);
 	
 	if(!strncmp(ptr, "Content-Type: ", 14) || !strncmp(ptr, "Content-type: ", 14)) {
+		free(curl->http_type);
+		curl->http_type = NULL;
+			
 		if(!strncmp(ptr + 14, "image/", 6)) {
 			printf("[+] CURL/Header: <image> mime type detected\n");
 			curl->type = IMAGE_ALL;
@@ -135,13 +138,10 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 			return size * nmemb;
 		}
 		
-		printf("[ ] CURL/Header: <%s>", ptr);
+		printf("[ ] CURL/Header: match: %s", ptr);
 		
 		/* ignoring anything else */
 		curl->type = UNKNOWN_TYPE;
-		
-		// Freeing previously malloc (if multiple content-type, memory leak)
-		free(curl->http_type);
 		
 		len = strlen(ptr + 14);
 		curl->http_type = (char*) malloc(sizeof(char) * len + 1);
@@ -227,8 +227,10 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: code: %ld\n", data->code);
 		
-		if(!data->data)
+		if(!data->data) {
+			fprintf(stderr, "[-] CURL: data is empty.\n");
 			return 1;
+		}
 		
 		if(data->type == TEXT_HTML) {
 			data->charset = url_extract_charset(data->data);
@@ -400,6 +402,11 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	printf("[+] Downloaded Length: %d\n", curl.length);
 	printf("[+] Downloaded Type  : %d\n", curl.type);
 	// printf("%s\n", curl.data);
+	
+	if(!curl.data) {
+		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
+		return 2;
+	}
 	
 	if(!curl.length && curl.type != UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
