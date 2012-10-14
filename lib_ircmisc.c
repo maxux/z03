@@ -369,7 +369,7 @@ char * irc_knownuser(char *nick, char *host) {
 	char *sqlquery;
 	size_t size = 0, nicklen;
 	char *thisnick, *nicklist = NULL;
-	int row;
+	int row, z;
 	
 	/* Init List */
 	nicklist = (char*) malloc(sizeof(char));
@@ -383,8 +383,10 @@ char * irc_knownuser(char *nick, char *host) {
 		fprintf(stderr, "[-] Action/Count: SQL Error\n");
 	
 	/* Building list */
+	z = 0;
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
+			z++;
 			thisnick = (char*) sqlite3_column_text(stmt, 0);
 			
 			// Skipping same name
@@ -399,6 +401,12 @@ char * irc_knownuser(char *nick, char *host) {
 			strcat(nicklist, thisnick);
 			strcat(nicklist, ", ");
 		}
+	}
+	
+	if(z > 5) {
+		free(nicklist);
+		nicklist = (char*) malloc(sizeof(char) * 128);
+		sprintf(nicklist, "(list hidden, %d rows found)  ", z);
 	}
 	
 	if(size == 0) {

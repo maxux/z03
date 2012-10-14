@@ -44,7 +44,7 @@ time_t last_backurl_request = 0;
 void action_weather(char *chan, char *args) {
 	char cmdline[256], *list;
 	unsigned int i;
-	int id = 0;	// default
+	int id = 2;	// default
 	
 	/* Checking arguments */
 	if(*args) {
@@ -108,18 +108,26 @@ void action_time(char *chan, char *args) {
 }
 
 void action_random(char *chan, char *args) {
-	char answer[512];
-	int random, max = 100;
+	char answer[512], *x;
+	int random, min = 0, max = 100;
 	
-	/* Randomize */
-	srand(time(NULL));
+	/* Trim last spaces */
+	short_trim(args);
 	
-	if(*args)
-		max = (atoi(args) <= 0) ? 100 : atoi(args);
+	if(*args) {
+		/* Min/Max or just Max */
+		if((x = strchr(args, ' '))) {
+			min = (atoi(args) <= 0) ? 0 : atoi(args);
+			max = (atoi(args) <= 0) ? 100 : atoi(x);
+			
+		} else max = (atoi(args) <= 0) ? 100 : atoi(args);
+	}
 	
-	random = rand() % max;
+	printf("[ ] Action/Random: min: %d, max: %d\n", min, max);
 	
-	sprintf(answer, "PRIVMSG %s :%d", chan, random);
+	random = (rand() % (max - min + 1) + min);
+	
+	sprintf(answer, "PRIVMSG %s :Random (%d, %d): %d", chan, min, max, random);
 	raw_socket(sockfd, answer);
 }
 
@@ -456,7 +464,7 @@ void action_count(char *chan, char *args) {
 }
 
 void action_known(char *chan, char *args) {
-	char *list;
+	char *list, *listhl;
 	char output[256];
 	whois_t *whois;
 		
@@ -467,9 +475,12 @@ void action_known(char *chan, char *args) {
 	
 	if((whois = irc_whois(args))) {
 		if((list = irc_knownuser(args, whois->host))) {
-			snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, anti_hl(args), whois->host, list);
+			listhl = anti_hl_each_words(list, strlen(list), UTF_8);
+			snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, anti_hl(args), whois->host, listhl);
 			
+			free(listhl);
 			free(list);
+			
 			whois_free(whois);
 			
 		} else snprintf(output, sizeof(output), "PRIVMSG %s :<%s> has no previous known host", chan, anti_hl(args));
@@ -536,4 +547,20 @@ void action_google(char *chan, char *args) {
 	short_trim(args);
 	
 	google_search(chan, args, 3);
+}
+
+void action_man(char *chan, char *args) {
+	char reply[1024];
+	unsigned int i;
+	
+	if(!*args)
+		return;
+	
+	for(i = 0; i < __request_count; i++) {
+		if(match_prefix(args, __request[i].match + 1)) {
+			sprintf(reply, "PRIVMSG %s :%s: %s", chan, args, __request[i].man);
+			raw_socket(sockfd, reply);
+			return;
+		}
+	}
 }

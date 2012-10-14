@@ -18,4 +18,5 @@
 	void action_url(char *chan, char *args);
 	void action_goo(char *chan, char *args);
 	void action_google(char *chan, char *args);
+	void action_man(char *chan, char *args);
 #endif

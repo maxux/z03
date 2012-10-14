@@ -7,6 +7,7 @@
 	typedef struct request_t {
 		char *match;
 		void (*callback)(char *, char*);
+		char *man;
 		
 	} request_t;
 	
@@ -17,6 +18,8 @@
 	
 	extern unsigned int __request_count;
 	extern request_t __request[];
+	
+	char * match_prefix(char *data, char *match);
 	
 	void main_core(char *data, char *request);
 	
