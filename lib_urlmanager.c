@@ -48,6 +48,11 @@ char *__host_ignore[] = {NULL
 	"git.maxux.net/" */
 };
 
+host_cookies_t __host_cookies[] = {
+	{.host = "facebook.com",    .cookie = "..."},
+	{.host = NULL,              .cookie = NULL},
+};
+
 char *extract_url(char *url) {
 	int i = 0, braks = 0;
 	char *out;
@@ -109,6 +114,25 @@ char *curl_useragent(char *url) {
 	printf("[+] CURL/UserAgent: <%s>\n", useragent);
 	
 	return useragent;
+}
+
+char * curl_cookie(char *url) {
+	char *host, *cookie = NULL;
+	int i;
+	
+	if((host = curl_gethost(url))) {
+		for(i = 0; __host_cookies[i].host; i++) {
+			if(strstr(host, __host_cookies[i].host)) {
+				printf("[ ] URL/Cookie: special cookie for host %s (%s) found\n", __host_cookies[i].host, host);
+				cookie = __host_cookies[i].cookie;
+				break;
+			}
+		}
+		
+		free(host);
+	}
+	
+	return cookie;
 }
 
 size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata) {
@@ -188,14 +212,15 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 int curl_download(char *url, curl_data_t *data, char forcedl) {
 	CURL *curl;
 	char *useragent = CURL_USERAGENT;
+	char *cookie;
 	
 	curl = curl_easy_init();
 	
 	data->data        = NULL;
 	data->type        = UNKNOWN_TYPE;
 	data->length      = 0;
-	data->charset     = UNKNOWN_CHARSET;
 	data->http_length = 0;
+	data->charset     = UNKNOWN_CHARSET;
 	data->http_type   = NULL;
 	data->forcedl     = forcedl;
 	
@@ -222,12 +247,18 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
+		/* Checking Host for specific Cookies */
+		if((cookie = curl_cookie(url)))
+			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
+		
 		data->curlcode = curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
 		printf("[ ] CURL: code: %ld\n", data->code);
 		
-		if(!data->data) {
+		curl_easy_cleanup(curl);
+		
+		if(!data->data && !data->http_length) {
 			fprintf(stderr, "[-] CURL: data is empty.\n");
 			return 1;
 		}
@@ -237,13 +268,10 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 			printf("[ ] CURL: charset: %d\n", data->charset);
 		}
 		
-		curl_easy_cleanup(curl);
-		
 	} else return 1;
 	
 	return 0;
 }
-
 
 void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t ts, int hit) {
 	char timestring[64];
@@ -403,7 +431,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	printf("[+] Downloaded Type  : %d\n", curl.type);
 	// printf("%s\n", curl.data);
 	
-	if(!curl.data) {
+	if(!curl.data && !curl.http_length) {
 		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
 		return 2;
 	}
@@ -579,18 +607,24 @@ char * url_extract_title(char *body, char *title) {
 	char *read, *write;
 	unsigned int len;
 	
-	if((read = strcasestr(body, "<title>"))) {
-		write = read + 7;
+	if((read = strcasestr(body, "<title"))) {
+		/* Skipping attributes */
+		while(*read && *read != '>')
+			read++;
+		
+		/* Skipping last > */
+		read++;
 		
 		/* Calculing length */
+		write = read;
 		while(*write && *write != '<')
 			write++;
 		
-		len = write - read - 7;
+		len = write - read;
 		title = (char*) malloc(sizeof(char) * len + 1);
 		
 		/* Copying title */
-		strncpy(title, read + 7, len);
+		strncpy(title, read, len);
 		title[len] = '\0';
 		
 		if(strlen(title) > 450)

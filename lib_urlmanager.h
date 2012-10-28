@@ -45,11 +45,17 @@
 		
 	} curl_data_t;
 	
+	typedef struct host_cookies_t {
+		char *host;
+		char *cookie;
+		
+	} host_cookies_t;
+	
 	char *extract_url(char *url);
 	
 	size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata);
 	size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata);
-	
+	char * curl_cookie(char *url);
 	int curl_download(char *url, curl_data_t *data, char forcedl);
 	
 	char * repost();
