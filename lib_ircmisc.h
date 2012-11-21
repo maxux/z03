@@ -21,4 +21,6 @@
 	whois_t * whois_init();
 	whois_t * irc_whois(char *nick);
 	void whois_free(whois_t *whois);
+	
+	void irc_privmsg(char *chan, char *message);
 #endif

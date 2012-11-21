@@ -6,7 +6,7 @@
 	
 	typedef struct request_t {
 		char *match;
-		void (*callback)(char *, char*);
+		void (*callback)(ircmessage_t *, char*);
 		char *man;
 		
 	} request_t;

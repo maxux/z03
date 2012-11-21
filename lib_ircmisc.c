@@ -500,3 +500,10 @@ char * space_encode(char *str) {
 	
 	return str;
 }
+
+void irc_privmsg(char *chan, char *message) {
+	char buffer[2048];
+	
+	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :%s", chan, message);
+	raw_socket(sockfd, buffer);
+}

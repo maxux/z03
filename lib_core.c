@@ -30,6 +30,7 @@
 #include <netdb.h>
 #include <curl/curl.h>
 #include <ctype.h>
+#include <time.h>
 
 #define __LIB_CORE_C
 #include "bot.h"
@@ -62,6 +63,7 @@ request_t __request[] = {
 	{.match = ".google",   .callback = action_google,      .man = "search on Google, print the 3 firsts result: .google keywords"},
 	{.match = ".help",     .callback = action_help,        .man = "print the list of all the commands available"},
 	{.match = ".man",      .callback = action_man,         .man = "print 'man page' of a given bot command: .man command"},
+	{.match = ".note",     .callback = action_notes,       .man = "leave a message to someone, will be sent when connecting."},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
@@ -126,9 +128,15 @@ void handle_nick(char *data) {
 }
 
 void handle_join(char *data) {
+	sqlite3_stmt *stmt;
 	char *nick = NULL, *username, *host = NULL, *chan;
+	char *fnick, *message;
 	char *sqlquery, *list;
-	char output[256];
+	char output[1024], timestring[64];
+	struct tm * timeinfo;
+	int row;
+	time_t ts;
+	
 	// curl_data_t curl;
 	// whois_t *whois;
 	
@@ -151,12 +159,46 @@ void handle_join(char *data) {
 				raw_socket(sockfd, output);
 				free(list);
 			}
+			
 		} else printf("[-] Lib/Join: cannot update db, probably because nick already exists.\n");
 			
 		/* Clearing */
 		sqlite3_free(sqlquery);
-	
 		free(username);
+		
+		/* Checking notes */	
+		sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
+		if((stmt = db_select_query(sqlite_db, sqlquery))) {
+			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+				if(row == SQLITE_ROW) {
+					fnick   = (char*) sqlite3_column_text(stmt, 0);
+					message = (char*) sqlite3_column_text(stmt, 1);
+					
+					if((ts = sqlite3_column_int(stmt, 2)) > 0) {
+						timeinfo = localtime(&ts);
+						sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+						
+					} else strcpy(timestring, "unknown");
+						
+					snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
+					raw_socket(sockfd, output);
+					
+					snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
+					raw_socket(sockfd, output);
+				}
+			}
+			
+			sqlite3_free(sqlquery);
+			sqlite3_finalize(stmt);
+			
+			sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q'", nick);
+			if(!db_simple_query(sqlite_db, sqlquery))
+				printf("[-] Lib/Join: cannot mark as read\n");
+		
+		} else fprintf(stderr, "[-] Action/Notes: SQL Error\n");
+		
+		/* Clearing */
+		sqlite3_free(sqlquery);
 	
 	} else printf("[-] Lib/Join: Extract data info failed\n");
 	
@@ -237,7 +279,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	for(i = 0; i < __request_count; i++) {
 		if((temp = match_prefix(content, __request[i].match))) {
-			__request[i].callback(message->chan, temp);
+			__request[i].callback(message, temp);
 			return 0;
 		}
 	}
