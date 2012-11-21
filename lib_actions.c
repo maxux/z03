@@ -148,27 +148,30 @@ void action_help(char *chan, char *args) {
 
 void action_stats(char *chan, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery = "SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) FROM url;";
+	char *sqlquery;
 	char msg[256];
 	int count = 0, cnick = 0, chits = 0;
 	int row;
 	(void) args;
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	sqlquery = sqlite3_mprintf("SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) FROM url WHERE chan = '%q'", chan);
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			count = sqlite3_column_int(stmt, 0);
-			cnick = sqlite3_column_int(stmt, 1);
-			chits = sqlite3_column_int(stmt, 2);
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+			if(row == SQLITE_ROW) {
+				count = sqlite3_column_int(stmt, 0);
+				cnick = sqlite3_column_int(stmt, 1);
+				chits = sqlite3_column_int(stmt, 2);
+			}
 		}
-	}
+			
+		sprintf(msg, "PRIVMSG %s :Got %d url on database for %d nicks and %d total hits", chan, count, cnick, chits);
+		raw_socket(sockfd, msg);
 	
-	sprintf(msg, "PRIVMSG %s :Got %d url on database for %d nicks and %d total hits", chan, count, cnick, chits);
-	raw_socket(sockfd, msg);
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	/* Clearing */
+	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
 }
 
@@ -192,40 +195,41 @@ void action_chart(char *chan, char *args) {
 	} else last_chart_request = time(NULL);
 	
 	/* Working */          
-	sqlquery = "SELECT count(id), date(time, 'unixepoch') d, strftime('%w', time, 'unixepoch') w FROM url WHERE time > 0 GROUP BY d ORDER BY d DESC LIMIT 31";
+	sqlquery = sqlite3_mprintf("SELECT count(id), date(time, 'unixepoch') d, strftime('%w', time, 'unixepoch') w FROM url WHERE chan = '%q' AND time > 0 GROUP BY d ORDER BY d DESC LIMIT 31", chan);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL) {
+		/* sqlite3_column_int auto-finalize */
+		nbrows = db_sqlite_num_rows(stmt);
+		values = (int*) malloc(sizeof(int) * nbrows);
+		days   = (char*) malloc(sizeof(char) * nbrows);
 	
-	/* sqlite3_column_int auto-finalize */
-	nbrows = db_sqlite_num_rows(stmt);
-	values = (int*) malloc(sizeof(int) * nbrows);
-	days   = (char*) malloc(sizeof(char) * nbrows);
-	
-	printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
-	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
-	
-	i = nbrows - 1;
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			values[i] = sqlite3_column_int(stmt, 0);	/* count value */
-			days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
+		printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
+		
+		if((stmt = db_select_query(sqlite_db, sqlquery))) {
+			i = nbrows - 1;
 			
-			printf("[ ] Action: Chart: Day %s (url %d) is %d\n", sqlite3_column_text(stmt, 1), values[i], days[i]);
-			
-			if(i == 0)
-				strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
-				
-			else if(i == nbrows - 1)
-				strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
-			
-			i--;
+			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+				if(row == SQLITE_ROW) {
+					values[i] = sqlite3_column_int(stmt, 0);	/* count value */
+					days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
+					
+					printf("[ ] Action: Chart: Day %s (url %d) is %d\n", sqlite3_column_text(stmt, 1), values[i], days[i]);
+					
+					if(i == 0)
+						strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
+						
+					else if(i == nbrows - 1)
+						strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
+					
+					i--;
+				}
+			}
 		}
-	}
+			
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
 	
 	chart = ascii_chart(values, nbrows, lines, days);
 	
@@ -263,7 +267,7 @@ void action_uptime(char *chan, char *args) {
 
 void action_backlog_url(char *chan, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery = "SELECT url, nick, title FROM url ORDER BY id DESC LIMIT 5";
+	char *sqlquery;
 	char *message;
 	const unsigned char *row_url, *row_nick, *row_title;
 	char *url_nick;
@@ -280,35 +284,38 @@ void action_backlog_url(char *chan, char *args) {
 		
 	} else last_backurl_request = time(NULL);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	sqlquery = sqlite3_mprintf("SELECT url, nick, title FROM url WHERE chan = '%q' ORDER BY id DESC LIMIT 5", chan);
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			row_url   = sqlite3_column_text(stmt, 0);
-			row_nick  = sqlite3_column_text(stmt, 1);
-			row_title = sqlite3_column_text(stmt, 2);
-			
-			url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
-			strcpy(url_nick, (char*) row_nick);
-			
-			if(!row_title)
-				row_title = (unsigned char*) "(No title)";
-			
-			len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
-			message = (char*) malloc(sizeof(char) * len + 1);
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+			if(row == SQLITE_ROW) {
+				row_url   = sqlite3_column_text(stmt, 0);
+				row_nick  = sqlite3_column_text(stmt, 1);
+				row_title = sqlite3_column_text(stmt, 2);
 				
-			snprintf(message, len, "PRIVMSG %s :<%s> [%s] %s", chan, anti_hl(url_nick), row_url, row_title);
-			
-			raw_socket(sockfd, message);
-			
-			free(url_nick);
-			free(message);
+				url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
+				strcpy(url_nick, (char*) row_nick);
+				
+				if(!row_title)
+					row_title = (unsigned char*) "(No title)";
+				
+				len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
+				message = (char*) malloc(sizeof(char) * len + 1);
+					
+				snprintf(message, len, "PRIVMSG %s :<%s> [%s] %s", chan, anti_hl(url_nick), row_url, row_title);
+				
+				raw_socket(sockfd, message);
+				
+				free(url_nick);
+				free(message);
+			}
 		}
-	}
+	
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	/* Clearing */
 	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
 }
 
 void action_seen(char *chan, char *args) {
@@ -502,27 +509,27 @@ void action_url(char *chan, char *args) {
 	/* Trim last spaces */
 	short_trim(args);
 	
-	sqlquery = sqlite3_mprintf("SELECT url, title FROM url WHERE url LIKE '%%%q%%' OR title LIKE '%%%q%%' ORDER BY time DESC LIMIT 5;", args, args);
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] Action/URL: SQL Error\n");
-	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			url   = (char*) sqlite3_column_text(stmt, 0);
-			title = (char*) sqlite3_column_text(stmt, 1);
-			
-			if(!title)
-				title = "Unknown title";
+	sqlquery = sqlite3_mprintf("SELECT url, title FROM url WHERE (url LIKE '%%%q%%' OR title LIKE '%%%q%%') AND chan = '%q' ORDER BY time DESC LIMIT 5;", args, args, chan);
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+			if(row == SQLITE_ROW) {
+				url   = (char*) sqlite3_column_text(stmt, 0);
+				title = (char*) sqlite3_column_text(stmt, 1);
 				
-			len = strlen(url) + strlen(title) + 64;
-			output = (char*) malloc(sizeof(char) * len);
+				if(!title)
+					title = "Unknown title";
+					
+				len = strlen(url) + strlen(title) + 64;
+				output = (char*) malloc(sizeof(char) * len);
+					
+				snprintf(output, len, "PRIVMSG %s :%s (%s)", chan, url, title);
+				raw_socket(sockfd, output);
 				
-			snprintf(output, len, "PRIVMSG %s :%s (%s)", chan, url, title);
-			raw_socket(sockfd, output);
-			
-			free(output);
+				free(output);
+			}
 		}
-	}
+	
+	} else fprintf(stderr, "[-] Action/URL: SQL Error\n");
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);

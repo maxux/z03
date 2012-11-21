@@ -30,7 +30,10 @@
 #include <netdb.h>
 #include <curl/curl.h>
 #include <ctype.h>
+
+#define __LIB_CORE_C
 #include "bot.h"
+
 #include "core_init.h"
 #include "core_database.h"
 #include "lib_core.h"
@@ -41,24 +44,24 @@
 #include "lib_ircmisc.h"
 
 request_t __request[] = {
-	{.match = ".weather",  .callback = action_weather,     .man = "Print weather information: .weather list, .weather station"},
-	{.match = ".ping",     .callback = action_ping,        .man = "Ping request/reply"},
-	{.match = ".time",     .callback = action_time,        .man = "Print the time"},
-	{.match = ".rand",     .callback = action_random,      .man = "Random generator: .rand, .rand max, .rand min max"},
-	{.match = ".stats",    .callback = action_stats,       .man = "Print url statistics"},
-	{.match = ".chart",    .callback = action_chart,       .man = "Print a chart about url usage"},
-	{.match = ".backurl",  .callback = action_backlog_url, .man = "Print the lastest urls posted on the chan"},
-	{.match = ".uptime",   .callback = action_uptime,      .man = "Print the bot's uptime"},
-	{.match = ".seen",     .callback = action_seen,        .man = "Print the last line of the given nick: .seen nick"},
-	{.match = ".somafm",   .callback = action_somafm,      .man = "Print the current track on SomaFM radio: .somafm list, .somafm station"},
-	{.match = ".dns",      .callback = action_dns,         .man = "Resolve a dns name address: .dns domain-name"},
-	{.match = ".count",    .callback = action_count,       .man = "Print the number of line posted by a given nick: .count nick"},
-	{.match = ".known",    .callback = action_known,       .man = "Check if a given nick is already known, by hostname: .known nick"},
-	{.match = ".url",      .callback = action_url,         .man = "Search on url database, by url or title. Use %% as wildcard. ie: .url youtube%gang"},
-	{.match = ".goo",      .callback = action_goo,         .man = "Search on Google, print the first result: .goo keywords"},
-	{.match = ".google",   .callback = action_google,      .man = "Search on Google, print the 3 firsts result: .google keywords"},
-	{.match = ".help",     .callback = action_help,        .man = "Print the list of all the commands available"},
-	{.match = ".man",      .callback = action_man,         .man = "Print 'man page' of a given bot command: .man command"},
+	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather station"},
+	{.match = ".ping",     .callback = action_ping,        .man = "ping request/reply"},
+	{.match = ".time",     .callback = action_time,        .man = "print the time"},
+	{.match = ".rand",     .callback = action_random,      .man = "random generator: .rand, .rand max, .rand min max"},
+	{.match = ".stats",    .callback = action_stats,       .man = "print url statistics"},
+	{.match = ".chart",    .callback = action_chart,       .man = "print a chart about url usage"},
+	{.match = ".backurl",  .callback = action_backlog_url, .man = "print the lastest urls posted on the chan"},
+	{.match = ".uptime",   .callback = action_uptime,      .man = "print the bot's uptime"},
+	{.match = ".seen",     .callback = action_seen,        .man = "print the last line of the given nick: .seen nick"},
+	{.match = ".somafm",   .callback = action_somafm,      .man = "print the current track on SomaFM radio: .somafm list, .somafm station"},
+	{.match = ".dns",      .callback = action_dns,         .man = "resolve a dns name address: .dns domain-name"},
+	{.match = ".count",    .callback = action_count,       .man = "print the number of line posted by a given nick: .count nick"},
+	{.match = ".known",    .callback = action_known,       .man = "check if a given nick is already known, by hostname: .known nick"},
+	{.match = ".url",      .callback = action_url,         .man = "search on url database, by url or title. Use % as wildcard. ie: .url gang%youtube"},
+	{.match = ".goo",      .callback = action_goo,         .man = "search on Google, print the first result: .goo keywords"},
+	{.match = ".google",   .callback = action_google,      .man = "search on Google, print the 3 firsts result: .google keywords"},
+	{.match = ".help",     .callback = action_help,        .man = "print the list of all the commands available"},
+	{.match = ".man",      .callback = action_man,         .man = "print 'man page' of a given bot command: .man command"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
@@ -116,8 +119,8 @@ void handle_nick(char *data) {
 	nick++;
 	
 	/* Check Nick Length */
-	if(nick_length_check(nick, IRC_CHANNEL))
-		return;
+	/* if(nick_length_check(nick, IRC_CHANNEL))
+		return; */
 	
 	/* More Stuff Here */
 }
@@ -134,13 +137,13 @@ void handle_join(char *data) {
 	// extract_nick(data, nick, sizeof(nick));
 	if(irc_extract_userdata(data, &nick, &username, &host)) {
 		/* Check Nick Length */
-		if(nick_length_check(nick, IRC_CHANNEL))
+		if(nick_length_check(nick, chan))
 			return;
 			
 		printf("[+] Lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
 		
 		/* Insert to db */
-		sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host) VALUES ('%q', '%q', '%q')", nick, username, host);
+		sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
 	
 		if(db_simple_query(sqlite_db, sqlquery)) {
 			if((list = irc_knownuser(nick, host))) {
@@ -283,6 +286,16 @@ size_t extract_nick(char *data, char *destination, size_t size) {
 	return len;
 }
 
+void irc_joinall() {
+	unsigned int i;
+	char buffer[128];
+	
+	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char*); i++) {
+		sprintf(buffer, "JOIN %s", IRC_CHANNEL[i]);
+		raw_socket(sockfd, buffer);
+	}
+}
+
 void main_core(char *data, char *request) {
 	ircmessage_t message;
 
@@ -293,13 +306,13 @@ void main_core(char *data, char *request) {
 	}
 	
 	if(!strncmp(request, "376", 3)) {
-		if(IRC_NICKSERV)
+		if(IRC_NICKSERV) {
 			raw_socket(sockfd, "PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
 		
 		/* if(IRC_OPER)
 			raw_socket(sockfd, "OPER " IRC_NICK " " IRC_OPER_PASS); */
 		
-		else raw_socket(sockfd, "JOIN " IRC_CHANNEL);
+		} else irc_joinall();
 		
 		return;
 	}
@@ -307,7 +320,7 @@ void main_core(char *data, char *request) {
 	if(!strncmp(request, "MODE", 4)) {
 		/* Bot identified */
 		if(!strncmp(request, "MODE " IRC_NICK " :+r", 9 + sizeof(IRC_NICK)) && IRC_NICKSERV)
-			raw_socket(sockfd, "JOIN " IRC_CHANNEL);
+			irc_joinall();
 	}
 	
 	if(!strncmp(request, "JOIN", 4)) {

@@ -68,7 +68,7 @@ void sighandler(int signal) {
 
 	switch(signal) {
 		case SIGSEGV:
-			raw_socket(sockfd, "PRIVMSG " IRC_CHANNEL " :[System] Segmentation fault");
+			raw_socket(sockfd, "PRIVMSG " IRC_HARDCHAN " :[System] Segmentation fault");
 			
 			size = backtrace(array, 32);
 			backtrace_symbols_fd(array, size, 2);
@@ -237,8 +237,10 @@ int read_socket(int sockfd, char *data, char *next) {
 		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) < 0)
 			diep("recv");
 		
-		if(rlen == 0)
-			printf("[ ] Core: Nothing read from socket, looping.\n");
+		if(rlen == 0) {
+			printf("[ ] Core: Nothing read from socket, exiting...\n");
+			exit(EXIT_FAILURE);
+		}
 			
 		buff[rlen] = '\0';
 	}
@@ -255,6 +257,9 @@ int main(void) {
 		.handler  = NULL,
 		.main     = NULL,
 	};
+	
+	/* Init random */
+	srand(time(NULL));
 	
 	/* Initializing global variables */
 	global_core.startup_time = time(NULL);

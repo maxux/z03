@@ -49,7 +49,7 @@ char *__host_ignore[] = {NULL
 };
 
 host_cookies_t __host_cookies[] = {
-	{.host = "facebook.com",    .cookie = "..."},
+	{.host = "facebook.com",    .cookie = PRIVATE_FBCOOK},
 	{.host = NULL,              .cookie = NULL},
 };
 
@@ -303,27 +303,29 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 	raw_socket(sockfd, msg);
 }
 
-void check_round_count() {
+void check_round_count(ircmessage_t *message) {
 	sqlite3_stmt *stmt;
 	char *sqlquery, msg[128];
 	int row, urls = -1;
 
-	sqlquery = "SELECT count(id) FROM url";
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW)
-			urls = sqlite3_column_int(stmt, 0);
-	}
-	
-	printf("[ ] URL: %d\n", urls);
-	if(urls % 500 == 0) {
-		sprintf(msg, "PRIVMSG " IRC_CHANNEL " :We just reached %d urls !", urls);
-		raw_socket(sockfd, msg);
-	}
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {		
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+			if(row == SQLITE_ROW)
+				urls = sqlite3_column_int(stmt, 0);
+		}
+		
+		printf("[ ] URL: %d\n", urls);
+		if(urls % 500 == 0) {
+			sprintf(msg, "PRIVMSG %s :We just reached %d urls !", message->chan, urls);
+			raw_socket(sockfd, msg);
+		}
+		
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
 	
 	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
 }
 
 int handle_url(ircmessage_t *message, char *url) {
@@ -346,7 +348,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	/*
 	 *   Quering database
 	 */
-	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q'", url);
+	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q' AND chan = '%q'", url, message->chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL) {
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 		return 1;
@@ -376,7 +378,7 @@ int handle_url(ircmessage_t *message, char *url) {
 		
 	} else {
 		printf("[+] URL Parser: New url, inserting...\n");
-		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time) VALUES ('%q', '%q', 1, %d)", message->nick, url, time(NULL));
+		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time, chan) VALUES ('%q', '%q', 1, %d, '%q')", message->nick, url, time(NULL), message->chan);
 	}
 	
 	if(!db_simple_query(sqlite_db, sqlquery))
@@ -386,7 +388,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
 	
-	check_round_count();
+	check_round_count(message);
 	
 	/*
 	 *   Dispatching url handling if not a repost
@@ -480,7 +482,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			/* Check Title Repost */
 			// redecoding entities for clear title update
 			decode_html_entities_utf8(title, NULL);
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q' AND nick != '%q' LIMIT 1", title, message->nick);
+			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q' AND nick != '%q' AND chan = '%q' LIMIT 1", title, message->nick, message->chan);
 			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
@@ -536,28 +538,28 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			sqlite3_free(sqlquery);
 			
 			/* Checking checksum repost */
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE sha1 = '%s' AND url != '%q'", sha1_char, url);
-			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-				fprintf(stderr, "[-] URL Parser: cannot select url\n");
-			
-			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-				if(row == SQLITE_ROW) {
-					/* Skip repost from same nick */
-					nick   = sqlite3_column_text(stmt, 1);
-					
-					if(!strcmp((char *) nick, message->nick))
-						continue;
+			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE sha1 = '%s' AND url != '%q' AND chan = '%q'", sha1_char, url, message->chan);
+			if((stmt = db_select_query(sqlite_db, sqlquery))) {
+				while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+					if(row == SQLITE_ROW) {
+						/* Skip repost from same nick */
+						nick   = sqlite3_column_text(stmt, 1);
 						
-					sqlurl = sqlite3_column_text(stmt, 0);
-					ts     = sqlite3_column_int(stmt, 2);
-					hit    = sqlite3_column_int(stmt, 3);
+						if(!strcmp((char *) nick, message->nick))
+							continue;
+							
+						sqlurl = sqlite3_column_text(stmt, 0);
+						ts     = sqlite3_column_int(stmt, 2);
+						hit    = sqlite3_column_int(stmt, 3);
+						
+						if(!already_match)
+							handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
+					}
 					
-					if(!already_match)
-						handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
+					break;
 				}
-				
-				break;
-			}
+			
+			} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
 			/* Clearing */
 			sqlite3_free(sqlquery);

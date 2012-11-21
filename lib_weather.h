@@ -16,14 +16,14 @@
 	} weather_station_t;
 
 	typedef struct weather_data_t {
-		char date[32];              // date of the last writing
-		double temp;                // temperature (°C)
-		double temp_min;            // temperature min (°C)
-		char temp_min_time[8];      // hour of min temp
-		double temp_max;            // temperature max (°C)
-		char temp_max_time[8];      // hour of max temp
-		double wind_speed;          // wind speed (km/h)
-		int humidity;               // humidity (%)
+		char date[32];              /* date of the last writing */
+		double temp;                /* temperature (°C)         */
+		double temp_min;            /* temperature min (°C)     */
+		char temp_min_time[8];      /* hour of min temp         */
+		double temp_max;            /* temperature max (°C)     */
+		char temp_max_time[8];      /* hour of max temp         */
+		double wind_speed;          /* wind speed (km/h)        */
+		int humidity;               /* humidity (%)             */
 		
 	} weather_data_t;
 	
