@@ -195,9 +195,9 @@ void action_chart(char *chan, char *args) {
 	} else last_chart_request = time(NULL);
 	
 	/* Working */          
-	sqlquery = sqlite3_mprintf("SELECT count(id), date(time, 'unixepoch') d, strftime('%w', time, 'unixepoch') w FROM url WHERE chan = '%q' AND time > 0 GROUP BY d ORDER BY d DESC LIMIT 31", chan);
+	sqlquery = sqlite3_mprintf("SELECT count(id), date(time, 'unixepoch') d, strftime('%%w', time, 'unixepoch') w FROM url WHERE chan = '%q' AND time > 0 GROUP BY d ORDER BY d DESC LIMIT 31", chan);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL) {
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
 		/* sqlite3_column_int auto-finalize */
 		nbrows = db_sqlite_num_rows(stmt);
 		values = (int*) malloc(sizeof(int) * nbrows);
@@ -218,7 +218,7 @@ void action_chart(char *chan, char *args) {
 					if(i == 0)
 						strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
 						
-					else if(i == nbrows - 1)
+					if(i == nbrows - 1)
 						strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
 					
 					i--;
