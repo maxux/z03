@@ -31,7 +31,6 @@
 #include <ctype.h>
 #include <dlfcn.h>
 #include <signal.h>
-#include <execinfo.h>
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
@@ -63,16 +62,9 @@ int signal_intercept(int signal, void (*function)(int)) {
 }
 
 void sighandler(int signal) {
-	void *array[32];
-	size_t size;
-
 	switch(signal) {
 		case SIGSEGV:
 			raw_socket(sockfd, "PRIVMSG " IRC_HARDCHAN " :[System] Segmentation fault");
-			
-			size = backtrace(array, 32);
-			backtrace_symbols_fd(array, size, 2);
-			
 			exit(EXIT_FAILURE);
 		break;
 	}
@@ -83,6 +75,9 @@ void loadlib(codemap_t *codemap) {
 	
 	/* Unloading previously loaded lib */
 	if(codemap->handler) {
+		printf("[+] Core: destructing...\n");
+		codemap->destruct();
+		
 		printf("[+] Core: unlinking library...\n");
 		if(dlclose(codemap->handler)) {
 			fprintf(stderr, "[-] Core: %s\n", dlerror());
@@ -102,8 +97,15 @@ void loadlib(codemap_t *codemap) {
 		exit(EXIT_FAILURE);
 	}
 	
-	/* Linking flags */
+	/* Linking main */
 	codemap->main = dlsym(codemap->handler, "main_core");
+	if((error = dlerror()) != NULL) {
+		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
+		exit(EXIT_FAILURE);
+	}
+	
+	/* Linking destruct */
+	codemap->destruct = dlsym(codemap->handler, "main_destruct");
 	if((error = dlerror()) != NULL) {
 		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
 		exit(EXIT_FAILURE);
@@ -112,7 +114,7 @@ void loadlib(codemap_t *codemap) {
 	global_core.rehash_time = time(NULL);
 	global_core.rehash_count++;
 	
-	printf("[+] Core: library linked\n");
+	printf("[+] Core: linking done\n");
 }
 
 void core_handle_private_message(char *data, codemap_t *codemap) {
@@ -163,14 +165,14 @@ char *skip_server(char *data) {
 	return NULL;
 }
 
-int init_irc_socket(char *server, int port) {
+int init_socket(char *server, int port) {
 	int sockfd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
 	
 	/* Resolving name */
 	if((he = gethostbyname(server)) == NULL)
-		perror("[-] IRC: gethostbyname");
+		perror("[-] socket: gethostbyname");
 	
 	bcopy(he->h_addr, &server_addr.sin_addr, he->h_length);
 
@@ -178,15 +180,15 @@ int init_irc_socket(char *server, int port) {
 	server_addr.sin_port = htons(port);
 
 	/* Creating Socket */
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
-		perror("[-] IRC: socket");
+	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		perror("[-] socket: socket");
 
 	/* Init Connection */
-	connresult = connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr));
-	
-	if(connresult < 0)
-		perror("[-] IRC: connect");
+	if((connresult = connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr))) < 0) {
+		perror("[-] socket: connect");
+		close(sockfd);
+		return -1;
+	}
 	
 	return sockfd;
 }
@@ -249,13 +251,14 @@ int read_socket(int sockfd, char *data, char *next) {
 }
 
 int main(void) {
-	char *data = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
-	char *next = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
+	char *data = (char*) calloc(sizeof(char), (2 * MAXBUFF));
+	char *next = (char*) calloc(sizeof(char), (2 * MAXBUFF));
 	char *request, auth = 0;
 	codemap_t codemap = {
 		.filename = "./libz03.so",
 		.handler  = NULL,
 		.main     = NULL,
+		.destruct = NULL,
 	};
 	
 	/* Init random */
@@ -278,7 +281,7 @@ int main(void) {
 	
 	printf("[+] Core: Connecting...\n");
 	
-	sockfd = init_irc_socket(IRC_SERVER, IRC_PORT);
+	sockfd = init_socket(IRC_SERVER, IRC_PORT);
 	
 	while(1) {
 		read_socket(sockfd, data, next);

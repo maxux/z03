@@ -9,6 +9,7 @@
 		char *filename;        /* library filename */
 		void *handler;         /* library handler */
 		void (*main)(char *, char *);  /* main library function */
+		void (*destruct)(void);        /* unlinking threads, ... */
 		
 	} codemap_t;
 	
@@ -40,7 +41,7 @@
 	extern int sockfd;
 	extern global_core_t global_core;
 	
-	int init_irc_socket(char *server, int port);
+	int init_socket(char *server, int port);
 	void raw_socket(int sockfd, char *message);
 	int read_socket(int sockfd, char *data, char *next);
 	char *skip_server(char *data);

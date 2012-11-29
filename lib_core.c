@@ -43,6 +43,7 @@
 #include "lib_urlmanager.h"
 #include "lib_logs.h"
 #include "lib_ircmisc.h"
+#include "lib_run.h"
 
 request_t __request[] = {
 	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather station"},
@@ -64,6 +65,10 @@ request_t __request[] = {
 	{.match = ".help",     .callback = action_help,        .man = "print the list of all the commands available"},
 	{.match = ".man",      .callback = action_man,         .man = "print 'man page' of a given bot command: .man command"},
 	{.match = ".note",     .callback = action_notes,       .man = "leave a message to someone, will be sent when connecting."},
+	{.match = ".c",        .callback = action_run_c,       .man = "compile and run c code, from arguments: .run printf(\"Hello world\\n\");"},
+	{.match = ".py",       .callback = action_run_py,      .man = "compile and run inline python code, from arguments: .py print('Hello world')"},
+	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
+	// {.match = ".plz",       .callback = action_run_plz,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
@@ -385,4 +390,8 @@ void main_core(char *data, char *request) {
 		handle_private_message(data + 1);
 		return;
 	}
+}
+
+void main_destruct(void) {
+	// Nothing yet
 }

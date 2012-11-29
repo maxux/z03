@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc message->channel bot actions
+/* z03 - small bot with some network features - irc channel bot actions
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -8,7 +8,7 @@
  * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERmessage->chanTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * 
  * You should have received a copy of the GNU General Public License
@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <time.h>
+#include <unistd.h>
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
@@ -37,6 +38,7 @@
 #include "lib_weather.h"
 #include "lib_somafm.h"
 #include "lib_google.h"
+#include "lib_run.h"
 
 time_t last_chart_request = 0;
 time_t last_backurl_request = 0;
@@ -623,3 +625,19 @@ void action_notes(ircmessage_t *message, char *args) {
 	
 	sqlite3_free(sqlquery);
 }
+
+void action_run_c(ircmessage_t *message, char *args) {
+	lib_run_init(message, args, C);
+}
+
+void action_run_py(ircmessage_t *message, char *args) {
+	lib_run_init(message, args, PYTHON);
+}
+
+void action_run_hs(ircmessage_t *message, char *args) {
+	lib_run_init(message, args, HASKELL);
+}
+
+/* void action_run_plz(ircmessage_t *message, char *args) {
+	raw_socket(sockfd, "PRIVMSG #test :Plz, do not segf");
+} */

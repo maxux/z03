@@ -20,6 +20,11 @@
 	void action_google(ircmessage_t *message, char *args);
 	void action_man(ircmessage_t *message, char *args);
 	void action_notes(ircmessage_t *message, char *args);
+	void action_run_c(ircmessage_t *message, char *args);
+	void action_run_py(ircmessage_t *message, char *args);
+	void action_run_hs(ircmessage_t *message, char *args);
+	
+	void action_run_plz(ircmessage_t *message, char *args);
 	
 	#define MAX_NOTES	4
 #endif
