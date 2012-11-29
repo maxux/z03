@@ -51,8 +51,15 @@ int signal_intercept(int signal, void (*function)(int)) {
 	sigemptyset(&sig.sa_mask);
 	
 	/* Building Signal */
-	sig.sa_handler	 = function;
-	sig.sa_flags	 = 0;
+	if(signal == SIGCHLD) {
+		sig.sa_handler = SIG_IGN;
+		sig.sa_flags   = SA_NOCLDWAIT;
+	
+	} else {
+		sig.sa_handler = function;
+		sig.sa_flags   = 0;
+	}
+	
 	
 	/* Installing Signal */
 	if((ret = sigaction(signal, &sig, NULL)) == -1)
@@ -269,6 +276,7 @@ int main(void) {
 	global_core.rehash_count = 0;
 	
 	signal_intercept(SIGSEGV, sighandler);
+	signal_intercept(SIGCHLD, sighandler);
 	
 	/* Loading dynamic code */
 	loadlib(&codemap);
