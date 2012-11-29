@@ -1,0 +1,14 @@
+import Control.Applicative
+import Control.Arrow
+import Control.Monad
+import Data.Ratio
+import Data.Bits
+import Data.Function
+import Data.Maybe
+import Data.Int
+import Data.Word
+import Text.Printf
+import Data.Monoid
+import Data.List
+
+main = %s
