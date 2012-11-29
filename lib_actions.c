@@ -637,7 +637,3 @@ void action_run_py(ircmessage_t *message, char *args) {
 void action_run_hs(ircmessage_t *message, char *args) {
 	lib_run_init(message, args, HASKELL);
 }
-
-/* void action_run_plz(ircmessage_t *message, char *args) {
-	raw_socket(sockfd, "PRIVMSG #test :Plz, do not segf");
-} */
