@@ -196,7 +196,7 @@ void handle_join(char *data) {
 			sqlite3_free(sqlquery);
 			sqlite3_finalize(stmt);
 			
-			sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q'", nick);
+			sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
 			if(!db_simple_query(sqlite_db, sqlquery))
 				printf("[-] Lib/Join: cannot mark as read\n");
 		

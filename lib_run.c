@@ -34,65 +34,14 @@
 #include "lib_run.h"
 #include "lib_ircmisc.h"
 
-void lib_run_thread(int sock, ircmessage_t *message) {
-	char buffer[1024], length = 0, *match, *print;
-	size_t rlen;
-	
-	buffer[0] = '\0';
-	
-	while((rlen = recv(sock, buffer, sizeof(buffer), 0))) {
-		buffer[rlen] = '\0';
-		print = buffer;
-		
-		if(strchr(buffer, 0x07)) {
-			irc_privmsg(message->chan, "Bell detected, closing thread.");
-			break;
-		}
-		
-		/* Multiple lines */
-		while((match = strchr(print, '\n'))) {
-			*match = '\0';
-			
-			if(strlen(print) > 180)
-				strcpy(print + 172, " [...]");
-				
-			irc_privmsg(message->chan, print);
-			
-			if(length++ > 4) {
-				irc_privmsg(message->chan, "Output truncated. Too verbose.");
-				return;
-			}
-			
-			print = match + 1;
-			rlen = 0;
-		}
-		
-		/* Single Line */
-		if(rlen) {
-			if(strlen(buffer) > 180)
-				strcpy(buffer + 172, " [...]");
-				
-			irc_privmsg(message->chan, buffer);
-			
-			if(length++ > 4) {
-				irc_privmsg(message->chan, "Output truncated. Too verbose.");
-				return;
-			}
-		}
-	}
-	
-	/* Clearing */
-	close(sock);
-	free(message);
-}
-
 void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	char buffer[2048], fd1[32], fd2[32];
-	char *prefix[] = {"C ", "PY ", "HS "};
+	char *prefix[] = {"C ", "PY ", "HS ", "PHP "};
 	int fd;
 	ircmessage_t *message;
 	
 	if((fd = init_socket(SRV_RUN_CLIENT, SRV_RUN_PORT)) < 0) {
+		irc_privmsg(msg->chan, "Cannot connect the build machine");
 		irc_privmsg(message->chan, "Cannot connect the build machine");
 		return;
 	}

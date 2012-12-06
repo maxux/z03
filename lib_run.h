@@ -8,6 +8,7 @@
 		C,
 		PYTHON,
 		HASKELL,
+		PHP,
 		
 	} action_run_lang_t;
 	
