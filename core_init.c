@@ -31,12 +31,14 @@
 #include <ctype.h>
 #include <dlfcn.h>
 #include <signal.h>
+#include <setjmp.h>
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
 
 int sockfd;
 global_core_t global_core;
+jmp_buf segfault_env;
 
 void diep(char *str) {
 	perror(str);
@@ -60,7 +62,6 @@ int signal_intercept(int signal, void (*function)(int)) {
 		sig.sa_flags   = 0;
 	}
 	
-	
 	/* Installing Signal */
 	if((ret = sigaction(signal, &sig, NULL)) == -1)
 		perror("sigaction");
@@ -71,8 +72,8 @@ int signal_intercept(int signal, void (*function)(int)) {
 void sighandler(int signal) {
 	switch(signal) {
 		case SIGSEGV:
-			raw_socket(sockfd, "PRIVMSG " IRC_HARDCHAN " :[System] Segmentation fault");
-			exit(EXIT_FAILURE);
+			raw_socket(sockfd, "PRIVMSG " IRC_HARDCHAN " :[System] Warning: segmentation fault, reloading.");
+			longjmp(segfault_env, 1);
 		break;
 	}
 }
@@ -260,7 +261,7 @@ int read_socket(int sockfd, char *data, char *next) {
 int main(void) {
 	char *data = (char*) calloc(sizeof(char), (2 * MAXBUFF));
 	char *next = (char*) calloc(sizeof(char), (2 * MAXBUFF));
-	char *request, auth = 0;
+	char *request;
 	codemap_t codemap = {
 		.filename = "./libz03.so",
 		.handler  = NULL,
@@ -274,6 +275,7 @@ int main(void) {
 	/* Initializing global variables */
 	global_core.startup_time = time(NULL);
 	global_core.rehash_count = 0;
+	global_core.auth         = 0;
 	
 	signal_intercept(SIGSEGV, sighandler);
 	signal_intercept(SIGCHLD, sighandler);
@@ -292,6 +294,10 @@ int main(void) {
 	sockfd = init_socket(IRC_SERVER, IRC_PORT);
 	
 	while(1) {
+		/* Reloading lib on segmentation fault */
+		if(setjmp(segfault_env) == 2)
+			loadlib(&codemap);
+		
 		read_socket(sockfd, data, next);
 		printf("[ ] IRC: >> %s\n", data);
 		
@@ -305,11 +311,11 @@ int main(void) {
 			continue;
 		}
 		
-		if(!auth && !strncmp(request, "NOTICE AUTH", 11)) {
+		if(!global_core.auth && !strncmp(request, "NOTICE AUTH", 11)) {
 			raw_socket(sockfd, "NICK " IRC_NICK);
 			raw_socket(sockfd, "USER " IRC_USERNAME " " IRC_USERNAME " " IRC_USERNAME " :" IRC_REALNAME);
 			
-			auth = 1;
+			global_core.auth = 1;
 			continue;
 		}
 		

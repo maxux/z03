@@ -30,6 +30,8 @@
 		time_t rehash_time;
 		unsigned int rehash_count;
 		
+		char auth;
+		
 	} global_core_t;
 	
 	typedef struct whois_t {
