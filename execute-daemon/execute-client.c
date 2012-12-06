@@ -35,6 +35,11 @@
 
 int sockfd;
 
+void dies(int sock) {
+	close(sock);
+	exit(EXIT_SUCCESS);
+}
+
 void raw_socket(int sockfd, char *message) {
 	char *sending = (char*) malloc(sizeof(char*) * strlen(message) + 3);
 	
@@ -93,7 +98,7 @@ int main(int argc, char *argv[]) {
 			
 			if(length++ > 4) {
 				irc_privmsg(chan, "Output truncated. Too verbose.");
-				return 0;
+				dies(sock);
 			}
 			
 			print = match + 1;
@@ -109,7 +114,7 @@ int main(int argc, char *argv[]) {
 			
 			if(length++ > 4) {
 				irc_privmsg(chan, "Output truncated. Too verbose.");
-				return 0;
+				dies(sock);
 			}
 		}
 	}

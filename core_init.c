@@ -174,7 +174,7 @@ char *skip_server(char *data) {
 }
 
 int init_socket(char *server, int port) {
-	int sockfd = -1, connresult;
+	int fd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
 	
@@ -188,17 +188,19 @@ int init_socket(char *server, int port) {
 	server_addr.sin_port = htons(port);
 
 	/* Creating Socket */
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("[-] socket: socket");
+		return -1;
+	}
 
 	/* Init Connection */
-	if((connresult = connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr))) < 0) {
+	if((connresult = connect(fd, (struct sockaddr *) &server_addr, sizeof(server_addr))) < 0) {
 		perror("[-] socket: connect");
-		close(sockfd);
+		close(fd);
 		return -1;
 	}
 	
-	return sockfd;
+	return fd;
 }
 
 void raw_socket(int sockfd, char *message) {
