@@ -23,6 +23,7 @@
 	void action_run_c(ircmessage_t *message, char *args);
 	void action_run_py(ircmessage_t *message, char *args);
 	void action_run_hs(ircmessage_t *message, char *args);
+	void action_run_php(ircmessage_t *message, char *args);
 	
 	#define MAX_NOTES	4
 #endif

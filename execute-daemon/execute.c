@@ -30,11 +30,13 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <time.h>
+#include <signal.h>
 
 #define LISTEN_PORT	45871
 #define LISTEN_ADDR	"0.0.0.0"
 #define TARGET_FILE	"execute-code.template"
 #define TARGET_FILE_HS	"execute-code-hs.template"
+#define TARGET_FILE_PHP	"execute-code-php.template"
 
 typedef struct thread_data_t {
 	int sockfd;
@@ -52,6 +54,24 @@ void diep(char *str) {
 	exit(EXIT_FAILURE);
 }
 
+int signal_ignore(int signal) {
+	struct sigaction sig;
+	int ret;
+	
+	/* Building empty signal set */
+	sigemptyset(&sig.sa_mask);
+	
+	/* Building Signal */
+	sig.sa_handler = SIG_IGN;
+	sig.sa_flags   = SA_NOCLDWAIT;
+	
+	/* Installing Signal */
+	if((ret = sigaction(signal, &sig, NULL)) == -1)
+		perror("sigaction");
+	
+	return ret;
+}
+
 int main(void) {
 	int sockfd, new_fd;
 	struct sockaddr_in addr_listen, addr_client;
@@ -60,6 +80,9 @@ int main(void) {
 	thread_data_t *thread_data;
 	
 	srand(time(NULL));
+	
+	signal_ignore(SIGPIPE);
+	signal_ignore(SIGCHLD);
 
 	/* Creating Server Socket */
 	addr_listen.sin_family      = AF_INET;
@@ -171,8 +194,48 @@ void execute_hs(thread_data_t *thread_data, char *code) {
 	fclose(out);
 	
 	/* Executing */
-	sprintf(cmdline, "runhaskell %s 2>&1", tmpfile);
-	printf("[+] Running: %s\n", tmpfile);
+	sprintf(cmdline, "runghc %s 2>&1", tmpfile);
+	printf("[+] Running: %s\n", cmdline);
+	
+	if(!(cmd = popen(cmdline, "r"))) {
+		perror("[-] popen");
+		return;
+	}
+	
+	while(fgets(buffer, sizeof(buffer), cmd)) {
+		printf("[*] %s", buffer);
+		if(send(thread_data->sockfd, buffer, strlen(buffer), 0) < 0)
+			break;
+	}
+	
+	pclose(cmd);
+	
+	/* Cleaning */
+	unlink(tmpfile);
+}
+
+void execute_php(thread_data_t *thread_data, char *code) {
+	FILE *out, *cmd;
+	char buffer[4096];
+	char tmpfile[128], cmdline[256];
+	
+	/* Writing C file */
+	if(!fileread_light(TARGET_FILE_PHP, buffer, sizeof(buffer)))
+		return;
+	
+	sprintf(tmpfile, "/tmp/z03.code-%d.php", rand());
+	
+	if(!(out = fopen(tmpfile, "w"))) {
+		perror("[-] fopen");
+		return;
+	}
+	
+	fprintf(out, buffer, code);
+	fclose(out);
+	
+	/* Executing */
+	sprintf(cmdline, "php %s 2>&1", tmpfile);
+	printf("[+] Running: %s\n", cmdline);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
 		perror("[-] popen");
@@ -281,11 +344,16 @@ void * working(void *thread) {
 			printf("[ ] Code: <%s>\n", buffer + 2);
 			execute_c(thread_data, buffer + 2);
 		
-		} else if(!strncmp(buffer, "HS ", 2)) {
+		} else if(!strncmp(buffer, "HS ", 3)) {
 			printf("[ ] Lang: Haskell\n");
 			printf("[ ] Code: <%s>\n", buffer + 3);
 			execute_hs(thread_data, buffer + 3);
-			
+		
+		} else if(!strncmp(buffer, "PHP ", 4)) {
+			printf("[ ] Lang: PHP\n");
+			printf("[ ] Code: <%s>\n", buffer + 4);
+			execute_php(thread_data, buffer + 4);
+				
 		} else printf("[-] Unknown lang: %s\n", buffer);
 		
 	} else printf("[-] Nothing to read\n");
