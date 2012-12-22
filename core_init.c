@@ -177,6 +177,7 @@ int init_socket(char *server, int port) {
 	int fd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
+	struct timeval tv = {tv.tv_sec = 30, tv.tv_usec = 0};
 	
 	/* Resolving name */
 	if((he = gethostbyname(server)) == NULL)
@@ -199,6 +200,9 @@ int init_socket(char *server, int port) {
 		close(fd);
 		return -1;
 	}
+	
+	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv, sizeof(tv)))
+		diep("setsockopt SO_RCVTIMEO");
 	
 	return fd;
 }
@@ -246,15 +250,16 @@ int read_socket(int sockfd, char *data, char *next) {
 			}
 		}
 		
-		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) < 0)
-			diep("recv");
-		
-		if(rlen == 0) {
-			printf("[ ] Core: Nothing read from socket, exiting...\n");
-			exit(EXIT_FAILURE);
-		}
+		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) >= 0) {
+			if(rlen == 0) {
+				printf("[ ] Core: Warning: nothing read from socket\n");
+				usleep(120000);
+			}
+				
+			buff[rlen] = '\0';
 			
-		buff[rlen] = '\0';
+		} else if(errno != EAGAIN)
+			diep("recv");
 	}
 	
 	return 0;
