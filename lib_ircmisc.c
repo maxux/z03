@@ -215,49 +215,33 @@ char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	return stripped;
 }
 
-char * trim(char *str, unsigned int len) {
-	char *read, *write;
-	unsigned int i;
-	
-	read  = str;
-	write = str;
-	
-	/* Strip \n */
-	for(i = 0; i < len; i++) {
-		if(*read != '\n') {
-			*write = *read;
-			write++;
-		}
+char * ltrim(char *str) {
+	while(isspace(*str))
+		str++;
 		
-		read++;
+	return str;
+}
+
+char * rtrim(char *str) {
+	char *back = str + strlen(str);
+	
+	while(isspace(*--back));
+		*(back+1) = '\0';
+		
+	return str;
+}
+
+char * crlftrim(char *str) {
+	char *keep = str;
+	
+	while(*str) {
+		if(*str == '\r' || *str == '\n')
+			*str = ' ';
+		
+		str++;
 	}
 	
-	/* New line limit */
-	*write = '\0';
-	
-	/* Trim spaces before/after */
-	read  = str;
-	write = str;
-	
-	/* Before */
-	while(isspace(*read))
-		read++;
-	
-	/* Copy */
-	while(*read)
-		*write++ = *read++;
-	
-	/* After */
-	while(isspace(*write))
-		write--;
-		
-	*write = '\0';
-	
-	/* Removing double spaces */
-	while((read = strstr(str, "  ")))
-		strcpy(read, read + 1);
-	
-	return str;
+	return keep;
 }
 
 char * time_elapsed(time_t time) {

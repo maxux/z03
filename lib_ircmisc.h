@@ -2,7 +2,11 @@
 	#define __IRCMISC_H
 
 	char * clean_filename(char *file);
-	char * trim(char *str, unsigned int len);
+	
+	char * ltrim(char *str);
+	char * rtrim(char *str);
+	char * crlftrim(char *str);
+	
 	char * short_trim(char *str);
 	char * space_encode(char *str);
 	

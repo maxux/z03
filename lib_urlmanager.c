@@ -513,7 +513,6 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			sqlite3_free(sqlquery);
 			
 			free(stripped);
-			free(title);
 			free(request);
 			
 		} else printf("[-] URL: Cannot extract title\n");
@@ -606,34 +605,16 @@ int handle_url_image(char *url, curl_data_t *curl) {
 }
 
 char * url_extract_title(char *body, char *title) {
-	char *read, *write;
-	unsigned int len;
+	char *read, *end;
 	
 	if((read = strcasestr(body, "<title"))) {
-		/* Skipping attributes */
-		while(*read && *read != '>')
+		while(*read != '>')
 			read++;
+			
+		end = strcasestr(++read, "</title>");
+		*end = '\0';
 		
-		/* Skipping last > */
-		read++;
-		
-		/* Calculing length */
-		write = read;
-		while(*write && *write != '<')
-			write++;
-		
-		len = write - read;
-		title = (char*) malloc(sizeof(char) * len + 1);
-		
-		/* Copying title */
-		strncpy(title, read, len);
-		title[len] = '\0';
-		
-		if(strlen(title) > 450)
-			strcpy(title + 440, " [...]");
-		
-		/* Stripping carriege return */
-		trim(title, strlen(title));
+		title = rtrim(ltrim(crlftrim(read)));
 		
 		if(!strlen(title))
 			return NULL;
