@@ -509,7 +509,11 @@ void action_known(ircmessage_t *message, char *args) {
 void action_url(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
 	char *sqlquery;
-	char *output, *title, *url;
+	char *output = NULL, *title, *url, *nick;
+	time_t time;
+	struct tm * timeinfo;
+	char date[128], *url_nick;
+	
 	int row, len;
 	
 	if(!*args) {
@@ -520,27 +524,39 @@ void action_url(ircmessage_t *message, char *args) {
 	/* Trim last spaces */
 	short_trim(args);
 	
-	sqlquery = sqlite3_mprintf("SELECT url, title FROM url WHERE (url LIKE '%%%q%%' OR title LIKE '%%%q%%') AND chan = '%q' ORDER BY time DESC LIMIT 5;", args, args, message->chan);
+	sqlquery = sqlite3_mprintf("SELECT url, title, nick, time FROM url WHERE (url LIKE '%%%q%%' OR title LIKE '%%%q%%') AND chan = '%q' ORDER BY time DESC LIMIT 5;", args, args, message->chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 			if(row == SQLITE_ROW) {
 				url   = (char*) sqlite3_column_text(stmt, 0);
 				title = (char*) sqlite3_column_text(stmt, 1);
+				nick  = (char*) sqlite3_column_text(stmt, 2);
+				time  = (time_t) sqlite3_column_int(stmt, 3);
+				
+				timeinfo = localtime(&time);
+				strftime(date, sizeof(date), "%x %X", timeinfo);
 				
 				if(!title)
-					title = "Unknown title";
+					title = "Unknown title";				
+				
+				url_nick = (char*) malloc(sizeof(char) * strlen((char*) nick) + 4);
+				strcpy(url_nick, nick);
 					
-				len = strlen(url) + strlen(title) + 64;
+				len = strlen(url) + strlen(title) + strlen(nick) + 128;
 				output = (char*) malloc(sizeof(char) * len);
 					
-				snprintf(output, len, "PRIVMSG %s :%s (%s)", message->chan, url, title);
+				snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s | %s", message->chan, date, anti_hl(url_nick), url, title);
 				raw_socket(sockfd, output);
 				
 				free(output);
+				free(url_nick);
 			}
 		}
 	
 	} else fprintf(stderr, "[-] Action/URL: SQL Error\n");
+	
+	if(!output)
+		irc_privmsg(message->chan, "No match found");
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);

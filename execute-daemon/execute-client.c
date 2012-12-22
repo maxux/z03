@@ -57,7 +57,7 @@ void raw_socket(int sockfd, char *message) {
 void irc_privmsg(char *chan, char *message) {
 	char buffer[2048];
 	
-	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :%s", chan, message);
+	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :[%d] %s", chan, getpid(), message);
 	raw_socket(sockfd, buffer);
 }
 

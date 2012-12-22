@@ -41,8 +41,7 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	ircmessage_t *message;
 	
 	if((fd = init_socket(SRV_RUN_CLIENT, SRV_RUN_PORT)) < 0) {
-		irc_privmsg(msg->chan, "Cannot connect the build machine");
-		irc_privmsg(message->chan, "Cannot connect the build machine");
+		irc_privmsg(msg->chan, "Cannot connect to the build machine");
 		return;
 	}
 	

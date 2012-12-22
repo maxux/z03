@@ -588,8 +588,7 @@ int handle_url_image(char *url, curl_data_t *curl) {
 	/* Open File */
 	sprintf(filename, "%s/%s", OUTPUT_PATH, temp);
 		
-	fp = fopen(filename, "w");
-	if(!fp) {
+	if(!(fp = fopen(filename, "w"))) {
 		perror(filename);
 		return 1;
 	}
