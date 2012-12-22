@@ -616,6 +616,9 @@ char * url_extract_title(char *body, char *title) {
 		
 		title = rtrim(ltrim(crlftrim(read)));
 		
+		if(strlen(title) > 250)
+			strcpy(title + 240, " [...]");
+		
 		if(!strlen(title))
 			return NULL;
 			
