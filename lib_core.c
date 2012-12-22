@@ -69,6 +69,7 @@ request_t __request[] = {
 	{.match = ".py",       .callback = action_run_py,      .man = "compile and run inline python code, from arguments: .py print('Hello world')"},
 	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
 	{.match = ".php",      .callback = action_run_php,     .man = "compile and run inline php code, from arguments: .php echo \"Hello\";"},
+	{.match = ".backlog",  .callback = action_backlog,     .man = "print some last lines"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);

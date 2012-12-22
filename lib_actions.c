@@ -42,6 +42,7 @@
 
 time_t last_chart_request = 0;
 time_t last_backurl_request = 0;
+time_t last_backlog_request = 0;
 
 void action_weather(ircmessage_t *message, char *args) {
 	char cmdline[256], *list;
@@ -640,4 +641,58 @@ void action_run_hs(ircmessage_t *message, char *args) {
 
 void action_run_php(ircmessage_t *message, char *args) {
 	lib_run_init(message, args, PHP);
+}
+
+void action_backlog(ircmessage_t *message, char *args) {
+	sqlite3_stmt *stmt;
+	char *sqlquery, *msg;
+	const unsigned char *row_nick, *row_msg;
+	time_t row_time;
+	struct tm * timeinfo;
+	char date[128], *log_nick;
+	size_t len, row;
+	(void) args;
+	
+	/* Flood Protection */
+	if(time(NULL) - (60 * 10) < last_backlog_request) {
+		irc_privmsg(message->chan, "Avoiding flood, bitch !");
+		return;
+		
+	} else last_backlog_request = time(NULL);
+	
+	sqlquery = sqlite3_mprintf("SELECT nick, timestamp, message FROM "
+				   "  (SELECT nick, timestamp, message FROM logs WHERE chan = '%q' ORDER BY id DESC LIMIT 1, 7) "
+				   "ORDER BY timestamp ASC", message->chan);
+	
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
+			if(row == SQLITE_ROW) {
+				row_nick  = sqlite3_column_text(stmt, 0);
+				row_time  = sqlite3_column_int(stmt, 1);
+				row_msg   = sqlite3_column_text(stmt, 2);
+				
+				/* Date formating */
+				timeinfo = localtime(&row_time);
+				strftime(date, sizeof(date), "%X", timeinfo);
+				
+				log_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
+				strcpy(log_nick, (char*) row_nick);
+				
+				len = strlen(log_nick) * strlen((char*) row_msg) + 64;
+				msg = (char*) malloc(sizeof(char) * len + 1);
+					
+				snprintf(msg, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, date, anti_hl(log_nick), row_msg);
+				
+				raw_socket(sockfd, msg);
+				
+				free(log_nick);
+				free(msg);
+			}
+		}
+	
+	} else fprintf(stderr, "[-] URL Parser: cannot select logs\n");
+	
+	/* Clearing */
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
 }
