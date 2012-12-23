@@ -29,20 +29,16 @@
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
+#include "lib_list.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
 #include "lib_actions.h"
 #include "lib_chart.h"
 #include "lib_ircmisc.h"
-
 #include "lib_weather.h"
 #include "lib_somafm.h"
 #include "lib_google.h"
 #include "lib_run.h"
-
-time_t last_chart_request = 0;
-time_t last_backurl_request = 0;
-time_t last_backlog_request = 0;
 
 void action_weather(ircmessage_t *message, char *args) {
 	char cmdline[256], *list;
@@ -75,11 +71,6 @@ void action_weather(ircmessage_t *message, char *args) {
 	}
 	
 	weather_handle(message->chan, (weather_stations + id));
-	
-	/* if(weather_read_data(buffer, sizeof(buffer), id)) {
-		sprintf(cmdline, "PRIVMSG %s :%s: %s", message->chan, weather_id[id].name, buffer);
-		raw_socket(sockfd, cmdline);
-	} */
 }
 
 void action_ping(ircmessage_t *message, char *args) {
@@ -160,12 +151,10 @@ void action_stats(ircmessage_t *message, char *args) {
 	sqlquery = sqlite3_mprintf("SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) FROM url WHERE chan = '%q'", message->chan);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW) {
-				count = sqlite3_column_int(stmt, 0);
-				cnick = sqlite3_column_int(stmt, 1);
-				chits = sqlite3_column_int(stmt, 2);
-			}
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			count = sqlite3_column_int(stmt, 0);
+			cnick = sqlite3_column_int(stmt, 1);
+			chits = sqlite3_column_int(stmt, 2);
 		}
 			
 		sprintf(msg, "PRIVMSG %s :Got %d url on database for %d nicks and %d total hits", message->chan, count, cnick, chits);
@@ -182,7 +171,6 @@ void action_chart(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
 	int nbrows = 0, row, i;
 	char *sqlquery;
-	
 	char *days = NULL;
 	int *values = NULL, lines = 6;
 	char **chart, first_date[32], last_date[32];
@@ -190,12 +178,12 @@ void action_chart(ircmessage_t *message, char *args) {
 	(void) args;
 	
 	/* Flood Protection */
-	if(time(NULL) - (60 * 10) < last_chart_request) {
+	if(time(NULL) - (60 * 10) < message->channel->last_chart_request) {
 		snprintf(temp, sizeof(temp), "PRIVMSG %s :Avoiding flood, bitch !", message->chan);
 		raw_socket(sockfd, temp);
 		return;
 		
-	} else last_chart_request = time(NULL);
+	} else message->channel->last_chart_request = time(NULL);
 	
 	/* Working */          
 	sqlquery = sqlite3_mprintf("SELECT count(id), date(time, 'unixepoch') d, strftime('%%w', time, 'unixepoch') w FROM url WHERE chan = '%q' AND time > 0 GROUP BY d ORDER BY d DESC LIMIT 31", message->chan);
@@ -211,21 +199,19 @@ void action_chart(ircmessage_t *message, char *args) {
 		if((stmt = db_select_query(sqlite_db, sqlquery))) {
 			i = nbrows - 1;
 			
-			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-				if(row == SQLITE_ROW) {
-					values[i] = sqlite3_column_int(stmt, 0);	/* count value */
-					days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
+			while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+				values[i] = sqlite3_column_int(stmt, 0);	/* count value */
+				days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
+				
+				printf("[ ] Action: Chart: Day %s (url %d) is %d\n", sqlite3_column_text(stmt, 1), values[i], days[i]);
+				
+				if(i == 0)
+					strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
 					
-					printf("[ ] Action: Chart: Day %s (url %d) is %d\n", sqlite3_column_text(stmt, 1), values[i], days[i]);
-					
-					if(i == 0)
-						strcpy(first_date, (char*) sqlite3_column_text(stmt, 1));
-						
-					if(i == nbrows - 1)
-						strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
-					
-					i--;
-				}
+				if(i == nbrows - 1)
+					strcpy(last_date, (char*) sqlite3_column_text(stmt, 1));
+				
+				i--;
 			}
 		}
 			
@@ -279,37 +265,35 @@ void action_backlog_url(ircmessage_t *message, char *args) {
 	(void) args;
 	
 	/* Flood Protection */
-	if(time(NULL) - (60 * 10) < last_backurl_request) {
+	if(time(NULL) - (60 * 10) < message->channel->last_backurl_request) {
 		irc_privmsg(message->chan, "Avoiding flood, bitch !");
 		return;
 		
-	} else last_backurl_request = time(NULL);
+	} else message->channel->last_backurl_request = time(NULL);
 	
 	sqlquery = sqlite3_mprintf("SELECT url, nick, title FROM url WHERE chan = '%q' ORDER BY id DESC LIMIT 5", message->chan);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW) {
-				row_url   = sqlite3_column_text(stmt, 0);
-				row_nick  = sqlite3_column_text(stmt, 1);
-				row_title = sqlite3_column_text(stmt, 2);
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			row_url   = sqlite3_column_text(stmt, 0);
+			row_nick  = sqlite3_column_text(stmt, 1);
+			row_title = sqlite3_column_text(stmt, 2);
+			
+			url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
+			strcpy(url_nick, (char*) row_nick);
+			
+			if(!row_title)
+				row_title = (unsigned char*) "(No title)";
+			
+			len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
+			msg = (char*) malloc(sizeof(char) * len + 1);
 				
-				url_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
-				strcpy(url_nick, (char*) row_nick);
-				
-				if(!row_title)
-					row_title = (unsigned char*) "(No title)";
-				
-				len = strlen((char*) row_url) * strlen(url_nick) * strlen((char*) row_title) + 64;
-				msg = (char*) malloc(sizeof(char) * len + 1);
-					
-				snprintf(msg, len, "PRIVMSG %s :<%s> %s | %s", message->chan, anti_hl(url_nick), row_url, row_title);
-				
-				raw_socket(sockfd, msg);
-				
-				free(url_nick);
-				free(msg);
-			}
+			snprintf(msg, len, "PRIVMSG %s :<%s> %s | %s", message->chan, anti_hl(url_nick), row_url, row_title);
+			
+			raw_socket(sockfd, msg);
+			
+			free(url_nick);
+			free(msg);
 		}
 	
 	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
@@ -341,26 +325,24 @@ void action_seen(ircmessage_t *message, char *args) {
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] Action/Seen: SQL Error\n");
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			found = 1;
-			
-			timestamp = sqlite3_column_int(stmt, 0);
-			msg       = sqlite3_column_text(stmt, 1);
-			
-			printf("[ ] Action/Seen: message: <%s>\n", msg);
-			
-			len = strlen((char*) msg) + strlen(args) + sizeof(buffer) + 16;
-			output = (char*) malloc(sizeof(char) * len);
-			
-			timeinfo = localtime(&timestamp);
-			strftime(buffer, sizeof(buffer), "%A %d %B %X %Y", timeinfo);
-			
-			snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, buffer, anti_hl(args), msg);
-			raw_socket(sockfd, output);
-			
-			free(output);
-		}
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+		found = 1;
+		
+		timestamp = sqlite3_column_int(stmt, 0);
+		msg       = sqlite3_column_text(stmt, 1);
+		
+		printf("[ ] Action/Seen: message: <%s>\n", msg);
+		
+		len = strlen((char*) msg) + strlen(args) + sizeof(buffer) + 16;
+		output = (char*) malloc(sizeof(char) * len);
+		
+		timeinfo = localtime(&timestamp);
+		strftime(buffer, sizeof(buffer), "%A %d %B %X %Y", timeinfo);
+		
+		snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, buffer, anti_hl(args), msg);
+		raw_socket(sockfd, output);
+		
+		free(output);
 	}
 	
 	if(!found) {
@@ -438,10 +420,8 @@ void action_count(ircmessage_t *message, char *args) {
 	int row, count1, count2;
 	char found = 0;
 	
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
-		return;
-	}
+	if(!*args)
+		args = message->nick;
 	
 	/* Trim last spaces */
 	short_trim(args);
@@ -450,20 +430,18 @@ void action_count(ircmessage_t *message, char *args) {
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] Action/Count: SQL Error\n");
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			count1 = sqlite3_column_int(stmt, 0);
-			count2 = sqlite3_column_int(stmt, 1);
-			
-			if(count1)
-				found = 1;
-			
-			printf("[ ] Action/Count: %d / %d\n", count1, count2);
-			
-			if(count1 && count2) {
-				snprintf(output, sizeof(output), "PRIVMSG %s :Got %d lines for <%s>, which is %.2f%% of the %d total lines", message->chan, count1, anti_hl(args), ((float) count1 / count2) * 100, count2);
-				raw_socket(sockfd, output);
-			}
+	while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+		count1 = sqlite3_column_int(stmt, 0);
+		count2 = sqlite3_column_int(stmt, 1);
+		
+		if(count1)
+			found = 1;
+		
+		printf("[ ] Action/Count: %d / %d\n", count1, count2);
+		
+		if(count1 && count2) {
+			snprintf(output, sizeof(output), "PRIVMSG %s :Got %d lines for <%s>, which is %.2f%% of the %d total lines", message->chan, count1, anti_hl(args), ((float) count1 / count2) * 100, count2);
+			raw_socket(sockfd, output);
 		}
 	}
 	
@@ -526,31 +504,29 @@ void action_url(ircmessage_t *message, char *args) {
 	
 	sqlquery = sqlite3_mprintf("SELECT url, title, nick, time FROM url WHERE (url LIKE '%%%q%%' OR title LIKE '%%%q%%') AND chan = '%q' ORDER BY time DESC LIMIT 5;", args, args, message->chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW) {
-				url   = (char*) sqlite3_column_text(stmt, 0);
-				title = (char*) sqlite3_column_text(stmt, 1);
-				nick  = (char*) sqlite3_column_text(stmt, 2);
-				time  = (time_t) sqlite3_column_int(stmt, 3);
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			url   = (char*) sqlite3_column_text(stmt, 0);
+			title = (char*) sqlite3_column_text(stmt, 1);
+			nick  = (char*) sqlite3_column_text(stmt, 2);
+			time  = (time_t) sqlite3_column_int(stmt, 3);
+			
+			timeinfo = localtime(&time);
+			strftime(date, sizeof(date), "%x %X", timeinfo);
+			
+			if(!title)
+				title = "Unknown title";				
+			
+			url_nick = (char*) malloc(sizeof(char) * strlen((char*) nick) + 4);
+			strcpy(url_nick, nick);
 				
-				timeinfo = localtime(&time);
-				strftime(date, sizeof(date), "%x %X", timeinfo);
+			len = strlen(url) + strlen(title) + strlen(nick) + 128;
+			output = (char*) malloc(sizeof(char) * len);
 				
-				if(!title)
-					title = "Unknown title";				
-				
-				url_nick = (char*) malloc(sizeof(char) * strlen((char*) nick) + 4);
-				strcpy(url_nick, nick);
-					
-				len = strlen(url) + strlen(title) + strlen(nick) + 128;
-				output = (char*) malloc(sizeof(char) * len);
-					
-				snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s | %s", message->chan, date, anti_hl(url_nick), url, title);
-				raw_socket(sockfd, output);
-				
-				free(output);
-				free(url_nick);
-			}
+			snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s | %s", message->chan, date, anti_hl(url_nick), url, title);
+			raw_socket(sockfd, output);
+			
+			free(output);
+			free(url_nick);
 		}
 	
 	} else fprintf(stderr, "[-] Action/URL: SQL Error\n");
@@ -618,11 +594,9 @@ void action_notes(ircmessage_t *message, char *args) {
 	
 	sqlquery = sqlite3_mprintf("SELECT COUNT(id) FROM notes WHERE chan = '%q' AND tnick = '%q' AND seen = 0", message->chan, args);
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW) {
-				if((count = sqlite3_column_int(stmt, 0)) >= MAX_NOTES)
-					irc_privmsg(message->chan, "Message queue full");
-			}
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			if((count = sqlite3_column_int(stmt, 0)) >= MAX_NOTES)
+				irc_privmsg(message->chan, "Message queue full");
 		}
 	
 	} else fprintf(stderr, "[-] Action/URL: SQL Error\n");
@@ -670,40 +644,38 @@ void action_backlog(ircmessage_t *message, char *args) {
 	(void) args;
 	
 	/* Flood Protection */
-	if(time(NULL) - (60 * 10) < last_backlog_request) {
+	if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
 		irc_privmsg(message->chan, "Avoiding flood, bitch !");
 		return;
 		
-	} else last_backlog_request = time(NULL);
+	} else message->channel->last_backlog_request = time(NULL);
 	
 	sqlquery = sqlite3_mprintf("SELECT nick, timestamp, message FROM "
 				   "  (SELECT nick, timestamp, message FROM logs WHERE chan = '%q' ORDER BY id DESC LIMIT 1, 7) "
 				   "ORDER BY timestamp ASC", message->chan);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW) {
-				row_nick  = sqlite3_column_text(stmt, 0);
-				row_time  = sqlite3_column_int(stmt, 1);
-				row_msg   = sqlite3_column_text(stmt, 2);
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			row_nick  = sqlite3_column_text(stmt, 0);
+			row_time  = sqlite3_column_int(stmt, 1);
+			row_msg   = sqlite3_column_text(stmt, 2);
+			
+			/* Date formating */
+			timeinfo = localtime(&row_time);
+			strftime(date, sizeof(date), "%X", timeinfo);
+			
+			log_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
+			strcpy(log_nick, (char*) row_nick);
+			
+			len = strlen(log_nick) * strlen((char*) row_msg) + 64;
+			msg = (char*) malloc(sizeof(char) * len + 1);
 				
-				/* Date formating */
-				timeinfo = localtime(&row_time);
-				strftime(date, sizeof(date), "%X", timeinfo);
-				
-				log_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
-				strcpy(log_nick, (char*) row_nick);
-				
-				len = strlen(log_nick) * strlen((char*) row_msg) + 64;
-				msg = (char*) malloc(sizeof(char) * len + 1);
-					
-				snprintf(msg, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, date, anti_hl(log_nick), row_msg);
-				
-				raw_socket(sockfd, msg);
-				
-				free(log_nick);
-				free(msg);
-			}
+			snprintf(msg, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, date, anti_hl(log_nick), row_msg);
+			
+			raw_socket(sockfd, msg);
+			
+			free(log_nick);
+			free(msg);
 		}
 	
 	} else fprintf(stderr, "[-] URL Parser: cannot select logs\n");

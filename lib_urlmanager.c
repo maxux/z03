@@ -35,6 +35,7 @@
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
+#include "lib_list.h"
 #include "lib_core.h"
 #include "lib_entities.h"
 #include "lib_urlmanager.h"

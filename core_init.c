@@ -37,6 +37,7 @@
 #include "core_database.h"
 
 int sockfd;
+
 global_core_t global_core;
 jmp_buf segfault_env;
 
@@ -113,6 +114,13 @@ void loadlib(codemap_t *codemap) {
 	}
 	
 	/* Linking destruct */
+	codemap->construct = dlsym(codemap->handler, "main_construct");
+	if((error = dlerror()) != NULL) {
+		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
+		exit(EXIT_FAILURE);
+	}
+	
+	/* Linking destruct */
 	codemap->destruct = dlsym(codemap->handler, "main_destruct");
 	if((error = dlerror()) != NULL) {
 		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
@@ -122,7 +130,10 @@ void loadlib(codemap_t *codemap) {
 	global_core.rehash_time = time(NULL);
 	global_core.rehash_count++;
 	
-	printf("[+] Core: linking done\n");
+	printf("[+] Core: calling constructor...\n");
+	codemap->construct();
+	
+	printf("[+] Core: link ready\n");
 }
 
 void core_handle_private_message(char *data, codemap_t *codemap) {

@@ -24,6 +24,8 @@
 #include <iconv.h>
 #include "core_init.h"
 #include "core_database.h"
+#include "lib_list.h"
+#include "lib_core.h"
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
 
@@ -490,4 +492,16 @@ void irc_privmsg(char *chan, char *message) {
 	
 	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :%s", chan, message);
 	raw_socket(sockfd, buffer);
+}
+
+int progression_match(size_t value) {
+	size_t match = 250;
+	
+	while(match < value && match < 10000)
+		match *= 2;
+	
+	if(match == value)
+		return 1;
+		
+	return !(value % 20000);
 }

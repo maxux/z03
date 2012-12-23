@@ -9,15 +9,14 @@
 	#define IRC_REALNAME		"Zoé"
 	#define IRC_USERNAME		"z03"
 	
-	#define IRC_HARDCHAN		"#inpres"
-	
 	#ifdef __DEBUG__
 		#define IRC_NICK		"z03`test"
 		#define IRC_NICKSERV		0
 		#define IRC_NICKSERV_PASS	""
+		#define IRC_HARDCHAN		"#test"
 		
 		#ifdef __LIB_CORE_C
-			static const char *IRC_CHANNEL[] = {"#test"};
+			static const char *IRC_CHANNEL[] = {"#test", "#test2"};
 		#endif
 
 	#else
@@ -26,6 +25,7 @@
 		#define IRC_NICKSERV_PASS	PRIVATE_NICKSERV
 		#define IRC_OPER		1
 		#define IRC_OPER_PASS		PRIVATE_OPERSERV
+		#define IRC_HARDCHAN		"#inpres"
 		
 		#ifdef __LIB_CORE_C
 			static const char *IRC_CHANNEL[] = {"#inpres", "#bapteme", "#test"};

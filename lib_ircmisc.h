@@ -27,4 +27,6 @@
 	void whois_free(whois_t *whois);
 	
 	void irc_privmsg(char *chan, char *message);
+	
+	int progression_match(size_t value);
 #endif

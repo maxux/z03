@@ -37,6 +37,7 @@
 
 #include "core_init.h"
 #include "core_database.h"
+#include "lib_list.h"
 #include "lib_core.h"
 #include "lib_actions.h"
 #include "lib_entities.h"
@@ -74,6 +75,67 @@ request_t __request[] = {
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
 
+global_lib_t global_lib = {
+	.channels = NULL,
+};
+
+/*
+ * Channel Handling
+ */
+channel_t * channel_load(char *chan) {
+	sqlite3_stmt *stmt;
+	char *sqlquery, *nickname;
+	int row;
+	channel_t *channel;
+	nick_t *nick;
+	char buffer[512];
+	
+	printf("[+] Lib/Channel: creating <%s> environment...\n", chan);
+		
+	if(!(channel = (channel_t*) calloc(1, sizeof(channel_t))))
+		diep("malloc");
+	
+	/* Reading channel stats */
+	sqlquery = sqlite3_mprintf("SELECT count(id) FROM logs WHERE chan = '%q'", chan);
+	printf("[ ] Lib/Channel: loading channel length...\n");
+		
+	if((stmt = db_select_query(sqlite_db, sqlquery)))
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW)
+			channel->lines = (size_t) sqlite3_column_int(stmt, 0);
+	
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	/* Creating nick list */
+	channel->nicks = list_init(NULL);
+	
+	/* Reading nick list */
+	sqlquery = sqlite3_mprintf("SELECT nick, count(id) FROM logs WHERE chan = '%q' GROUP BY nick", chan);
+	printf("[ ] Lib/Channel: loading nick list...\n");
+		
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
+				diep("malloc");
+				
+			nickname    = (char*) sqlite3_column_text(stmt, 0);
+			nick->lines = (size_t) sqlite3_column_int(stmt, 1);
+			
+			list_append(channel->nicks, nickname, nick);
+		}
+	}
+	
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	list_append(global_lib.channels, chan, channel);
+	
+	snprintf(buffer, sizeof(buffer), "[table rehashed: got %u total lines for %u nicks on database]", channel->lines, channel->nicks->length);
+	irc_privmsg(chan, buffer);
+	
+	return channel;
+}
+
 /*
  * Chat Handling
  */
@@ -98,10 +160,14 @@ int nick_length_check(char *nick, char *channel) {
 }
 
 int pre_handle(char *data, ircmessage_t *message) {
-	// Extracting Nick
+	/* Extracting nick */
 	extract_nick(data, message->nick, sizeof(message->nick));
 	
-	// Extracting Message Chan
+	/* Highlight protection */
+	strcpy(message->nickhl, message->nick);
+	anti_hl(message->nickhl);
+	
+	/* Extracting channel */
 	data = skip_server(data);
 	data = skip_server(data);
 	extract_chan(data, message->chan, sizeof(message->chan));
@@ -110,7 +176,10 @@ int pre_handle(char *data, ircmessage_t *message) {
 	if(nick_length_check(message->nick, message->chan))
 		return 0;
 	
-	/* More Stuff Here */
+	if(!(message->channel = list_search(global_lib.channels, message->chan))) {
+		printf("[-] Lib/PreHandle: cannot find channel, reloading.\n");
+		message->channel = channel_load(message->chan);
+	}
 	
 	return 0;
 }
@@ -125,12 +194,6 @@ void handle_nick(char *data) {
 	
 	/* Skipping ':' */
 	nick++;
-	
-	/* Check Nick Length */
-	/* if(nick_length_check(nick, IRC_CHANNEL))
-		return; */
-	
-	/* More Stuff Here */
 }
 
 void handle_join(char *data) {
@@ -143,92 +206,99 @@ void handle_join(char *data) {
 	int row;
 	time_t ts;
 	
-	// curl_data_t curl;
-	// whois_t *whois;
-	
 	chan = skip_header(data);
 	
-	// extract_nick(data, nick, sizeof(nick));
-	if(irc_extract_userdata(data, &nick, &username, &host)) {
-		/* Check Nick Length */
-		if(nick_length_check(nick, chan))
-			return;
-			
-		printf("[+] Lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
-		
-		/* Insert to db */
-		sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
+	/* Extracting data */
+	if(!irc_extract_userdata(data, &nick, &username, &host)) {
+		printf("[-] Lib/Join: Extract data info failed\n");
+		return;
+	}
 	
-		if(db_simple_query(sqlite_db, sqlquery)) {
-			if((list = irc_knownuser(nick, host))) {
-				snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, nick, host, list);
-				raw_socket(sockfd, output);
-				free(list);
-			}
-			
-		} else printf("[-] Lib/Join: cannot update db, probably because nick already exists.\n");
-			
-		/* Clearing */
-		sqlite3_free(sqlquery);
-		free(username);
-		
-		/* Checking notes */	
-		sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
-		if((stmt = db_select_query(sqlite_db, sqlquery))) {
-			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-				if(row == SQLITE_ROW) {
-					fnick   = (char*) sqlite3_column_text(stmt, 0);
-					message = (char*) sqlite3_column_text(stmt, 1);
-					
-					if((ts = sqlite3_column_int(stmt, 2)) > 0) {
-						timeinfo = localtime(&ts);
-						sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-						
-					} else strcpy(timestring, "unknown");
-						
-					snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
-					raw_socket(sockfd, output);
-					
-					snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
-					raw_socket(sockfd, output);
-				}
-			}
-			
-			sqlite3_free(sqlquery);
-			sqlite3_finalize(stmt);
-			
-			sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
-			if(!db_simple_query(sqlite_db, sqlquery))
-				printf("[-] Lib/Join: cannot mark as read\n");
-		
-		} else fprintf(stderr, "[-] Action/Notes: SQL Error\n");
-		
-		/* Clearing */
-		sqlite3_free(sqlquery);
+	printf("[+] Lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
 	
-	} else printf("[-] Lib/Join: Extract data info failed\n");
+	/* Check Nick Length */
+	if(nick_length_check(nick, chan))
+		return;
 	
-	/* Tor Detection */
-	/*
-	if(!curl_download("http://torstatus.blutmagie.de/ip_list_exit.php", &curl, 1)) {
-		whois = irc_whois(nick);
-		snprintf(output, sizeof(output), "%s\n", whois->ip);
+	/* Checking if it's the bot itself */
+	if(!strcmp(nick, IRC_NICK))
+		channel_load(chan);
+	
+	/* Insert to db */
+	sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
+
+	if(db_simple_query(sqlite_db, sqlquery)) {
+		if((list = irc_knownuser(nick, host))) {
+			snprintf(output, sizeof(output), "PRIVMSG %s :%s (host: %s) is also known as: %s", chan, nick, host, list);
+			raw_socket(sockfd, output);
+			free(list);
+		}
 		
-		printf("[ ] Lib/Join: connected from <%s>\n", whois->ip);
+	} else printf("[-] Lib/Join: cannot update db, probably because nick already exists.\n");
 		
-		// Detecting tor ip
-		if(strstr(curl.data, output)) {
-			snprintf(output, sizeof(output), "MODE %s +b *!*@%s", chan, host);
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	free(username);
+	
+	/* Checking notes */	
+	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			fnick   = (char*) sqlite3_column_text(stmt, 0);
+			message = (char*) sqlite3_column_text(stmt, 1);
+			
+			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
+				timeinfo = localtime(&ts);
+				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+				
+			} else strcpy(timestring, "unknown");
+				
+			snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
 			raw_socket(sockfd, output);
 			
-			irc_kick(chan, nick, "Tor is not allowed on this channel");
+			snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
+			raw_socket(sockfd, output);
+		}
 		
-		} else printf("[ ] Lib/Join: no tor ip detected\n");
+		sqlite3_free(sqlquery);
+		sqlite3_finalize(stmt);
 		
-		free(curl.data);
-		
-	} else printf("[-] Lib/Join: cannot download tor list\n");
-	*/
+		sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
+		if(!db_simple_query(sqlite_db, sqlquery))
+			printf("[-] Lib/Join: cannot mark as read\n");
+	
+	} else fprintf(stderr, "[-] Action/Notes: SQL Error\n");
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	
+	free(host);
+	free(nick);
+}
+
+void handle_part(char *data) {
+	char *nick = NULL, *username, *host = NULL, *chan;
+	
+	if(!(chan = strstr(data, "PART #"))) {
+		printf("[-] Lib/Part: cannot get channel\n");
+		return;
+	}
+	
+	chan += 5;
+	
+	/* Extracting data */
+	if(!irc_extract_userdata(data, &nick, &username, &host)) {
+		printf("[-] Lib/Part: Extract data info failed\n");
+		return;
+	}
+	
+	printf("[+] Lib/Part: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
+	
+	/* Checking if it's the bot itself */
+	if(!strcmp(nick, IRC_NICK)) {
+		printf("[+] Lib/Part: cleaning <%s> environment...\n", chan);
+		list_remove(global_lib.channels, chan);
+	}
 	
 	free(host);
 	free(nick);
@@ -271,6 +341,8 @@ int handle_message(char *data, ircmessage_t *message) {
 	char *content, *temp;
 	unsigned int i;
 	char *url, *trueurl;
+	nick_t *nick;
+	char buffer[256];
 	
 	content = skip_server(data) + 1;
 	
@@ -281,6 +353,37 @@ int handle_message(char *data, ircmessage_t *message) {
 	if(strchr(data, '\x07')) {
 		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
 		return 0;
+	}
+	
+	/* Updating channel lines count */
+	if(progression_match(++message->channel->lines)) {
+		snprintf(buffer, sizeof(buffer), "Well done, we just reached %u lines !\n", message->channel->lines);
+		irc_privmsg(message->chan, buffer);
+	}
+	
+	/* Updating nick lines count */
+	if((nick = list_search(message->channel->nicks, message->nick))) {
+		if(progression_match(++nick->lines)) {
+			snprintf(buffer, sizeof(buffer), "Hey, %s justs reached %u lines (%.2f%% of %s) !\n", 
+					message->nickhl, nick->lines, ((double)nick->lines / message->channel->lines) * 100, message->chan);
+				
+			irc_privmsg(message->chan, buffer);
+		}
+			
+		printf("[ ] Lib/Message: %s/%s: %u (%u)\n", message->chan, message->nickhl, nick->lines, message->channel->lines);
+	
+	/* New user, adding it */
+	} else {
+		if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
+			diep("malloc");
+		
+		nick->lines = 1;
+		list_append(message->channel->nicks, message->nick, nick);
+		
+		if(message->channel->nicks->length % 100) {
+			snprintf(buffer, sizeof(buffer), "%s is the %uth nick on this channel", message->nickhl, message->channel->nicks->length);
+			irc_privmsg(message->chan, buffer);
+		}
 	}
 	
 	for(i = 0; i < __request_count; i++) {
@@ -376,13 +479,20 @@ void main_core(char *data, char *request) {
 		return;
 	}
 	
+	if(!strncmp(request, "PART", 4)) {
+		handle_part(data + 1);
+		return;
+	}
+	
 	if(!strncmp(request, "NICK", 4)) {
 		handle_nick(data + 1);
 		return;
 	}
 	
 	if(!strncmp(request, "PRIVMSG #", 9)) {
-		pre_handle(data + 1, &message);
+		if(pre_handle(data + 1, &message))
+			return;
+			
 		handle_message(skip_server(request), &message);	
 		return;
 	}
@@ -391,6 +501,10 @@ void main_core(char *data, char *request) {
 		handle_private_message(data + 1);
 		return;
 	}
+}
+
+void main_construct(void) {
+	global_lib.channels = list_init(NULL);
 }
 
 void main_destruct(void) {

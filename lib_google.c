@@ -25,9 +25,9 @@
 #include "lib_google.h"
 #include "bot.h"
 #include "core_init.h"
+#include "lib_list.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
-
 #include "lib_actions.h"
 #include "lib_ircmisc.h"
 

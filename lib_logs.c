@@ -24,6 +24,7 @@
 #include "bot.h"
 #include "core_init.h"
 #include "core_database.h"
+#include "lib_list.h"
 #include "lib_core.h"
 
 int log_privmsg(char *chan, char *nick, char *message) {

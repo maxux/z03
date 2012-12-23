@@ -6,23 +6,13 @@
 	#define MAXBUFF			4096
 	
 	typedef struct codemap_t {
-		char *filename;        /* library filename */
-		void *handler;         /* library handler */
+		char *filename;                /* library filename */
+		void *handler;                 /* library handler */
 		void (*main)(char *, char *);  /* main library function */
-		void (*destruct)(void);        /* unlinking threads, ... */
+		void (*construct)(void);       /* pre-load data */
+		void (*destruct)(void);        /* closing data, threads, ... */
 		
 	} codemap_t;
-	
-	typedef struct ircmessage_t {
-		char nick[32];
-		char chan[32];
-		
-		char *message;
-		
-		char *command;
-		char *args;
-		
-	} ircmessage_t;
 	
 	typedef struct global_core_t {
 		time_t startup_time;
@@ -47,6 +37,8 @@
 	void raw_socket(int sockfd, char *message);
 	int read_socket(int sockfd, char *data, char *next);
 	char *skip_server(char *data);
+	
+	void diep(char *str);
 	
 	void handle_private_message(char *data);
 #endif
