@@ -61,7 +61,7 @@ request_t __request[] = {
 	{.match = ".count",    .callback = action_count,       .man = "print the number of line posted by a given nick: .count nick"},
 	{.match = ".known",    .callback = action_known,       .man = "check if a given nick is already known, by hostname: .known nick"},
 	{.match = ".url",      .callback = action_url,         .man = "search on url database, by url or title. Use % as wildcard. ie: .url gang%youtube"},
-	{.match = ".goo",      .callback = action_goo,         .man = "search on Google, print the first result: .goo keywords"},
+	{.match = ".goo",      .callback = action_google,      .man = "search on Google, print the first result: .goo keywords"},
 	{.match = ".google",   .callback = action_google,      .man = "search on Google, print the 3 firsts result: .google keywords"},
 	{.match = ".help",     .callback = action_help,        .man = "print the list of all the commands available"},
 	{.match = ".man",      .callback = action_man,         .man = "print 'man page' of a given bot command: .man command"},
@@ -71,6 +71,7 @@ request_t __request[] = {
 	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
 	{.match = ".php",      .callback = action_run_php,     .man = "compile and run inline php code, from arguments: .php echo \"Hello\";"},
 	{.match = ".backlog",  .callback = action_backlog,     .man = "print some last lines"},
+	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki article"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
@@ -380,7 +381,7 @@ int handle_message(char *data, ircmessage_t *message) {
 		nick->lines = 1;
 		list_append(message->channel->nicks, message->nick, nick);
 		
-		if(message->channel->nicks->length % 100) {
+		if(!(message->channel->nicks->length % 100)) {
 			snprintf(buffer, sizeof(buffer), "%s is the %uth nick on this channel", message->nickhl, message->channel->nicks->length);
 			irc_privmsg(message->chan, buffer);
 		}
@@ -388,6 +389,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	for(i = 0; i < __request_count; i++) {
 		if((temp = match_prefix(content, __request[i].match))) {
+			message->command = content;
 			__request[i].callback(message, temp);
 			return 0;
 		}

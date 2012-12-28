@@ -16,7 +16,6 @@
 	void action_count(ircmessage_t *message, char *args);
 	void action_known(ircmessage_t *message, char *args);
 	void action_url(ircmessage_t *message, char *args);
-	void action_goo(ircmessage_t *message, char *args);
 	void action_google(ircmessage_t *message, char *args);
 	void action_man(ircmessage_t *message, char *args);
 	void action_notes(ircmessage_t *message, char *args);
@@ -25,6 +24,7 @@
 	void action_run_hs(ircmessage_t *message, char *args);
 	void action_run_php(ircmessage_t *message, char *args);
 	void action_backlog(ircmessage_t *message, char *args);
+	void action_wiki(ircmessage_t *message, char *args);
 	
 	#define MAX_NOTES	4
 #endif

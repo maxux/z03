@@ -9,7 +9,6 @@
 	} list_node_t;
 
 	typedef struct list_t {
-		void (*construct)(void);
 		void (*destruct)(void *data);
 		struct list_node_t *nodes;
 		unsigned int length;

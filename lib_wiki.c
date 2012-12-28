@@ -28,22 +28,14 @@
 #include "lib_list.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
-#include "lib_actions.h"
 #include "lib_ircmisc.h"
 
-char *baseurl = "https://www.google.com/search?hl=en&q=";
-
-google_search_t * google_search(char *keywords) {
+char * wiki_head(char *url) {
 	curl_data_t curl;
-	google_search_t *search;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
-	xmlNode *node = NULL;
-	char url[2048];
-	int i;
-	
-	snprintf(url, sizeof(url), "%s%s", baseurl, space_encode(keywords));
+	char *text = NULL;
 	
 	if(curl_download(url, &curl, 0) || !curl.length)
 		return NULL;
@@ -52,41 +44,19 @@ google_search_t * google_search(char *keywords) {
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
-	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//a[@class='l']", ctx);
+	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@id='mw-content-text']/p", ctx);
 	
-	search = (google_search_t *) calloc(1, sizeof(google_search_t));
-
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		search->length = xpathObj->nodesetval->nodeNr;
-		search->result = (google_result_t *) calloc(1, sizeof(google_result_t) * search->length);
-		
-		for(i = 0; i < xpathObj->nodesetval->nodeNr; i++) {
-			node = xpathObj->nodesetval->nodeTab[i];
-			
-			if(xmlNodeGetContent(node))
-				search->result[i].title = strdup((char *) xmlNodeGetContent(node));
-			
-			if(xmlGetProp(node, (unsigned char *) "href"))
-				search->result[i].url   = strdup((char *) xmlGetProp(node, (unsigned char *) "href"));
-		}
+		if(xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]))
+			text = strdup((char *) xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]));
 		
 		xmlXPathFreeObject(xpathObj);
 		xmlXPathFreeContext(ctx);
-	}
+		
+	} else return NULL;
 
 	xmlFreeDoc(doc);
 	free(curl.data);
 	
-	return search;
-}
-
-void google_free(google_search_t *search) {
-	unsigned int i;
-
-	for(i = 0; i < search->length; i++) {
-		free(search->result[i].title);
-		free(search->result[i].url);
-	}
-
-	free(search);
+	return text;
 }

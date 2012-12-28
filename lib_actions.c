@@ -39,6 +39,7 @@
 #include "lib_somafm.h"
 #include "lib_google.h"
 #include "lib_run.h"
+#include "lib_wiki.h"
 
 void action_weather(ircmessage_t *message, char *args) {
 	char cmdline[256], *list;
@@ -539,19 +540,12 @@ void action_url(ircmessage_t *message, char *args) {
 	sqlite3_finalize(stmt);
 }
 
-void action_goo(ircmessage_t *message, char *args) {
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
-		return;
-	}
-	
-	/* Trim last spaces */
-	short_trim(args);
-	
-	google_search(message->chan, args, 1);
-}
-
 void action_google(ircmessage_t *message, char *args) {
+	unsigned int max;
+	char msg[1024], *url;
+	google_search_t *google;
+	unsigned int i;
+
 	if(!*args) {
 		irc_privmsg(message->chan, "Missing arguments");
 		return;
@@ -559,7 +553,26 @@ void action_google(ircmessage_t *message, char *args) {
 	
 	/* Trim last spaces */
 	short_trim(args);
-	google_search(message->chan, args, 3);
+	
+	google = google_search(args);
+	if(google->length) {
+		if(!strncmp(message->command, ".google", 7))
+			max = (google->length < 3) ? google->length : 3;
+
+		else max = 1;
+
+		for(i = 0; i < max; i++) {
+			if(!(url = shurl(google->result[i].url)))
+				url = google->result[i].url;
+
+			snprintf(msg, sizeof(msg), "%u) %s | %s", i + 1, google->result[i].title, url);
+			irc_privmsg(message->chan, msg);
+			free(url);
+		}
+
+	} else irc_privmsg(message->chan, "No result");
+	
+	google_free(google);
 }
 
 void action_man(ircmessage_t *message, char *args) {
@@ -683,4 +696,36 @@ void action_backlog(ircmessage_t *message, char *args) {
 	/* Clearing */
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
+}
+
+void action_wiki(ircmessage_t *message, char *args) {
+	google_search_t *google;
+	char *data = NULL;
+	char reply[1024];
+
+	if(!*args) {
+		irc_privmsg(message->chan, "Missing arguments");
+		return;
+	}
+
+	/* Trim last spaces */
+	short_trim(args);
+
+	/* Using 'reply' for request and answer */
+	snprintf(reply, sizeof(reply), "%s wiki", args);
+	google = google_search(reply);
+
+	if(google->length) {
+		if((data = wiki_head(google->result[0].url))) {
+			if(strlen(data) > 290)
+				strcpy(data + 280, " [...]");
+
+			snprintf(reply, sizeof(reply), "Wiki: %s [%s]", data, google->result[0].url);
+			irc_privmsg(message->chan, reply);
+
+		} else irc_privmsg(message->chan, "Wiki: cannot grab data from wikipedia");
+	} else irc_privmsg(message->chan, "Wiki: not found");
+
+	free(data);
+	google_free(google);
 }
