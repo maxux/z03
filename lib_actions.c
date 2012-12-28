@@ -41,6 +41,16 @@
 #include "lib_run.h"
 #include "lib_wiki.h"
 
+int action_parse_args(ircmessage_t *message, char *args) {
+	if(!*args) {
+		irc_privmsg(message->chan, "Missing arguments");
+		return 0;
+		
+	} else short_trim(args);
+	
+	return 1;
+}
+
 void action_weather(ircmessage_t *message, char *args) {
 	char cmdline[256], *list;
 	unsigned int i;
@@ -314,13 +324,8 @@ void action_seen(ircmessage_t *message, char *args) {
 	struct tm * timeinfo;
 	char buffer[64], found = 0;
 	
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	if(!action_parse_args(message, args))
 		return;
-	}
-	
-	/* Trim last spaces */
-	short_trim(args);
 	
 	sqlquery = sqlite3_mprintf("SELECT timestamp, message FROM logs WHERE chan = '%q' AND nick = '%q' ORDER BY timestamp DESC LIMIT 1", message->chan, args);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
@@ -396,10 +401,8 @@ void action_dns(ircmessage_t *message, char *args) {
 	char reply[256];
 	char *ipbuf;
 	
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	if(!action_parse_args(message, args))
 		return;
-	}
 		
 	if((he = gethostbyname(args)) == NULL) {
 		sprintf(reply, "PRIVMSG %s :Cannot resolve host", message->chan);
@@ -421,11 +424,8 @@ void action_count(ircmessage_t *message, char *args) {
 	int row, count1, count2;
 	char found = 0;
 	
-	if(!*args)
-		args = message->nick;
-	
-	/* Trim last spaces */
-	short_trim(args);
+	if(!action_parse_args(message, args))
+		return;
 	
 	sqlquery = sqlite3_mprintf("SELECT COUNT(*) as match, (SELECT COUNT(*) FROM logs WHERE chan = '%q') as total FROM logs WHERE nick = '%q' AND chan = '%q';", message->chan, args, message->chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
@@ -461,12 +461,8 @@ void action_known(ircmessage_t *message, char *args) {
 	char output[256];
 	whois_t *whois;
 		
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	if(!action_parse_args(message, args))
 		return;
-	}
-	
-	short_trim(args);
 	
 	if((whois = irc_whois(args))) {
 		if((list = irc_knownuser(args, whois->host))) {
@@ -492,16 +488,10 @@ void action_url(ircmessage_t *message, char *args) {
 	time_t time;
 	struct tm * timeinfo;
 	char date[128], *url_nick;
-	
 	int row, len;
 	
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	if(!action_parse_args(message, args))
 		return;
-	}
-	
-	/* Trim last spaces */
-	short_trim(args);
 	
 	sqlquery = sqlite3_mprintf("SELECT url, title, nick, time FROM url WHERE (url LIKE '%%%q%%' OR title LIKE '%%%q%%') AND chan = '%q' ORDER BY time DESC LIMIT 5;", args, args, message->chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
@@ -545,31 +535,26 @@ void action_google(ircmessage_t *message, char *args) {
 	char msg[1024], *url;
 	google_search_t *google;
 	unsigned int i;
-
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	
+	if(!action_parse_args(message, args))
 		return;
-	}
 	
-	/* Trim last spaces */
-	short_trim(args);
-	
-	google = google_search(args);
+	google = google_search(args);	
 	if(google->length) {
 		if(!strncmp(message->command, ".google", 7))
 			max = (google->length < 3) ? google->length : 3;
-
+		
 		else max = 1;
-
+		
 		for(i = 0; i < max; i++) {
 			if(!(url = shurl(google->result[i].url)))
 				url = google->result[i].url;
-
+			
 			snprintf(msg, sizeof(msg), "%u) %s | %s", i + 1, google->result[i].title, url);
 			irc_privmsg(message->chan, msg);
 			free(url);
 		}
-
+		
 	} else irc_privmsg(message->chan, "No result");
 	
 	google_free(google);
@@ -579,10 +564,8 @@ void action_man(ircmessage_t *message, char *args) {
 	char reply[1024];
 	unsigned int i;
 	
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	if(!action_parse_args(message, args))
 		return;
-	}
 	
 	for(i = 0; i < __request_count; i++) {
 		if(match_prefix(args, __request[i].match + 1)) {
@@ -702,30 +685,25 @@ void action_wiki(ircmessage_t *message, char *args) {
 	google_search_t *google;
 	char *data = NULL;
 	char reply[1024];
-
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
+	
+	if(!action_parse_args(message, args))
 		return;
-	}
-
-	/* Trim last spaces */
-	short_trim(args);
-
+	
 	/* Using 'reply' for request and answer */
-	snprintf(reply, sizeof(reply), "%s wiki", args);
+	snprintf(reply, sizeof(reply), "site:fr.wikipedia.org %s", args);
 	google = google_search(reply);
-
+	
 	if(google->length) {
-		if((data = wiki_head(google->result[0].url))) {
+		if((data = wiki_head(google->result[0].url))) {			
 			if(strlen(data) > 290)
 				strcpy(data + 280, " [...]");
-
+			
 			snprintf(reply, sizeof(reply), "Wiki: %s [%s]", data, google->result[0].url);
 			irc_privmsg(message->chan, reply);
-
-		} else irc_privmsg(message->chan, "Wiki: cannot grab data from wikipedia");
+			
+		} else irc_privmsg(message->chan, "Wiki: cannot grab data from wikipedia");		
 	} else irc_privmsg(message->chan, "Wiki: not found");
-
+	
 	free(data);
 	google_free(google);
 }
