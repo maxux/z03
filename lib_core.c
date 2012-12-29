@@ -71,7 +71,8 @@ request_t __request[] = {
 	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
 	{.match = ".php",      .callback = action_run_php,     .man = "compile and run inline php code, from arguments: .php echo \"Hello\";"},
 	{.match = ".backlog",  .callback = action_backlog,     .man = "print some last lines"},
-	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki article"},
+	{.match = ".wi",       .callback = action_wiki,        .man = "summary an english wikipedia's article: .wiki keywords"},
+	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki's international article: .wiki lang keywords"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);

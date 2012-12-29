@@ -683,14 +683,34 @@ void action_backlog(ircmessage_t *message, char *args) {
 
 void action_wiki(ircmessage_t *message, char *args) {
 	google_search_t *google;
-	char *data = NULL;
+	char lang[64] = {0};
+	char *data = NULL, *match;
 	char reply[1024];
+	size_t matchlen;
 	
 	if(!action_parse_args(message, args))
 		return;
 	
+	/* Wiki International */
+	if(!strncmp(message->command, ".wiki", 5)) {
+		if(!(match = strchr(args, ' ')) || (match - args >= (signed) sizeof(lang))) {
+			irc_privmsg(message->chan, "Wiki Intl: wrong arguments");
+			return;
+		}
+
+		matchlen = match - args;
+
+		strncpy(lang, args, matchlen);
+		lang[matchlen] = '\0';
+
+		args += matchlen + 1;
+
+	} else strcpy(lang, "en");
+
 	/* Using 'reply' for request and answer */
-	snprintf(reply, sizeof(reply), "site:fr.wikipedia.org %s", args);
+	printf("[+] Wikipedia: request (lang: %s): %s\n", lang, args);
+
+	snprintf(reply, sizeof(reply), "site:%s.wikipedia.org %s", lang, args);
 	google = google_search(reply);
 	
 	if(google->length) {
@@ -698,7 +718,7 @@ void action_wiki(ircmessage_t *message, char *args) {
 			if(strlen(data) > 290)
 				strcpy(data + 280, " [...]");
 			
-			snprintf(reply, sizeof(reply), "Wiki: %s [%s]", data, google->result[0].url);
+			snprintf(reply, sizeof(reply), "Wiki (%s): %s [%s]", lang, data, google->result[0].url);
 			irc_privmsg(message->chan, reply);
 			
 		} else irc_privmsg(message->chan, "Wiki: cannot grab data from wikipedia");		

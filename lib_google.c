@@ -69,11 +69,10 @@ google_search_t * google_search(char *keywords) {
 			if(xmlGetProp(node, (unsigned char *) "href"))
 				search->result[i].url   = strdup((char *) xmlGetProp(node, (unsigned char *) "href"));
 		}
-		
-		xmlXPathFreeObject(xpathObj);
-		xmlXPathFreeContext(ctx);
 	}
 
+	xmlXPathFreeObject(xpathObj);
+	xmlXPathFreeContext(ctx);
 	xmlFreeDoc(doc);
 	free(curl.data);
 	

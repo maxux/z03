@@ -49,12 +49,10 @@ char * wiki_head(char *url) {
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		if(xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]))
 			text = strdup((char *) xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]));
-		
-		xmlXPathFreeObject(xpathObj);
-		xmlXPathFreeContext(ctx);
-		
-	} else return NULL;
+	}
 
+	xmlXPathFreeObject(xpathObj);
+	xmlXPathFreeContext(ctx);
 	xmlFreeDoc(doc);
 	free(curl.data);
 	
