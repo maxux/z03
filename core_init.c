@@ -313,8 +313,10 @@ int main(void) {
 	
 	while(1) {
 		/* Reloading lib on segmentation fault */
-		if(setjmp(segfault_env) == 2)
+		if(setjmp(segfault_env) == 1) {
 			loadlib(&codemap);
+			continue;
+		}
 		
 		read_socket(sockfd, data, next);
 		printf("[ ] IRC: >> %s\n", data);

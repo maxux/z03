@@ -40,6 +40,8 @@
 #include "lib_google.h"
 #include "lib_run.h"
 #include "lib_wiki.h"
+#include "lib_lastfm.h"
+#include "lib_settings.h"
 
 int action_parse_args(ircmessage_t *message, char *args) {
 	if(!*args) {
@@ -52,9 +54,8 @@ int action_parse_args(ircmessage_t *message, char *args) {
 }
 
 void action_weather(ircmessage_t *message, char *args) {
-	char cmdline[256], *list;
-	unsigned int i;
-	int id = 2;	// default
+	char cmdline[256], *list, *value;
+	int id;
 	
 	/* Checking arguments */
 	if(*args) {
@@ -64,7 +65,7 @@ void action_weather(ircmessage_t *message, char *args) {
 			if(!list)
 				return;
 				
-			sprintf(cmdline, "PRIVMSG %s :Stations list: %s (Default: %s)", message->chan, list, weather_stations[id].ref);
+			sprintf(cmdline, "PRIVMSG %s :Stations list: %s (Default: %s)", message->chan, list, weather_stations[weather_default_station].ref);
 			raw_socket(sockfd, cmdline);
 			
 			free(list);
@@ -73,13 +74,13 @@ void action_weather(ircmessage_t *message, char *args) {
 		}
 		
 		/* Searching station */
-		for(i = 0; i < weather_stations_count; i++) {
-			if(!strcmp(args, weather_stations[i].ref)) {
-				id = i;
-				break;
-			}
-		}
-	}
+		id = weather_get_station(args);
+
+	} else if((value = settings_get(message->nick, "weather"))) {
+			id = weather_get_station(value);
+			free(value);
+
+	} else id = weather_default_station;
 	
 	weather_handle(message->chan, (weather_stations + id));
 }
@@ -312,55 +313,6 @@ void action_backlog_url(ircmessage_t *message, char *args) {
 	/* Clearing */
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
-}
-
-void action_seen(ircmessage_t *message, char *args) {
-	sqlite3_stmt *stmt;
-	char *sqlquery;
-	const unsigned char *msg;
-	char *output;
-	time_t timestamp;
-	int row, len;
-	struct tm * timeinfo;
-	char buffer[64], found = 0;
-	
-	if(!action_parse_args(message, args))
-		return;
-	
-	sqlquery = sqlite3_mprintf("SELECT timestamp, message FROM logs WHERE chan = '%q' AND nick = '%q' ORDER BY timestamp DESC LIMIT 1", message->chan, args);
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] Action/Seen: SQL Error\n");
-	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
-		found = 1;
-		
-		timestamp = sqlite3_column_int(stmt, 0);
-		msg       = sqlite3_column_text(stmt, 1);
-		
-		printf("[ ] Action/Seen: message: <%s>\n", msg);
-		
-		len = strlen((char*) msg) + strlen(args) + sizeof(buffer) + 16;
-		output = (char*) malloc(sizeof(char) * len);
-		
-		timeinfo = localtime(&timestamp);
-		strftime(buffer, sizeof(buffer), "%A %d %B %X %Y", timeinfo);
-		
-		snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, buffer, anti_hl(args), msg);
-		raw_socket(sockfd, output);
-		
-		free(output);
-	}
-	
-	if(!found) {
-		output = (char*) malloc(sizeof(char) * 128);
-		snprintf(output, 128, "PRIVMSG %s :No match found for <%s>", message->chan, args);
-		raw_socket(sockfd, output);
-		free(output);
-	}
-	
-	/* Clearing */
-	sqlite3_free(sqlquery);
-	sqlite3_finalize(stmt);
 }
 
 void action_somafm(ircmessage_t *message, char *args) {
@@ -635,30 +587,39 @@ void action_backlog(ircmessage_t *message, char *args) {
 	const unsigned char *row_nick, *row_msg;
 	time_t row_time;
 	struct tm * timeinfo;
-	char date[128], *log_nick;
+	char date[128], *log_nick, found = 0;
 	size_t len, row;
-	(void) args;
 	
-	/* Flood Protection */
-	if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
-		irc_privmsg(message->chan, "Avoiding flood, bitch !");
-		return;
+	if(*args) {
+		short_trim(args);
+		sqlquery = sqlite3_mprintf("SELECT nick, timestamp, message FROM "
+		                           "  (SELECT nick, timestamp, message FROM logs WHERE chan = '%q' AND nick = '%q' ORDER BY id DESC LIMIT 4) "
+		                           "ORDER BY timestamp ASC", message->chan, args);
+
+	} else {
+		/* Flood Protection */
+		if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
+			irc_privmsg(message->chan, "Avoiding flood, bitch !");
+			return;
+
+		} else message->channel->last_backlog_request = time(NULL);
 		
-	} else message->channel->last_backlog_request = time(NULL);
-	
-	sqlquery = sqlite3_mprintf("SELECT nick, timestamp, message FROM "
-				   "  (SELECT nick, timestamp, message FROM logs WHERE chan = '%q' ORDER BY id DESC LIMIT 1, 7) "
-				   "ORDER BY timestamp ASC", message->chan);
+		sqlquery = sqlite3_mprintf("SELECT nick, timestamp, message FROM "
+	                                  "  (SELECT nick, timestamp, message FROM logs WHERE chan = '%q' ORDER BY id DESC LIMIT 1, 7) "
+	                                  "ORDER BY timestamp ASC", message->chan);
+	}
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			found = 1;
+
 			row_nick  = sqlite3_column_text(stmt, 0);
 			row_time  = sqlite3_column_int(stmt, 1);
 			row_msg   = sqlite3_column_text(stmt, 2);
 			
 			/* Date formating */
 			timeinfo = localtime(&row_time);
-			strftime(date, sizeof(date), "%X", timeinfo);
+			strftime(date, sizeof(date), "%d/%m/%Y %X", timeinfo);
 			
 			log_nick = (char*) malloc(sizeof(char) * strlen((char*) row_nick) + 4);
 			strcpy(log_nick, (char*) row_nick);
@@ -666,9 +627,9 @@ void action_backlog(ircmessage_t *message, char *args) {
 			len = strlen(log_nick) * strlen((char*) row_msg) + 64;
 			msg = (char*) malloc(sizeof(char) * len + 1);
 				
-			snprintf(msg, len, "PRIVMSG %s :[%s] <%s> %s", message->chan, date, anti_hl(log_nick), row_msg);
+			snprintf(msg, len, "[%s] <%s> %s", date, anti_hl(log_nick), row_msg);
 			
-			raw_socket(sockfd, msg);
+			irc_privmsg(message->chan, msg);
 			
 			free(log_nick);
 			free(msg);
@@ -676,6 +637,13 @@ void action_backlog(ircmessage_t *message, char *args) {
 	
 	} else fprintf(stderr, "[-] URL Parser: cannot select logs\n");
 	
+	if(!found) {
+		msg = (char*) malloc(sizeof(char) * 128);
+		snprintf(msg, 128, "No match found for <%s>", args);
+		irc_privmsg(message->chan, msg);
+		free(msg);
+	}
+
 	/* Clearing */
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
@@ -726,4 +694,61 @@ void action_wiki(ircmessage_t *message, char *args) {
 	
 	free(data);
 	google_free(google);
+}
+
+void action_lastfm(ircmessage_t *message, char *args) {
+	char *user, answer[512];
+	lastfm_t *lastfm;
+
+	if(*args) {
+		short_trim(args);
+		user = args;
+
+	} else if(!(user = settings_get(message->nick, "lastfm"))) {
+		irc_privmsg(message->chan, "Lastfm username not set. Please set it with: .set lastfm <username>");
+		return;
+	}
+
+	lastfm = lastfm_getplaying(user);
+	switch(lastfm->type) {
+		case ERROR:
+			snprintf(answer, sizeof(answer), "Error: %s", lastfm->message);
+		break;
+
+		case NOW_PLAYING:
+			snprintf(answer, sizeof(answer), "Now playing: %s - %s [%s]", lastfm->artist, lastfm->title, lastfm->album);
+		break;
+
+		case LAST_PLAYED:
+			snprintf(answer, sizeof(answer), "Last played: %s - %s [%s] (%s)", lastfm->artist, lastfm->title, lastfm->album, lastfm->date);
+		break;
+
+		default:
+			snprintf(answer, sizeof(answer), "Error while fetching data");
+	}
+
+	irc_privmsg(message->chan, answer);
+	lastfm_free(lastfm);
+}
+
+void action_set(ircmessage_t *message, char *args) {
+	char *match, *key, answer[512];
+
+	if(!action_parse_args(message, args))
+		return;
+
+	if(!(match = strchr(args, ' '))) {
+		irc_privmsg(message->chan, "Wrong argument");
+		return;
+	}
+
+	key = strdup(args);
+	key[match - args] = '\0';
+
+	settings_set(message->nick, key, match + 1);
+
+	snprintf(answer, sizeof(answer), "%s.%s = %s", message->nickhl, key, match + 1);
+	irc_privmsg(message->chan, answer);
+
+	free(key);
 }

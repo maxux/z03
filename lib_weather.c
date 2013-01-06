@@ -46,11 +46,22 @@ weather_station_t weather_stations[] = {
 };
 
 unsigned int weather_stations_count = sizeof(weather_stations) / sizeof(weather_station_t);
+int weather_default_station = 2;
 
 char *__weather_internal_station_url[] = {
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datametar.php&Itemid=69&id=%d",
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datastation.php&Itemid=69&id=%d&lg=2"
 };
+
+int weather_get_station(char *name) {
+	unsigned int i;
+
+	for(i = 0; i < weather_stations_count; i++)
+		if(!strcmp(name, weather_stations[i].ref))
+			return i;
+
+	return weather_default_station;
+}
 
 char * weather_station_list() {
 	char *list;

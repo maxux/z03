@@ -25,6 +25,9 @@
 	void action_run_php(ircmessage_t *message, char *args);
 	void action_backlog(ircmessage_t *message, char *args);
 	void action_wiki(ircmessage_t *message, char *args);
+	void action_lastfm(ircmessage_t *message, char *args);
+	void action_set(ircmessage_t *message, char *args);
+	// void action_get(ircmessage_t *message, char *args);
 	
 	#define MAX_NOTES	4
 #endif

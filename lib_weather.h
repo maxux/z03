@@ -29,8 +29,10 @@
 	
 	extern weather_station_t weather_stations[];
 	extern unsigned int weather_stations_count;
+	extern int weather_default_station;
 	
 	char * weather_station_list();
 	void weather_parse(const char *data, weather_data_t *weather);
 	int weather_handle(char *chan, weather_station_t *station);
+	int weather_get_station(char *name);
 #endif

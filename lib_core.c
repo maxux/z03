@@ -47,7 +47,7 @@
 #include "lib_run.h"
 
 request_t __request[] = {
-	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather station"},
+	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather [station]"},
 	{.match = ".ping",     .callback = action_ping,        .man = "ping request/reply"},
 	{.match = ".time",     .callback = action_time,        .man = "print the time"},
 	{.match = ".rand",     .callback = action_random,      .man = "random generator: .rand, .rand max, .rand min max"},
@@ -55,7 +55,6 @@ request_t __request[] = {
 	{.match = ".chart",    .callback = action_chart,       .man = "print a chart about url usage"},
 	{.match = ".backurl",  .callback = action_backlog_url, .man = "print the lastest urls posted on the chan"},
 	{.match = ".uptime",   .callback = action_uptime,      .man = "print the bot's uptime"},
-	{.match = ".seen",     .callback = action_seen,        .man = "print the last line of the given nick: .seen nick"},
 	{.match = ".somafm",   .callback = action_somafm,      .man = "print the current track on SomaFM radio: .somafm list, .somafm station"},
 	{.match = ".dns",      .callback = action_dns,         .man = "resolve a dns name address: .dns domain-name"},
 	{.match = ".count",    .callback = action_count,       .man = "print the number of line posted by a given nick: .count nick"},
@@ -70,9 +69,11 @@ request_t __request[] = {
 	{.match = ".py",       .callback = action_run_py,      .man = "compile and run inline python code, from arguments: .py print('Hello world')"},
 	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
 	{.match = ".php",      .callback = action_run_php,     .man = "compile and run inline php code, from arguments: .php echo \"Hello\";"},
-	{.match = ".backlog",  .callback = action_backlog,     .man = "print some last lines"},
+	{.match = ".backlog",  .callback = action_backlog,     .man = "print last lines: .backlog [nick]"},
 	{.match = ".wi",       .callback = action_wiki,        .man = "summary an english wikipedia's article: .wiki keywords"},
 	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki's international article: .wiki lang keywords"},
+	{.match = ".fm",       .callback = action_lastfm,      .man = "print now playing lastfm title: .fm [username]"},
+	{.match = ".set",      .callback = action_set,         .man = "set a variable value: .set var1 val1"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);

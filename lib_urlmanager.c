@@ -201,7 +201,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 		return 0;
 	
 	/* Resize data */
-	curl->data  = (char*) realloc(curl->data, (curl->length + 32));
+	curl->data  = (char*) realloc(curl->data, (curl->length + 1));
 	
 	/* Appending data */
 	memcpy(curl->data + prev, ptr, size * nmemb);
