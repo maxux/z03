@@ -39,12 +39,20 @@
 #include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
-#include "lib_actions.h"
 #include "lib_entities.h"
 #include "lib_urlmanager.h"
 #include "lib_logs.h"
 #include "lib_ircmisc.h"
 #include "lib_run.h"
+
+#include "lib_actions.h"
+#include "lib_actions_binutils.h"
+#include "lib_actions_logs.h"
+#include "lib_actions_services.h"
+#include "lib_actions_lastfm.h"
+#include "lib_actions_settings.h"
+#include "lib_actions_webservices.h"
+#include "lib_actions_run.h"
 
 request_t __request[] = {
 	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather [station]"},
@@ -53,7 +61,6 @@ request_t __request[] = {
 	{.match = ".rand",     .callback = action_random,      .man = "random generator: .rand, .rand max, .rand min max"},
 	{.match = ".stats",    .callback = action_stats,       .man = "print url statistics"},
 	{.match = ".chart",    .callback = action_chart,       .man = "print a chart about url usage"},
-	{.match = ".backurl",  .callback = action_backlog_url, .man = "print the lastest urls posted on the chan"},
 	{.match = ".uptime",   .callback = action_uptime,      .man = "print the bot's uptime"},
 	{.match = ".somafm",   .callback = action_somafm,      .man = "print the current track on SomaFM radio: .somafm list, .somafm station"},
 	{.match = ".dns",      .callback = action_dns,         .man = "resolve a dns name address: .dns domain-name"},

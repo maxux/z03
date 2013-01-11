@@ -8,7 +8,6 @@ CORE_OBJ = $(CORE_SRC:.c=.o)
 LIB_SRC = $(wildcard lib_*.c)
 LIB_OBJ = $(LIB_SRC:.c=.o)
 
-
 all: options $(CORE_EXEC) $(LIB_EXEC)
 
 options: config.mk
@@ -26,17 +25,14 @@ $(CORE_EXEC): $(CORE_OBJ)
 	$(CC) -o $@ $^ $(CORE_LDFLAGS)
 
 $(CORE_OBJ):
-	$(CC) -o $@ -c $*.c $(CORE_CFLAGS) $(EXTRA_CFLAGS)
+	$(CC) -c $(CORE_CFLAGS) $(EXTRA_CFLAGS) $*.c
 
 
 $(LIB_EXEC): $(LIB_OBJ)
 	$(CC) -o $@ $^ $(LIB_LDFLAGS)
 	
 $(LIB_OBJ): $(LIB_SRC)
-	$(CC) -o $@ -c $*.c $(LIB_CFLAGS) $(EXTRA_CFLAGS)
-
-# %.o: %.c
-#	$(CC) -o $@ -c $< $(CFLAGS)
+	$(CC) -c $(LIB_CFLAGS) $(EXTRA_CFLAGS) $*.c
 
 clean:
 	rm -fv *.o

@@ -19,49 +19,45 @@
  
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-// #include <unistd.h>
 #include "bot.h"
 #include "core_init.h"
-#include "lib_core.h"
 #include "lib_database.h"
-#include "lib_list.h"
-#include "lib_urlmanager.h"
+#include "lib_core.h"
 #include "lib_actions.h"
-#include "lib_chart.h"
 #include "lib_ircmisc.h"
-#include "lib_weather.h"
-#include "lib_somafm.h"
-#include "lib_google.h"
-#include "lib_run.h"
-#include "lib_wiki.h"
-#include "lib_lastfm.h"
 #include "lib_settings.h"
+#include "lib_actions_settings.h"
 
-int action_parse_args(ircmessage_t *message, char *args) {
-	if(!*args) {
-		irc_privmsg(message->chan, "Missing arguments");
-		return 0;
-		
-	} else short_trim(args);
+void action_set(ircmessage_t *message, char *args) {
+	char *match, *key, answer[512];
 	
-	return 1;
-}
-
-void action_help(ircmessage_t *message, char *args) {
-	char list[1024];
-	unsigned int i;
-	(void) args;
+	if(!action_parse_args(message, args))
+		return;
 	
-	sprintf(list, "PRIVMSG %s :Commands: ", message->chan);
-	
-	for(i = 0; i < __request_count; i++) {
-		strcat(list, __request[i].match);
-		strcat(list, " ");
+	if(!(match = strchr(args, ' '))) {
+		irc_privmsg(message->chan, "Wrong argument");
+		return;
 	}
 	
-	raw_socket(sockfd, list);
+	key = strdup(args);
+	key[match - args] = '\0';
+	
+	settings_set(message->nick, key, match + 1);
+	
+	zsnprintf(answer, "%s.%s = %s", message->nickhl, key, match + 1);
+	irc_privmsg(message->chan, answer);
+	
+	free(key);
+}
+
+void action_unset(ircmessage_t *message, char *args) {
+	char answer[512];
+	
+	if(!action_parse_args(message, args))
+		return;
+	
+	settings_unset(message->nick, args);
+	
+	zsnprintf(answer, "%s.%s unset", message->nickhl, args);
+	irc_privmsg(message->chan, answer);
 }

@@ -5,4 +5,9 @@
 	#define PRIVATE_OPERSERV	""
 	
 	#define PRIVATE_FBCOOK		""
+	#define PRIVATE_WHATCD          ""
+	#define PRIVATE_GKS             ""
+	
+	#define LASTFM_APIKEY		""
+	#define LASTFM_APISECRET	""
 #endif

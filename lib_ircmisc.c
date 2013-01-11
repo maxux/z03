@@ -365,7 +365,11 @@ char *irc_knownuser(char *nick, char *host) {
 	nicklen = strlen(nick);
 	
 	/* Query database */
-	sqlquery = sqlite3_mprintf("SELECT nick FROM hosts WHERE host = '%q'", host);
+	sqlquery = sqlite3_mprintf(
+		"SELECT nick FROM hosts WHERE host = '%q'",
+		host
+	);
+	
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] Action/Count: SQL Error\n");
 	

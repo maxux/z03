@@ -5,9 +5,9 @@ LIB_EXEC  = libz03.so
 EXTRA_CFLAGS = # -D__DEBUG__
 
 CORE_CFLAGS  = -W -Wall -O2 -pipe -std=gnu99 -g
-CORE_LDFLAGS = -lsqlite3 -rdynamic
+CORE_LDFLAGS = -rdynamic -ldl
 
 LIB_CFLAGS   = -fpic -W -Wall -O2 -pipe -g -ansi -pedantic -std=gnu99 -I/usr/include/libxml2
-LIB_LDFLAGS  = -ldl -lcurl -lcrypto -lssl -lm -shared -lxml2 -ljansson
+LIB_LDFLAGS  = -ldl -lcurl -lcrypto -lssl -lm -shared -lxml2 -ljansson -lsqlite3
 
-CC = i686-pc-linux-gnu-gcc
+CC = gcc

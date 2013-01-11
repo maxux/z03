@@ -1,5 +1,7 @@
 #ifndef __IRCMISC_H
 	#define __IRCMISC_H
+	
+	#include "lib_urlmanager.h"
 
 	char *clean_filename(char *file);
 	

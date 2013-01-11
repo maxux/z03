@@ -1,6 +1,10 @@
 #ifndef __Z03_LIB_CORE_H
 	#define __Z03_LIB_CORE_H
 	
+	#include <time.h>
+	#include <string.h>
+	#include "lib_list.h"
+	
 	#define OUTPUT_PATH		"/var/www/perso/imagespawn/data/"
 	
 	typedef struct nick_t {
@@ -77,4 +81,6 @@
 	void handle_join(char *data);
 	
 	void irc_kick(char *chan, char *nick, char *reason);
+	
+	#define zsnprintf(x, ...) snprintf(x, sizeof(x), __VA_ARGS__)
 #endif

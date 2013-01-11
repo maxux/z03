@@ -15,10 +15,10 @@
 		
 	} list_t;
 	
-	list_t * list_init(void (*destruct)(void *));
+	list_t *list_init(void (*destruct)(void *));
 	
-	void * list_append(list_t *list, char *name, void *data);
-	void * list_search(list_t *list, char *name);
+	void *list_append(list_t *list, char *name, void *data);
+	void *list_search(list_t *list, char *name);
 	
 	int list_remove(list_t *list, char *name);
 	void list_free(list_t *list);
