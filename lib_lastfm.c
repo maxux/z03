@@ -29,101 +29,184 @@
 #include "lib_ircmisc.h"
 #include "lib_lastfm.h"
 
-#define LASTFM_URL "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=%s&format=json&user=%s"
+#define MALLOC_DEFAULT     2048
+#define LASTFM_API_BASE    "http://ws.audioscrobbler.com/2.0/"
+#define LASTFM_API_ROOT    LASTFM_API_BASE "?format=json"
 
-lastfm_t * lastfm_new() {
+/*
+ * global work:
+ *  - lastfm_t contains all needed data
+ *  - ask a request with lastfm_request_t, return a request_t
+ *    with error or reply filled with appropriate value
+ *  - when the request is completed, the request->reply is
+ *    filled with asked data
+ *  - lastfm->field *must* be malloc, request_new/free free
+ *    all fields
+ */
+
+/* lastfm root element */
+lastfm_t *lastfm_new(char *apikey, char *apisecret) {
 	lastfm_t *lastfm;
 	
-	lastfm = (lastfm_t*) malloc(sizeof(lastfm_t));
-	lastfm->type    = UNKNOWN;
-	lastfm->date    = NULL;
-	lastfm->message = NULL;
-	lastfm->total   = 0;
+	lastfm = (lastfm_t *) calloc(sizeof(lastfm_t), 1);
+	lastfm->apikey    = strdup(apikey);
+	lastfm->apisecret = strdup(apisecret);
 	
-	lastfm->artist  = NULL;
-	lastfm->title   = NULL;
-	lastfm->album   = NULL;
+	lastfm->track        = (lastfm_track_t *) calloc(sizeof(lastfm_track_t), 1);
+	lastfm->track->type  = UNKNOWN;
 	
 	return lastfm;
 }
 
 void lastfm_free(lastfm_t *lastfm) {
-	free(lastfm->date);
-	free(lastfm->message);
-	free(lastfm->artist);
-	free(lastfm->title);
-	free(lastfm->album);
+	// free root elements
+	free(lastfm->apikey);
+	free(lastfm->apisecret);
+	free(lastfm->token);
+	free(lastfm->session);
+	
+	// free track
+	free(lastfm->track->date);
+	free(lastfm->track->artist);
+	free(lastfm->track->title);
+	free(lastfm->track->album);
+	
+	// free structs
+	free(lastfm->track);
 	free(lastfm);
 }
 
-lastfm_t * lastfm_error(json_t *node, lastfm_t *lastfm) {
-	const char *errstr;
+/* lastfm request */
+lastfm_request_t *lastfm_request_new() {
+	lastfm_request_t *request;
+		
+	request = (lastfm_request_t *) calloc(sizeof(lastfm_request_t), 1);
 	
-	lastfm->type = ERROR;
-	
-	if((errstr = json_string_value(json_object_get(node, "message"))))
-		lastfm->message = strdup(errstr);
-	
-	return lastfm;
+	return request;
 }
 
-lastfm_t * lastfm_build(json_t *track, lastfm_t *lastfm) {
+void lastfm_request_free(lastfm_request_t *request) {
+	// free nodes
+	free(request->reply);
+	free(request->error);
+	free(request);
+}
+
+/* lastfm error setter and cleaner */
+static json_t *lastfm_json_load(char *json, size_t length, lastfm_request_t *request) {
+	json_t *root;
+	json_error_t error;
+	
+	if(!(root = json_loadb(json, length, 0, &error))) {
+		fprintf(stderr, "[-] lastfm/json: parsing error: line %d: %s\n", error.line, error.text);
+		
+		request->error = strdup("json parsing error");
+		
+		// clear json, warning: must be malloc
+		free(json);
+		
+		return NULL;
+	}
+	
+	// clear json, warning: must be malloc
+	free(json);
+	
+	if(!json_is_object(root)) {
+		request->error = strdup("json: root is not an object");
+		return NULL;
+	}
+	
+	return root;
+}
+
+static void *lastfm_abort_request(json_t *root, lastfm_request_t *request) {
+	json_decref(root);
+	return request;
+}
+
+static char *latsfm_json_checkerror(json_t *root) {
+	json_t *error;
+	
+	/* Checking for error */
+	error = json_object_get(root, "error");
+	if(json_is_integer(error)) {
+		fprintf(stderr, "[-] lastfm: error detected\n");
+		
+		if((json_string_value(json_object_get(root, "message"))))
+			return strdup(json_string_value(json_object_get(root, "message")));
+	}
+	
+	return NULL;
+}
+
+/* downloader wrapper */
+static int lastfm_curl_download_text(char *url, curl_data_t *data, lastfm_request_t *request) {
+	if(curl_download_text(url, data)) {
+		request->error = strdup("cannot download request content");
+		return 1;
+	}
+	
+	return 0;
+}
+
+/*
+ * CurrentTrack
+ */
+static lastfm_track_t *lastfm_build(json_t *track, lastfm_track_t *lastfm_track) {
 	json_t *node;
 	
 	/* reading artist data */
 	node = json_object_get(track, "artist");
 	if(json_is_object(node)) {
-		lastfm->artist = strdup(json_string_value(json_object_get(node, "#text")));
-		printf("[+] lastfm: artist: <%s>\n", lastfm->artist);
+		lastfm_track->artist = strdup(json_string_value(json_object_get(node, "#text")));
+		printf("[+] lastfm: artist: <%s>\n", lastfm_track->artist);
 		
 	} else fprintf(stderr, "[-] lastfm: artist object not found\n");
 	
 	/* reading album data */
 	node = json_object_get(track, "album");
 	if(json_is_object(node)) {
-		lastfm->album = strdup(json_string_value(json_object_get(node, "#text")));
+		lastfm_track->album = strdup(json_string_value(json_object_get(node, "#text")));
 		
 		/* album is empty */
-		if(!strlen(lastfm->album)) {
-			free(lastfm->album);
-			lastfm->album = strdup("album not found");
+		if(!strlen(lastfm_track->album)) {
+			free(lastfm_track->album);
+			lastfm_track->album = strdup("album not found");
 		}
 		
-		printf("[+] lastfm: album: <%s>\n", lastfm->album);
+		printf("[+] lastfm: album: <%s>\n", lastfm_track->album);
 		
 	} else fprintf(stderr, "[-] lastfm: album object not found\n");	
 	
 	/* reading (or not) date data */
 	node = json_object_get(track, "date");
 	if(json_is_object(node)) {
-		lastfm->date = strdup(json_string_value(json_object_get(node, "#text")));
-		printf("[+] lastfm: date: <%s>\n", lastfm->date);
+		lastfm_track->date = strdup(json_string_value(json_object_get(node, "#text")));
+		printf("[+] lastfm: date: <%s>\n", lastfm_track->date);
 		
 	} else fprintf(stderr, "[-] lastfm: no date found\n");	
 	
-	lastfm->title = strdup(json_string_value(json_object_get(track, "name")));
-	printf("[+] lastfm: title: <%s>\n", lastfm->title);
+	lastfm_track->title = strdup(json_string_value(json_object_get(track, "name")));
+	printf("[+] lastfm: title: <%s>\n", lastfm_track->title);
 	
-	return lastfm;
+	return lastfm_track;
 }
 
-lastfm_t * lastfm_tracks(json_t *node, lastfm_t *lastfm) {
+static lastfm_request_t *lastfm_recenttracks(json_t *node, lastfm_request_t *request, lastfm_track_t *track) {
 	json_t *tracks, *firsttrack, *attr;
 	const char *nowplaying;
 	
 	/* loading tracks */
 	tracks  = json_object_get(node, "track");
 	if(!json_is_array(tracks)) {
-		fprintf(stderr, "[-] lastfm: tracks is not an array\n");
-		lastfm->type    = ERROR;
-		lastfm->message = strdup("no recents tracks found");
-		return lastfm;
+		request->error = strdup("no recents tracks found (array not found)");
+		return NULL;
 	}
 	
 	/* counting tracks */
 	if(json_array_size(tracks) < 1) {
-		fprintf(stderr, "[-] lastfm/json: nothing on track array\n");
-		return lastfm;
+		request->error = strdup("no recents tracks found (array empty)");
+		return NULL;
 	}
 	
 	firsttrack = json_array_get(tracks, 0);	
@@ -134,64 +217,189 @@ lastfm_t * lastfm_tracks(json_t *node, lastfm_t *lastfm) {
 		
 		if(!strcmp(nowplaying, "true")) {
 			printf("[+] lastfm: track is a nowplaying track\n");
-			lastfm->type = NOW_PLAYING;	
+			track->type = NOW_PLAYING;	
 			
 		} else printf("[+] lastfm: track seems to be a last played track\n");
 		
-	} else lastfm->type = LAST_PLAYED;
+	} else track->type = LAST_PLAYED;
 	
-	lastfm_build(firsttrack, lastfm);
+	lastfm_build(firsttrack, track);
 	
-	return lastfm;
+	return request;
 }
 
-lastfm_t * lastfm_getplaying(char *user) {
+lastfm_request_t *lastfm_getplaying(lastfm_t *lastfm, lastfm_request_t *request, char *user) {
 	curl_data_t curl;
-	lastfm_t *lastfm;
 	char url[512];
-	json_t *root, *recents, *err;
-	json_error_t error;
+	json_t *root, *recents;
 	
-	lastfm = lastfm_new();
-	
-	snprintf(url, sizeof(url), LASTFM_URL, LASTFM_APIKEY, user);	
-	if(curl_download(url, &curl, 1) || !curl.length)
-		return lastfm;
+	lastfm_url(url, "&method=user.getrecenttracks&api_key=%s&user=%s", lastfm->apikey, user);
+
+	if(lastfm_curl_download_text(url, &curl, request))
+		return request;
 	
 	printf("[ ] lastfm: json dump: <%s>\n", curl.data);
 	
 	/* loading json */
-	if(!(root = json_loadb(curl.data, curl.length, 0, &error))) {
-		fprintf(stderr, "[-] lastfm/json: parsing error\n");
-		return lastfm;
-	}
+	if(!(root = lastfm_json_load(curl.data, curl.length, request)))
+		return lastfm_abort_request(root, request);
 	
-	if(!json_is_object(root)) {
-		fprintf(stderr, "[-] lastfm/json: root not an object\n");
-		goto clear;
-	}
-	
-	/* Checking for error */
-	err = json_object_get(root, "error");
-	if(json_is_integer(err)) {
-		fprintf(stderr, "[-] lastfm: error %.2f, parsing it\n", json_real_value(err));
-		lastfm_error(root, lastfm);
-		goto clear;
-	}
+	if((request->error = latsfm_json_checkerror(root)))
+		return lastfm_abort_request(root, request);
 	
 	/* Loading tracks list */
 	recents = json_object_get(root, "recenttracks");
 	if(!json_is_object(recents)) {
-		fprintf(stderr, "[-] lastfm: recenttracks not found\n");
-		goto clear;
+		request->error = strdup("json: recenttracks not found");
+		return lastfm_abort_request(root, request);
 	}
 	
-	lastfm_tracks(recents, lastfm);
+	if(lastfm_recenttracks(recents, request, lastfm->track))
+		request->reply = strdup("Success");
 	
-	/* cleaning */
-	clear:
-		json_decref(root);	
-		free(curl.data);
+	return request;
+}
+
+
+/*
+ * Love Track
+ */
+
+/*
+ * api note:
+ *  1) get Token
+ *  2) authorize client/application (http)
+ *  3) get Session
+ *  4) have Fun
+*/
+/* token */
+// sign the auth.getToken
+static char *lastfm_sig_gettoken(lastfm_t *lastfm) {
+	char *str = (char *) malloc(sizeof(char) * MALLOC_DEFAULT);
 	
-	return lastfm;
+	snprintf(str, MALLOC_DEFAULT, "api_key%smethodauth.getToken%s", lastfm->apikey, lastfm->apisecret);
+	return str;
+}
+
+// get a token
+lastfm_request_t *lastfm_api_gettoken(lastfm_t *lastfm, lastfm_request_t *request) {
+	char url[512], *sig;
+	curl_data_t curl;
+	json_t *root;
+	
+	sig = lastfm_sig_gettoken(lastfm);
+	lastfm_url(url, "&method=auth.getToken&api_key=%s&api_sig=%s", lastfm->apikey, sig);
+	free(sig);	
+	
+	if(curl_download_text(url, &curl))
+		return request;
+	
+	printf("[ ] lastfm: json dump: <%s>\n", curl.data);
+	
+	if(!(root = lastfm_json_load(curl.data, curl.length, request)))
+		return lastfm_abort_request(root, request);
+	
+	if((request->error = latsfm_json_checkerror(root)))
+		return lastfm_abort_request(root, request);
+	
+	if(json_string_value(json_object_get(root, "token")))
+		request->reply = strdup(json_string_value(json_object_get(root, "token")));
+	
+	return request;
+}
+
+// return url for client/application grant
+char *lastfm_api_authorize(lastfm_t *lastfm) {
+	char *str = (char *) malloc(sizeof(char) * MALLOC_DEFAULT);
+	
+	snprintf(str, MALLOC_DEFAULT, "http://www.last.fm/api/auth/?api_key=%s&token=%s", lastfm->apikey, lastfm->token);
+	return str;
+}
+
+/* session */
+// sign the auth.getSession
+static char *lastfm_sig_getsession(lastfm_t *lastfm) {
+	char str[MALLOC_DEFAULT], *md5;
+	
+	snprintf(str, MALLOC_DEFAULT, "api_key%smethodauth.getSessiontoken%s%s", lastfm->apikey, lastfm->token, lastfm->apisecret);
+	md5 = md5ascii(str);
+	
+	return md5;
+}
+
+// get a session key
+lastfm_request_t *lastfm_api_getsession(lastfm_t *lastfm, lastfm_request_t *request) {
+	char url[512], *sig;
+	curl_data_t curl;
+	json_t *root, *session;
+	
+	sig = lastfm_sig_getsession(lastfm);
+	lastfm_url(url, "&method=auth.getSession&api_key=%s&token=%s&api_sig=%s", lastfm->apikey, lastfm->token, sig);
+	free(sig);
+	
+	if(curl_download_text(url, &curl))
+		return request;
+	
+	printf("[ ] lastfm: json dump: <%s>\n", curl.data);
+	
+	if(!(root = lastfm_json_load(curl.data, curl.length, request)))
+		return lastfm_abort_request(root, request);
+	
+	if((request->error = latsfm_json_checkerror(root)))
+		return lastfm_abort_request(root, request);
+	
+	session = json_object_get(root, "session");
+	if(!json_is_object(session)) {
+		request->error = strdup("json: session type mismatch");
+		return lastfm_abort_request(root, request);
+	}
+	
+	if(json_string_value(json_object_get(session, "key")))
+		request->reply = strdup(json_string_value(json_object_get(session, "key")));
+	
+	return request;
+}
+
+/* love track */
+// sign the track.love
+static char *lastfm_sig_love(lastfm_t *lastfm) {
+	char str[MALLOC_DEFAULT];
+	
+	snprintf(str, MALLOC_DEFAULT, "api_key%sartist%smethodtrack.lovesk%strack%s%s",
+	                              lastfm->apikey, lastfm->track->artist, lastfm->session,
+	                              lastfm->track->title, lastfm->apisecret);
+	
+	printf("[ ] lasfm/sig: <%s>\n", str);
+	
+	return md5ascii(str);
+}
+
+// request love track
+lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
+	char post[512], *sig;
+	curl_data_t curl;
+	json_t *root;
+	
+	// FIXME: fix '&' on artist/title	
+	// building request
+	sig = lastfm_sig_love(lastfm);
+	snprintf(post, sizeof(post), "format=json&method=track.love&api_key=%s&sk=%s&api_sig=%s&artist=%s&track=%s",
+                                     lastfm->apikey, lastfm->session, sig, lastfm->track->artist, lastfm->track->title);
+	free(sig);
+	
+	if(curl_download_text_post(LASTFM_API_BASE, &curl, space_encode(post)))
+		return request;
+	
+	printf("[ ] lastfm: json dump: <%s>\n", curl.data);
+	
+	if(!(root = lastfm_json_load(curl.data, curl.length, request)))
+		return lastfm_abort_request(root, request);
+	
+	if((request->error = latsfm_json_checkerror(root)))
+		return lastfm_abort_request(root, request);
+	
+	if(json_string_value(json_object_get(root, "status")))
+		request->reply = strdup(json_string_value(json_object_get(root, "status")));
+	
+	return request;
 }

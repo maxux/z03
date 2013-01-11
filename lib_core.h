@@ -2,7 +2,6 @@
 	#define __Z03_LIB_CORE_H
 	
 	#define OUTPUT_PATH		"/var/www/perso/imagespawn/data/"
-	// #define OUTPUT_PATH		"/tmp/spawn/"
 	
 	typedef struct nick_t {
 		size_t lines;
@@ -41,7 +40,7 @@
 	
 	typedef struct request_t {
 		char *match;
-		void (*callback)(ircmessage_t *, char*);
+		void (*callback)(ircmessage_t *, char *);
 		char *man;
 		
 	} request_t;
@@ -61,7 +60,7 @@
 	extern global_lib_t global_lib;
 	
 	
-	char * match_prefix(char *data, char *match);
+	char *match_prefix(char *data, char *match);
 	
 	void main_construct(void);
 	void main_core(char *data, char *request);

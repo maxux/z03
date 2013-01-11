@@ -36,7 +36,7 @@
 #include "bot.h"
 
 #include "core_init.h"
-#include "core_database.h"
+#include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
 #include "lib_actions.h"
@@ -72,8 +72,10 @@ request_t __request[] = {
 	{.match = ".backlog",  .callback = action_backlog,     .man = "print last lines: .backlog [nick]"},
 	{.match = ".wi",       .callback = action_wiki,        .man = "summary an english wikipedia's article: .wiki keywords"},
 	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki's international article: .wiki lang keywords"},
-	{.match = ".fm",       .callback = action_lastfm,      .man = "print now playing lastfm title: .fm [username]"},
 	{.match = ".set",      .callback = action_set,         .man = "set a variable value: .set var1 val1"},
+	{.match = ".unset",    .callback = action_unset,       .man = "unset a variable value: .unset var1"},
+	{.match = ".fm",       .callback = action_lastfm,      .man = "print now playing lastfm title: .fm [username]"},
+	{.match = ".fmlove",   .callback = action_lastfmlove,  .man = "love your current track on last.fm"},
 };
 
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
@@ -121,7 +123,7 @@ channel_t * channel_load(char *chan) {
 			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
 				diep("malloc");
 				
-			nickname    = (char*) sqlite3_column_text(stmt, 0);
+			nickname    = (char *) sqlite3_column_text(stmt, 0);
 			nick->lines = (size_t) sqlite3_column_int(stmt, 1);
 			
 			list_append(channel->nicks, nickname, nick);
@@ -247,8 +249,8 @@ void handle_join(char *data) {
 	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
-			fnick   = (char*) sqlite3_column_text(stmt, 0);
-			message = (char*) sqlite3_column_text(stmt, 1);
+			fnick   = (char *) sqlite3_column_text(stmt, 0);
+			message = (char *) sqlite3_column_text(stmt, 1);
 			
 			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
 				timeinfo = localtime(&ts);
@@ -329,7 +331,7 @@ char * match_prefix(char *data, char *match) {
 void irc_kick(char *chan, char *nick, char *reason) {
 	char *request;
 	
-	request = (char*) malloc(sizeof(char) * ((strlen(chan) + strlen(nick) + strlen(reason)) + 16));
+	request = (char *) malloc(sizeof(char) * ((strlen(chan) + strlen(nick) + strlen(reason)) + 16));
 	sprintf(request, "KICK %s %s :%s", chan, nick, reason);
 	
 	raw_socket(sockfd, request);
@@ -367,7 +369,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	/* Updating nick lines count */
 	if((nick = list_search(message->channel->nicks, message->nick))) {
 		if(progression_match(++nick->lines)) {
-			snprintf(buffer, sizeof(buffer), "Hey, %s justs reached %u lines (%.2f%% of %s) !\n", 
+			snprintf(buffer, sizeof(buffer), "Hey, %s just reached %u lines (%.2f%% of %s) !\n", 
 					message->nickhl, nick->lines, ((double)nick->lines / message->channel->lines) * 100, message->chan);
 				
 			irc_privmsg(message->chan, buffer);
@@ -445,7 +447,7 @@ void irc_joinall() {
 	unsigned int i;
 	char buffer[128];
 	
-	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char*); i++) {
+	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char *); i++) {
 		sprintf(buffer, "JOIN %s", IRC_CHANNEL[i]);
 		raw_socket(sockfd, buffer);
 	}
@@ -509,8 +511,14 @@ void main_core(char *data, char *request) {
 
 void main_construct(void) {
 	global_lib.channels = list_init(NULL);
+	
+	// opening sqlite
+	sqlite_db = db_sqlite_init();
+	if(!db_sqlite_parse(sqlite_db))
+		fprintf(stderr, "[-] lib: error: cannot parse database !\n");
 }
 
 void main_destruct(void) {
-	// Nothing yet
+	// closing sqitite
+	db_sqlite_close(sqlite_db);
 }

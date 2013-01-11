@@ -55,11 +55,11 @@ char *__weather_internal_station_url[] = {
 
 int weather_get_station(char *name) {
 	unsigned int i;
-
+	
 	for(i = 0; i < weather_stations_count; i++)
 		if(!strcmp(name, weather_stations[i].ref))
-			return i;
-
+			return i;	
+	
 	return weather_default_station;
 }
 
@@ -70,7 +70,7 @@ char * weather_station_list() {
 	for(i = 0; i < weather_stations_count; i++)
 		len += strlen(weather_stations[i].ref) + 1;
 	
-	list = (char*) malloc(sizeof(char) * len + 1);
+	list = (char *) malloc(sizeof(char) * len + 1);
 	if(!list)
 		return NULL;
 	
@@ -141,7 +141,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	/* Downloading page */
 	sprintf(temp, __weather_internal_station_url[station->type], station->id);
 	
-	if(curl_download(temp, &curl, 0))
+	if(curl_download_text(temp, &curl))
 		return 1;
 	
 	if(!curl.length)
@@ -172,7 +172,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 
 	// reading date node
 	xmlXPathFreeObject(xpathObj);
-	xpathObj = xmlXPathEvalExpression((unsigned const char*) "//h3[@class='MBlegend-title']", ctx);
+	xpathObj = xmlXPathEvalExpression((unsigned const char *) "//h3[@class='MBlegend-title']", ctx);
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		printf("[-] XPath: No values\n");

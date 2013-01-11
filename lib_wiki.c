@@ -37,7 +37,7 @@ char * wiki_head(char *url) {
 	xmlXPathObject *xpathObj = NULL;
 	char *text = NULL;
 	
-	if(curl_download(url, &curl, 0) || !curl.length)
+	if(curl_download_text(url, &curl))
 		return NULL;
 	
 	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
@@ -48,7 +48,7 @@ char * wiki_head(char *url) {
 	
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		if(xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]))
-			text = strdup((char *) xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]));
+			text = strdup((char *) xmlNodeGetContent(xpathObj->nodesetval->nodeTab[0]));	
 	}
 
 	xmlXPathFreeObject(xpathObj);

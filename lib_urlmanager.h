@@ -57,6 +57,9 @@
 	size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata);
 	char * curl_cookie(char *url);
 	int curl_download(char *url, curl_data_t *data, char forcedl);
+	int curl_download_post(char *url, curl_data_t *data, char *post);
+	int curl_download_text(char *url, curl_data_t *data);
+	int curl_download_text_post(char *url, curl_data_t *data, char *post);
 	
 	char * repost();
 	

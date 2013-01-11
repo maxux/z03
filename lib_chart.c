@@ -43,10 +43,10 @@ char **ascii_chart(int *values, unsigned int values_count, unsigned int lines_co
 	char temp[128];
 	
 	/* Allocating */
-	lines = (char**) malloc(sizeof(char*) * lines_count);
+	lines = (char**) malloc(sizeof(char *) * lines_count);
 	
 	for(i = 0; i < lines_count; i++)
-		*(lines + i) = (char*) malloc(sizeof(char) * 512);	// FIXME
+		*(lines + i) = (char *) malloc(sizeof(char) * 512);	// FIXME
 	
 	/* Reducing scale */
 	max  = maxof(values, values_count);

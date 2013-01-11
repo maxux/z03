@@ -50,7 +50,7 @@ char * somafm_station_list() {
 	for(i = 0; i < somafm_stations_count; i++)
 		len += strlen(somafm_stations[i].ref) + 1;
 	
-	list = (char*) malloc(sizeof(char) * len + 1);
+	list = (char *) malloc(sizeof(char) * len + 1);
 	if(!list)
 		return NULL;
 	
@@ -78,7 +78,7 @@ int somafm_handle(char *chan, somafm_station_t *station) {
 	// downloading page
 	sprintf(temp, "http://somafm.com/%s/", station->ref);
 	
-	if(curl_download(temp, &curl, 0))
+	if(curl_download_text(temp, &curl))
 		return 1;
 	
 	if(!curl.length)

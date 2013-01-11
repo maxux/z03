@@ -34,7 +34,7 @@
 #include <openssl/sha.h>
 #include "bot.h"
 #include "core_init.h"
-#include "core_database.h"
+#include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
 #include "lib_entities.h"
@@ -51,6 +51,8 @@ char *__host_ignore[] = {NULL
 
 host_cookies_t __host_cookies[] = {
 	{.host = "facebook.com",    .cookie = PRIVATE_FBCOOK},
+	{.host = "what.cd",         .cookie = PRIVATE_WHATCD},
+	{.host = "gks.gs",          .cookie = PRIVATE_GKS},
 	{.host = NULL,              .cookie = NULL},
 };
 
@@ -69,7 +71,7 @@ char *extract_url(char *url) {
 		i++;
 	}
 	
-	if(!(out = (char*) malloc(sizeof(char) * i + 1)))
+	if(!(out = (char *) malloc(sizeof(char) * i + 1)))
 		return NULL;
 	
 	strncpy(out, url, i);
@@ -89,7 +91,7 @@ char *curl_gethost(char *url) {
 		if(!(left = strchr(match, '/')))
 			return NULL;
 		
-		buffer = (char*) malloc(sizeof(char) * (left - match) + 1);
+		buffer = (char *) malloc(sizeof(char) * (left - match) + 1);
 		snprintf(buffer, left - match + 1, "%s", match);
 		
 		return buffer;
@@ -107,6 +109,9 @@ char *curl_useragent(char *url) {
 		printf("[+] CURL/Init: host is <%s>\n", host);
 		
 		if(!strcmp(host, "t.co"))
+			useragent = CURL_USERAGENT_LEGACY;
+		
+		if(!strcmp(host, "gks.gs"))
 			useragent = CURL_USERAGENT_LEGACY;
 			
 		free(host);
@@ -169,7 +174,7 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 		curl->type = UNKNOWN_TYPE;
 		
 		len = strlen(ptr + 14);
-		curl->http_type = (char*) malloc(sizeof(char) * len + 1);
+		curl->http_type = (char *) malloc(sizeof(char) * len + 1);
 		
 		strcpy(curl->http_type, ptr + 14);
 		curl->http_type[len - 2] = '\0';
@@ -201,7 +206,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 		return 0;
 	
 	/* Resize data */
-	curl->data  = (char*) realloc(curl->data, (curl->length + 1));
+	curl->data  = (char *) realloc(curl->data, (curl->length + 1));
 	
 	/* Appending data */
 	memcpy(curl->data + prev, ptr, size * nmemb);
@@ -210,7 +215,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	return size * nmemb;
 }
 
-int curl_download(char *url, curl_data_t *data, char forcedl) {
+static int curl_download_process(char *url, curl_data_t *data, char forcedl, char *post) {
 	CURL *curl;
 	char *useragent = CURL_USERAGENT;
 	char *cookie;
@@ -248,6 +253,12 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
+		if(post) {
+			curl_easy_setopt(curl, CURLOPT_POST, 1);
+			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
+			printf("[+] CURL/Post: <%s>\n", post);
+		}
+		
 		/* Checking Host for specific Cookies */
 		if((cookie = curl_cookie(url)))
 			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
@@ -273,6 +284,32 @@ int curl_download(char *url, curl_data_t *data, char forcedl) {
 	
 	return 0;
 }
+
+/* wrapper */
+int curl_download(char *url, curl_data_t *data, char forcedl) {
+	return curl_download_process(url, data, forcedl, NULL);
+}
+
+int curl_download_post(char *url, curl_data_t *data, char *post) {
+	return curl_download_process(url, data, 1, post);
+}
+
+int curl_download_text(char *url, curl_data_t *data) {
+	if(curl_download(url, data, 1) || !data->length)
+		return 1;
+	
+	data->data[data->length] = '\0';	
+	return 0;
+}
+
+int curl_download_text_post(char *url, curl_data_t *data, char *post) {
+	if(curl_download_post(url, data, post) || !data->length)
+		return 1;
+	
+	data->data[data->length] = '\0';	
+	return 0;
+}
+
 
 void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t ts, int hit) {
 	char timestring[64];
@@ -456,7 +493,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 
 	if(curl.type == TEXT_HTML) {
 		/* Checking ignored hosts */
-		/* for(i = 0; i < sizeof(__host_ignore) / sizeof(char*); i++) {
+		/* for(i = 0; i < sizeof(__host_ignore) / sizeof(char *); i++) {
 			if(strstr(url, __host_ignore[i])) {
 				free(curl.data);
 				return 3;
@@ -466,7 +503,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 		/* Extract title */
 		if((title = url_extract_title(curl.data, title)) != NULL) {
 			len = strlen(title) + 256;
-			request = (char*) malloc(sizeof(char) * len);
+			request = (char *) malloc(sizeof(char) * len);
 			
 			if(curl.code == 404)
 				strcode = " (Error 404)";
@@ -662,11 +699,11 @@ char * shurl(char *url) {
 	size_t len;
 	
 	len = (strlen(baseurl) + strlen(url)) + 8;
-	request = (char*) malloc(sizeof(char) * len);
+	request = (char *) malloc(sizeof(char) * len);
 	
 	sprintf(request, "%s%s", baseurl, url);
 	
-	if(curl_download(request, &curl, 0) || !curl.length) {
+	if(curl_download_text(request, &curl)) {
 		free(request);
 		return NULL;
 	}

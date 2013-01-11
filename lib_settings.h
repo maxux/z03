@@ -3,4 +3,5 @@
 	
 	int settings_set(char *nick, char *key, char *value);
 	char *settings_get(char *nick, char *key);
+	int settings_unset(char *nick, char *key);
 #endif

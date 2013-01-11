@@ -45,7 +45,7 @@ google_search_t * google_search(char *keywords) {
 	
 	snprintf(url, sizeof(url), "%s%s", baseurl, space_encode(keywords));
 	
-	if(curl_download(url, &curl, 0) || !curl.length)
+	if(curl_download_text(url, &curl))
 		return NULL;
 	
 	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
@@ -55,7 +55,7 @@ google_search_t * google_search(char *keywords) {
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//a[@class='l']", ctx);
 	
 	search = (google_search_t *) calloc(1, sizeof(google_search_t));
-
+	
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		search->length = xpathObj->nodesetval->nodeNr;
 		search->result = (google_result_t *) calloc(1, sizeof(google_result_t) * search->length);
@@ -72,7 +72,7 @@ google_search_t * google_search(char *keywords) {
 	}
 
 	xmlXPathFreeObject(xpathObj);
-	xmlXPathFreeContext(ctx);
+	xmlXPathFreeContext(ctx);	
 	xmlFreeDoc(doc);
 	free(curl.data);
 	
@@ -81,11 +81,11 @@ google_search_t * google_search(char *keywords) {
 
 void google_free(google_search_t *search) {
 	unsigned int i;
-
+	
 	for(i = 0; i < search->length; i++) {
 		free(search->result[i].title);
 		free(search->result[i].url);
 	}
-
+	
 	free(search);
 }

@@ -23,7 +23,7 @@
 #include <time.h>
 #include "bot.h"
 #include "core_init.h"
-#include "core_database.h"
+#include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
 

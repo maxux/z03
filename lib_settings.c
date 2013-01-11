@@ -22,7 +22,7 @@
 #include <jansson.h>
 #include "bot.h"
 #include "core_init.h"
-#include "core_database.h"
+#include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
 #include "lib_settings.h"
@@ -63,4 +63,22 @@ char *settings_get(char *nick, char *key) {
 	sqlite3_free(sqlquery);
 	
 	return row_value;
+}
+
+int settings_unset(char *nick, char *key) {
+	char *sqlquery;
+	int retcode;
+	
+	sqlquery = sqlite3_mprintf("DELETE FROM settings WHERE nick = '%q' AND key = LOWER('%q')", nick, key);
+	
+	if(!db_simple_query(sqlite_db, sqlquery)) {
+		fprintf(stderr, "[-] settings/set: cannot insert data\n");
+		retcode = 1;
+	
+	} else retcode = 0;
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	
+	return retcode;
 }

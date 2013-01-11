@@ -34,7 +34,6 @@
 #include <setjmp.h>
 #include "bot.h"
 #include "core_init.h"
-#include "core_database.h"
 
 int sockfd;
 
@@ -159,11 +158,6 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 				printf("[+] Core: rehashing code...\n");
 				loadlib(codemap);
 				
-			} else if(!strncmp(request, ".reloadsql", 10)) {
-				printf("[+] Core: reloading sql database...\n");
-				if(!db_sqlite_close(sqlite_db))
-					db_sqlite_init();
-				
 			} else raw_socket(sockfd, request);
 		}
 		
@@ -212,14 +206,14 @@ int init_socket(char *server, int port) {
 		return -1;
 	}
 	
-	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv, sizeof(tv)))
+	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
 		diep("setsockopt SO_RCVTIMEO");
 	
 	return fd;
 }
 
 void raw_socket(int sockfd, char *message) {
-	char *sending = (char*) malloc(sizeof(char*) * strlen(message) + 3);
+	char *sending = (char *) malloc(sizeof(char *) * strlen(message) + 3);
 	
 	printf("[+] IRC: << %s\n", message);
 	
@@ -242,7 +236,7 @@ int read_socket(int sockfd, char *data, char *next) {
 	
 	while(1)  {
 		free(temp);
-		temp = (char*) malloc(sizeof(char*) * (strlen(next) + MAXBUFF));
+		temp = (char *) malloc(sizeof(char *) * (strlen(next) + MAXBUFF));
 		
 		tlen = sprintf(temp, "%s%s", next, buff);
 		
@@ -277,8 +271,8 @@ int read_socket(int sockfd, char *data, char *next) {
 }
 
 int main(void) {
-	char *data = (char*) calloc(sizeof(char), (2 * MAXBUFF));
-	char *next = (char*) calloc(sizeof(char), (2 * MAXBUFF));
+	char *data = (char *) calloc(sizeof(char), (2 * MAXBUFF));
+	char *next = (char *) calloc(sizeof(char), (2 * MAXBUFF));
 	char *request;
 	codemap_t codemap = {
 		.filename = "./libz03.so",
@@ -286,6 +280,8 @@ int main(void) {
 		.main     = NULL,
 		.destruct = NULL,
 	};
+	
+	printf("[+] Core: Loading...\n");
 	
 	/* Init random */
 	srand(time(NULL));
@@ -300,12 +296,6 @@ int main(void) {
 	
 	/* Loading dynamic code */
 	loadlib(&codemap);
-	
-	printf("[+] Core: Loading...\n");
-	
-	sqlite_db = db_sqlite_init();
-	if(!db_sqlite_parse(sqlite_db))
-		return 1;
 	
 	printf("[+] Core: Connecting...\n");
 	

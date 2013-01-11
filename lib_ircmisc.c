@@ -22,8 +22,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <iconv.h>
+#include <openssl/md5.h>
 #include "core_init.h"
-#include "core_database.h"
+#include "lib_database.h"
 #include "lib_list.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
@@ -80,7 +81,7 @@ void debug(char *data, size_t len) {
 	printf("\n");
 }
 
-char * clean_filename(char *file) {
+char *clean_filename(char *file) {
 	int i = 0;
 	
 	while(*(file + i)) {
@@ -93,7 +94,7 @@ char * clean_filename(char *file) {
 	return file;
 }
 
-char * anti_hl(char *nick) {
+char *anti_hl(char *nick) {
 	char temp[64];
 	
 	strcpy(temp, nick);
@@ -143,7 +144,7 @@ size_t iconvit(iconv_data_t *ico) {
 	return result;
 }
 
-char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
+char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	char *stripped = NULL, *convert = NULL;
 	int allocation, s;
 	char *read, *write;
@@ -153,12 +154,12 @@ char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	allocation = ((len * 3) + 8);
 	printf("[.] AntiHL: Allocating: %u bytes (original: %u)\n", allocation, len);
 	
-	stripped = (char*) malloc(sizeof(char) * allocation);
+	stripped = (char *) malloc(sizeof(char) * allocation);
 	bzero(stripped, allocation);
 	
 	/* Checking if string is probably an iso string */
 	if(charset != UNKNOWN_CHARSET && charset != UTF_8) {
-		convert = (char*) malloc(sizeof(char) * allocation);
+		convert = (char *) malloc(sizeof(char) * allocation);
 		
 		iconvme.outchar = "utf-8";
 		iconvme.instr   = str;
@@ -217,14 +218,14 @@ char * anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	return stripped;
 }
 
-char * ltrim(char *str) {
+char *ltrim(char *str) {
 	while(isspace(*str))
 		str++;
 		
 	return str;
 }
 
-char * rtrim(char *str) {
+char *rtrim(char *str) {
 	char *back = str + strlen(str);
 	
 	while(isspace(*--back));
@@ -233,7 +234,7 @@ char * rtrim(char *str) {
 	return str;
 }
 
-char * crlftrim(char *str) {
+char *crlftrim(char *str) {
 	char *keep = str;
 	
 	while(*str) {
@@ -246,8 +247,8 @@ char * crlftrim(char *str) {
 	return keep;
 }
 
-char * time_elapsed(time_t time) {
-	char *output = (char*) malloc(sizeof(char) * 64);
+char *time_elapsed(time_t time) {
+	char *output = (char *) malloc(sizeof(char) * 64);
 	unsigned int days, hours, min;
 	
 	if(time < 60) {
@@ -272,7 +273,7 @@ char * time_elapsed(time_t time) {
 	return output;
 }
 
-char * short_trim(char *str) {
+char *short_trim(char *str) {
 	size_t len = strlen(str);
 	
 	while(isspace(*(str + len - 1)))
@@ -283,10 +284,10 @@ char * short_trim(char *str) {
 	return str;
 }
 
-char * irc_mstrncpy(char *src, size_t len) {
+char *irc_mstrncpy(char *src, size_t len) {
 	char *str;
 	
-	if(!(str = (char*) malloc(sizeof(char) * len + 1)))
+	if(!(str = (char *) malloc(sizeof(char) * len + 1)))
 		return NULL;
 	
 	strncpy(str, src, len);
@@ -326,7 +327,7 @@ int irc_extract_userdata(char *data, char **nick, char **username, char **host) 
 	return 1;
 }
 
-char * string_index(char *str, unsigned int index) {
+char *string_index(char *str, unsigned int index) {
 	unsigned int i;
 	char *match;
 	
@@ -350,7 +351,7 @@ char * string_index(char *str, unsigned int index) {
 	} else return NULL;
 }
 
-char * irc_knownuser(char *nick, char *host) {
+char *irc_knownuser(char *nick, char *host) {
 	sqlite3_stmt *stmt;
 	char *sqlquery;
 	size_t size = 0, nicklen;
@@ -358,7 +359,7 @@ char * irc_knownuser(char *nick, char *host) {
 	int row, z;
 	
 	/* Init List */
-	nicklist = (char*) malloc(sizeof(char));
+	nicklist = (char *) malloc(sizeof(char));
 	*nicklist = '\0';
 	
 	nicklen = strlen(nick);
@@ -373,7 +374,7 @@ char * irc_knownuser(char *nick, char *host) {
 	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if(row == SQLITE_ROW) {
 			z++;
-			thisnick = (char*) sqlite3_column_text(stmt, 0);
+			thisnick = (char *) sqlite3_column_text(stmt, 0);
 			
 			// Skipping same name
 			if(!strncmp(thisnick, nick, nicklen))
@@ -381,8 +382,8 @@ char * irc_knownuser(char *nick, char *host) {
 			
 			printf("[ ] Action/known: appending: <%s>\n", thisnick);
 			
-			size += strlen((char*) thisnick) + 3;
-			nicklist = (char*) realloc(nicklist, size);
+			size += strlen((char *) thisnick) + 3;
+			nicklist = (char *) realloc(nicklist, size);
 			
 			strcat(nicklist, thisnick);
 			strcat(nicklist, ", ");
@@ -391,7 +392,7 @@ char * irc_knownuser(char *nick, char *host) {
 	
 	if(z > 5) {
 		free(nicklist);
-		nicklist = (char*) malloc(sizeof(char) * 128);
+		nicklist = (char *) malloc(sizeof(char) * 128);
 		sprintf(nicklist, "(list hidden, %d rows found)  ", z);
 	}
 	
@@ -404,7 +405,7 @@ char * irc_knownuser(char *nick, char *host) {
 	return nicklist;
 }
 
-char * skip_header(char *data) {
+char *skip_header(char *data) {
 	char *match;
 	
 	if((match = strchr(data + 1, ':')))
@@ -413,7 +414,7 @@ char * skip_header(char *data) {
 	else return NULL;
 }
 
-whois_t * whois_init() {
+whois_t *whois_init() {
 	whois_t *whois;
 	
 	whois = (whois_t*) malloc(sizeof(whois));
@@ -433,9 +434,9 @@ void whois_free(whois_t *whois) {
 	free(whois);
 }
 
-whois_t * irc_whois(char *nick) {
-	char *data = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
-	char *next = (char*) malloc(sizeof(char*) * (2 * MAXBUFF));
+whois_t *irc_whois(char *nick) {
+	char *data = (char *) malloc(sizeof(char *) * (2 * MAXBUFF));
+	char *next = (char *) malloc(sizeof(char *) * (2 * MAXBUFF));
 	char *request, temp[128];
 	whois_t *whois;
 	
@@ -474,15 +475,12 @@ whois_t * irc_whois(char *nick) {
 	return whois;
 }
 
-char * space_encode(char *str) {
-	char *new = str;
+char *space_encode(char *str) {
+	char *new;
 	
-	while(*new) {
+	for(new = str; *new; new++)
 		if(*new == ' ')
 			*new = '+';
-			
-		new++;
-	}
 	
 	return str;
 }
@@ -504,4 +502,26 @@ int progression_match(size_t value) {
 		return 1;
 		
 	return !(value % 20000);
+}
+
+char *md5ascii(char *source) {
+	unsigned char result[MD5_DIGEST_LENGTH];
+	const unsigned char *str;
+	char *output, tmp[3];
+	int i;
+	
+	printf("[+] ircmisc/md5: hashing <%s>\n", source);
+	
+	str = (unsigned char *) source;
+	
+	MD5(str, strlen(source), result);
+	
+	output = (char *) calloc(sizeof(char), (MD5_DIGEST_LENGTH * 2) + 1);
+	
+	for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
+		sprintf(tmp, "%02x", result[i]);
+		strcat(output, tmp);
+	}
+	
+	return output;
 }
