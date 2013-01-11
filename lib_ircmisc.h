@@ -28,8 +28,6 @@
 	whois_t *irc_whois(char *nick);
 	void whois_free(whois_t *whois);
 	
-	void irc_privmsg(char *chan, char *message);
-	
 	int progression_match(size_t value);
 	
 	char *md5ascii(char *source);

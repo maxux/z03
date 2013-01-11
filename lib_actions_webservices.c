@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc channel bot actions
+/* z03 - webservices like weather, radio station, google, wikipedia, ...
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify

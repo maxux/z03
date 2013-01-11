@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc channel bot actions
+/* z03 - actions root file
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -19,27 +19,12 @@
  
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-// #include <unistd.h>
 #include "bot.h"
 #include "core_init.h"
 #include "lib_core.h"
-#include "lib_database.h"
-#include "lib_list.h"
-#include "lib_urlmanager.h"
 #include "lib_actions.h"
-#include "lib_chart.h"
 #include "lib_ircmisc.h"
-#include "lib_weather.h"
-#include "lib_somafm.h"
-#include "lib_google.h"
-#include "lib_run.h"
-#include "lib_wiki.h"
-#include "lib_lastfm.h"
-#include "lib_settings.h"
+
 
 int action_parse_args(ircmessage_t *message, char *args) {
 	if(!*args) {
@@ -52,16 +37,41 @@ int action_parse_args(ircmessage_t *message, char *args) {
 }
 
 void action_help(ircmessage_t *message, char *args) {
-	char list[1024];
+	char list[512], buffer[768];
 	unsigned int i;
 	(void) args;
 	
-	sprintf(list, "PRIVMSG %s :Commands: ", message->chan);
+	// clearing list
+	list[0] = '\0';
 	
 	for(i = 0; i < __request_count; i++) {
-		strcat(list, __request[i].match);
-		strcat(list, " ");
+		if(!__request[i].hidden) {
+			strcat(list, __request[i].match);
+			strcat(list, " ");
+		}
+
+		if((!(i % 15) && i > 0) || i == __request_count - 1) {
+			zsnprintf(buffer, "Commands: %s", list);
+			irc_privmsg(message->chan, buffer);
+
+			// reset list
+			list[0] = '\0';
+		}
 	}
+}
+
+void action_man(ircmessage_t *message, char *args) {
+	char buffer[512];
+	unsigned int i;
+
+	if(!action_parse_args(message, args))
+		return;
 	
-	raw_socket(sockfd, list);
+	for(i = 0; i < __request_count; i++) {
+		if(match_prefix(args, __request[i].match + 1) && !__request[i].hidden) {
+			zsnprintf(buffer, "%s: %s", args, __request[i].man);
+			irc_privmsg(message->chan, buffer);
+			return;
+		}
+	}
 }

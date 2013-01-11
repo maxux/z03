@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc channel bot actions
+/* z03 - keep user settings on database (preferences, id, ...)
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #include "lib_database.h"
 #include "lib_core.h"
 #include "lib_actions.h"
-#include "lib_ircmisc.h"
+// #include "lib_ircmisc.h"
 #include "lib_settings.h"
 #include "lib_actions_settings.h"
 

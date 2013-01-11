@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc channel bot actions
+/* z03 - irc "binutils" (ping, time, ...) basic commands
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -95,22 +95,6 @@ void action_dns(ircmessage_t *message, char *args) {
 	
 	zsnprintf(buffer, "%s -> %s", args, ipbuf);
 	irc_privmsg(message->chan, buffer);
-}
-
-void action_man(ircmessage_t *message, char *args) {
-	char buffer[512];
-	unsigned int i;
-	
-	if(!action_parse_args(message, args))
-		return;
-	
-	for(i = 0; i < __request_count; i++) {
-		if(match_prefix(args, __request[i].match + 1)) {
-			zsnprintf(buffer, "%s: %s", args, __request[i].man);
-			irc_privmsg(message->chan, buffer);
-			return;
-		}
-	}
 }
 
 void action_random(ircmessage_t *message, char *args) {

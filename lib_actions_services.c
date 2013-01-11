@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc channel bot actions
+/* z03 - services like nickserv, ...
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #include "lib_database.h"
 #include "lib_core.h"
 #include "lib_chart.h"
-#include "lib_ircmisc.h"
+// #include "lib_ircmisc.h"
 #include "lib_actions_services.h"
 
 void action_notes(ircmessage_t *message, char *args) {

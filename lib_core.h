@@ -46,6 +46,7 @@
 		char *match;
 		void (*callback)(ircmessage_t *, char *);
 		char *man;
+		char hidden;
 		
 	} request_t;
 	
@@ -83,4 +84,7 @@
 	void irc_kick(char *chan, char *nick, char *reason);
 	
 	#define zsnprintf(x, ...) snprintf(x, sizeof(x), __VA_ARGS__)
+
+	void irc_privmsg(char *dest, char *message);
+	void irc_notice(char *user, char *message);
 #endif

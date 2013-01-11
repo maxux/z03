@@ -53,38 +53,10 @@
 #include "lib_actions_settings.h"
 #include "lib_actions_webservices.h"
 #include "lib_actions_run.h"
+#include "lib_actions_useless.h"
 
-request_t __request[] = {
-	{.match = ".weather",  .callback = action_weather,     .man = "print weather information: .weather list, .weather [station]"},
-	{.match = ".ping",     .callback = action_ping,        .man = "ping request/reply"},
-	{.match = ".time",     .callback = action_time,        .man = "print the time"},
-	{.match = ".rand",     .callback = action_random,      .man = "random generator: .rand, .rand max, .rand min max"},
-	{.match = ".stats",    .callback = action_stats,       .man = "print url statistics"},
-	{.match = ".chart",    .callback = action_chart,       .man = "print a chart about url usage"},
-	{.match = ".uptime",   .callback = action_uptime,      .man = "print the bot's uptime"},
-	{.match = ".somafm",   .callback = action_somafm,      .man = "print the current track on SomaFM radio: .somafm list, .somafm station"},
-	{.match = ".dns",      .callback = action_dns,         .man = "resolve a dns name address: .dns domain-name"},
-	{.match = ".count",    .callback = action_count,       .man = "print the number of line posted by a given nick: .count nick"},
-	{.match = ".known",    .callback = action_known,       .man = "check if a given nick is already known, by hostname: .known nick"},
-	{.match = ".url",      .callback = action_url,         .man = "search on url database, by url or title. Use % as wildcard. ie: .url gang%youtube"},
-	{.match = ".goo",      .callback = action_google,      .man = "search on Google, print the first result: .goo keywords"},
-	{.match = ".google",   .callback = action_google,      .man = "search on Google, print the 3 firsts result: .google keywords"},
-	{.match = ".help",     .callback = action_help,        .man = "print the list of all the commands available"},
-	{.match = ".man",      .callback = action_man,         .man = "print 'man page' of a given bot command: .man command"},
-	{.match = ".note",     .callback = action_notes,       .man = "leave a message to someone, will be sent when connecting."},
-	{.match = ".c",        .callback = action_run_c,       .man = "compile and run c code, from arguments: .run printf(\"Hello world\\n\");"},
-	{.match = ".py",       .callback = action_run_py,      .man = "compile and run inline python code, from arguments: .py print('Hello world')"},
-	{.match = ".hs",       .callback = action_run_hs,      .man = "compile and run inline haskell code, from arguments: .hs print \"Hello\""},
-	{.match = ".php",      .callback = action_run_php,     .man = "compile and run inline php code, from arguments: .php echo \"Hello\";"},
-	{.match = ".backlog",  .callback = action_backlog,     .man = "print last lines: .backlog [nick]"},
-	{.match = ".wi",       .callback = action_wiki,        .man = "summary an english wikipedia's article: .wiki keywords"},
-	{.match = ".wiki",     .callback = action_wiki,        .man = "summary a wiki's international article: .wiki lang keywords"},
-	{.match = ".set",      .callback = action_set,         .man = "set a variable value: .set var1 val1"},
-	{.match = ".unset",    .callback = action_unset,       .man = "unset a variable value: .unset var1"},
-	{.match = ".fm",       .callback = action_lastfm,      .man = "print now playing lastfm title: .fm [username]"},
-	{.match = ".fmlove",   .callback = action_lastfmlove,  .man = "love your current track on last.fm"},
-};
-
+// request_t __request= include
+#include "lib_request_list.h"
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
 
 global_lib_t global_lib = {
@@ -151,6 +123,20 @@ channel_t * channel_load(char *chan) {
 /*
  * Chat Handling
  */
+void irc_privmsg(char *dest, char *message) {
+	char buffer[2048];
+
+	zsnprintf(buffer, "PRIVMSG %s :%s", dest, message);
+	raw_socket(sockfd, buffer);
+}
+
+void irc_notice(char *user, char *message) {
+	char buffer[2048];
+
+	zsnprintf(buffer, "NOTICE %s :%s", user, message);
+	raw_socket(sockfd, buffer);
+}
+
 int nick_length_check(char *nick, char *channel) {
 	char raw[128];
 	

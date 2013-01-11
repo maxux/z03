@@ -1,4 +1,4 @@
-/* z03 - small bot with some network features - irc miscallinious functions (anti highlights, ...)
+/* z03 - irc miscallinious functions (anti highlights, ...)
  * Author: Daniel Maxime (root@maxux.net)
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -487,13 +487,6 @@ char *space_encode(char *str) {
 			*new = '+';
 	
 	return str;
-}
-
-void irc_privmsg(char *chan, char *message) {
-	char buffer[2048];
-	
-	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :%s", chan, message);
-	raw_socket(sockfd, buffer);
 }
 
 int progression_match(size_t value) {
