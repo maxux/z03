@@ -24,7 +24,6 @@
 #include "lib_database.h"
 #include "lib_core.h"
 #include "lib_actions.h"
-// #include "lib_ircmisc.h"
 #include "lib_settings.h"
 #include "lib_actions_settings.h"
 

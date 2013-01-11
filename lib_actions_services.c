@@ -24,7 +24,6 @@
 #include "lib_database.h"
 #include "lib_core.h"
 #include "lib_chart.h"
-// #include "lib_ircmisc.h"
 #include "lib_actions_services.h"
 
 void action_notes(ircmessage_t *message, char *args) {
