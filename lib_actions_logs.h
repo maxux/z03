@@ -7,4 +7,5 @@
 	void action_known(ircmessage_t *message, char *args);
 	void action_url(ircmessage_t *message, char *args);
 	void action_backlog(ircmessage_t *message, char *args);
+	void action_chartlog(ircmessage_t *message, char *args);
 #endif

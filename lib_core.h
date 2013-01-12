@@ -9,6 +9,8 @@
 	
 	typedef struct nick_t {
 		size_t lines;
+		size_t words;
+		time_t lasttime;
 		
 	} nick_t;
 	

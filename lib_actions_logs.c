@@ -33,24 +33,29 @@ void action_stats(ircmessage_t *message, char *args) {
 	char *sqlquery;
 	char msg[256];
 	int count = 0, cnick = 0, chits = 0;
-	int row;
+	int lines = 0, words = 0;
+	time_t timestamp;
 	(void) args;
 	
 	sqlquery = sqlite3_mprintf(
-		"SELECT COUNT(id), COUNT(DISTINCT nick), SUM(hit) "
+		"SELECT COUNT(*), COUNT(DISTINCT nick), SUM(hit), "
+		"   (SELECT SUM(lines) FROM stats WHERE chan = '%q') lines, "
+		"   (SELECT SUM(words) FROM stats WHERE chan = '%q') words "
 		"FROM url WHERE chan = '%q'",
-		message->chan
+		message->chan, message->chan, message->chan
 	);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			count = sqlite3_column_int(stmt, 0);
 			cnick = sqlite3_column_int(stmt, 1);
 			chits = sqlite3_column_int(stmt, 2);
+			lines = sqlite3_column_int(stmt, 3);
+			words = sqlite3_column_int(stmt, 4);
 		}
 			
-		zsnprintf(msg, "Got %d url on database for %d nicks and %d total hits",
-		               count, cnick, chits);
+		zsnprintf(msg, "Got  : %d url for %d nicks and %d total hits, %d lines and %d words",
+		               count, cnick, chits, lines, words);
 		irc_privmsg(message->chan, msg);
 	
 	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
@@ -58,6 +63,33 @@ void action_stats(ircmessage_t *message, char *args) {
 	/* Clearing */
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
+
+	/* Today */
+	timestamp = today();
+
+	sqlquery = sqlite3_mprintf(
+		"SELECT COUNT(*) FROM logs "
+		"WHERE chan = '%q' AND timestamp > %u GROUP BY nick",
+		message->chan, timestamp
+	);
+
+	cnick = 0;
+	lines = 0;
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while(sqlite3_step(stmt) == SQLITE_ROW) {
+			cnick++;
+			lines += sqlite3_column_int(stmt, 0);
+		}
+	}
+
+	zsnprintf(msg, "Today: %d lines for %d nicks", lines, cnick);
+	irc_privmsg(message->chan, msg);
+
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
+
+
 }
 
 void action_chart(ircmessage_t *message, char *args) {
@@ -96,7 +128,7 @@ void action_chart(ircmessage_t *message, char *args) {
 		if((stmt = db_select_query(sqlite_db, sqlquery))) {
 			i = nbrows - 1;
 			
-			while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+			while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 				values[i] = sqlite3_column_int(stmt, 0);	/* count value */
 				days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
 				
@@ -134,43 +166,57 @@ void action_chart(ircmessage_t *message, char *args) {
 
 void action_count(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery;
+	char *sqlquery, *nick;
 	char output[256];
-	int row, count1, count2;
+	int words, lines, twords, tlines;
 	char found = 0;
 	
-	if(!action_parse_args(message, args))
-		return;
+	if(!*args)
+		nick = message->nick;
+
+	else nick = short_trim(args);
 	
 	sqlquery = sqlite3_mprintf(
-		"SELECT COUNT(*) as match, ("
-		"    SELECT COUNT(*) FROM logs "
-		"    WHERE chan = '%q') as total "
-		"FROM logs WHERE nick = '%q' AND chan = '%q'",
-		message->chan, args, message->chan
+		"SELECT words, lines, ("
+		"   SELECT SUM(words) FROM stats "
+		"    WHERE chan = '%q') as twords, "
+		"    (SELECT COUNT(*) FROM logs "
+		"    WHERE chan = '%q') as tlines "
+		"FROM stats WHERE nick = '%q' AND chan = '%q'",
+		message->chan, message->chan, nick, message->chan
 	);
 	                           
 	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] Action/Count: SQL Error\n");
+		fprintf(stderr, "[-] action/count: sql error\n");
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
-		count1 = sqlite3_column_int(stmt, 0);
-		count2 = sqlite3_column_int(stmt, 1);
+	while(sqlite3_step(stmt) == SQLITE_ROW) {
+		found = 1;
 		
-		if(count1)
-			found = 1;
+		words  = sqlite3_column_int(stmt, 0);
+		lines  = sqlite3_column_int(stmt, 1);
+		twords = sqlite3_column_int(stmt, 2);
+		tlines = sqlite3_column_int(stmt, 3);
 		
-		printf("[ ] Action/Count: %d / %d\n", count1, count2);
+		printf("[ ] action/count: %d / %d / %d / %d\n", words, lines, twords, tlines);
+
+		// avoid divide by zero
+		if(tlines && twords) {
+			if(!*args)
+				nick = message->nickhl;
+
+			else nick = anti_hl(args);
 		
-		if(count1 && count2) {
-			zsnprintf(output, "Got %d lines for <%s>, which is %.2f%% of the %d total lines", 
-			                  count1, anti_hl(args), ((float) count1 / count2) * 100, count2);
+			zsnprintf(output, "Got %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words for <%s>",
+			                  lines, ((float) lines / tlines) * 100, tlines,
+			                  words, ((float) words / twords) * 100, twords,
+			                  nick);
+
 			irc_privmsg(message->chan, output);
 		}
 	}
 	
 	if(!found) {
-		zsnprintf(output, "No match found for <%s>", args);
+		zsnprintf(output, "No match found for <%s>", nick);
 		irc_privmsg(message->chan, output);
 	}
 	
@@ -226,7 +272,7 @@ void action_url(ircmessage_t *message, char *args) {
 	);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			url   = (char *) sqlite3_column_text(stmt, 0);
 			title = (char *) sqlite3_column_text(stmt, 1);
 			nick  = (char *) sqlite3_column_text(stmt, 2);
@@ -300,8 +346,8 @@ void action_backlog(ircmessage_t *message, char *args) {
 		);
 	}
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {	
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			found = 1;
 			
 			row_nick  = sqlite3_column_text(stmt, 0);
@@ -336,4 +382,78 @@ void action_backlog(ircmessage_t *message, char *args) {
 	/* Clearing */
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
+}
+
+void action_chartlog(ircmessage_t *message, char *args) {
+	sqlite3_stmt *stmt;
+	int nbrows = 0, row, i;
+	char *sqlquery;
+	char *days = NULL;
+	int *values = NULL, lines = 6;
+	char **chart, first_date[32], last_date[32];
+	char temp[256];
+	time_t now;
+	(void) args;
+
+	/* Flood Protection */
+	if(time(NULL) - (60 * 10) < message->channel->last_chart_request) {
+		irc_privmsg(message->chan, "Avoiding flood, bitch !");
+		return;
+
+	} else message->channel->last_chart_request = time(NULL);
+
+	/* Working */
+	now = today() - (60 * 24 * 60 * 60); // days paste
+	sqlquery = sqlite3_mprintf(
+		"SELECT count(id), date(timestamp, 'unixepoch') d, strftime('%%w', timestamp, 'unixepoch') w "
+		"FROM logs WHERE chan = '%q' AND timestamp > %u "
+		"GROUP BY d ORDER BY d DESC LIMIT 31",
+		message->chan, now
+	);
+
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		/* sqlite3_column_int auto-finalize */
+		nbrows = db_sqlite_num_rows(stmt);
+		values = (int *) malloc(sizeof(int) * nbrows);
+		days   = (char *) malloc(sizeof(char) * nbrows);
+
+		printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
+
+		if((stmt = db_select_query(sqlite_db, sqlquery))) {
+			i = nbrows - 1;
+
+			while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
+				values[i] = sqlite3_column_int(stmt, 0);	/* count value */
+				days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
+
+				printf("[ ] Action: Chart: Day %s (url %d) is %d\n",
+				       sqlite3_column_text(stmt, 1), values[i], days[i]);
+
+				if(i == 0)
+					strcpy(first_date, (char *) sqlite3_column_text(stmt, 1));
+
+				if(i == nbrows - 1)
+					strcpy(last_date, (char *) sqlite3_column_text(stmt, 1));
+
+				i--;
+			}
+		}
+
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
+
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+
+	chart = ascii_chart(values, nbrows, lines, days);
+
+	/* Chart Title */
+	zsnprintf(temp, "Chart: lines per day from %s to %s", first_date, last_date);
+	irc_privmsg(message->chan, temp);
+
+	/* Chart data */
+	for(i = lines - 1; i >= 0; i--)
+		irc_privmsg(message->chan, *(chart + i));
+
+	free(values);
+	free(days);
 }

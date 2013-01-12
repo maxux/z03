@@ -41,4 +41,6 @@
 	void diep(char *str);
 	
 	void handle_private_message(char *data);
+
+	int signal_intercept(int signal, void (*function)(int));
 #endif

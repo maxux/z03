@@ -136,7 +136,7 @@ void loadlib(codemap_t *codemap) {
 }
 
 void core_handle_private_message(char *data, codemap_t *codemap) {
-	char remote[128], *request;
+	char remote[256], *request;
 	char *diff = NULL;
 	unsigned char length;
 	
@@ -158,7 +158,8 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 				printf("[+] Core: rehashing code...\n");
 				loadlib(codemap);
 				
-			} else raw_socket(sockfd, request);
+			} else if(request[0] != '.')
+				raw_socket(sockfd, request);
 		}
 		
 	} else printf("[-] Host <%s> is not admin\n", remote);
@@ -264,7 +265,7 @@ int read_socket(int sockfd, char *data, char *next) {
 			buff[rlen] = '\0';
 			
 		} else if(errno != EAGAIN)
-			diep("recv");
+			perror("[-] core: recv");
 	}
 	
 	return 0;
@@ -316,10 +317,8 @@ int main(void) {
 			continue;
 		}
 		
-		if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1)) {
+		if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1))
 			core_handle_private_message(data + 1, &codemap);
-			continue;
-		}
 		
 		if(!global_core.auth && !strncmp(request, "NOTICE AUTH", 11)) {
 			raw_socket(sockfd, "NICK " IRC_NICK);

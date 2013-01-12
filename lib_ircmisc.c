@@ -351,18 +351,53 @@ char *string_index(char *str, unsigned int index) {
 	} else return NULL;
 }
 
+char *list_implode(list_t *list, size_t limit) {
+	size_t alloc = 0, now = 0;
+	list_node_t *node;
+	char *implode;
+	char buffer[128];
+
+	/* compute the full list length */
+	node = list->nodes;
+
+	while(node) {
+		alloc += strlen(node->name) + 8;
+		node = node->next;
+	}
+
+	/* allocating string and re-iterate list */
+	implode = (char *) calloc(sizeof(char), alloc);
+	node = list->nodes;
+
+	while(node && ++now) {
+		// appending anti-hled nick
+		zsnprintf(buffer, "%s", node->name);
+		anti_hl(buffer);
+		strcat(implode, buffer);
+
+		if(now > limit) {
+			zsnprintf(buffer, " and %u others hidden",
+			                  list->length - now);
+
+			implode = (char *) realloc(implode, alloc + 64);
+			strcat(implode, buffer);
+			return implode;
+
+		} else if(node->next)
+			strcat(implode, ", ");
+
+		node = node->next;
+	}
+
+	return implode;
+}
+
 char *irc_knownuser(char *nick, char *host) {
 	sqlite3_stmt *stmt;
 	char *sqlquery;
-	size_t size = 0, nicklen;
-	char *thisnick, *nicklist = NULL;
-	int row, z;
-	
-	/* Init List */
-	nicklist = (char *) malloc(sizeof(char));
-	*nicklist = '\0';
-	
-	nicklen = strlen(nick);
+	char *thisnick = NULL, *nickcast;
+	list_t *nicklist;
+	int row;
 	
 	/* Query database */
 	sqlquery = sqlite3_mprintf(
@@ -370,43 +405,39 @@ char *irc_knownuser(char *nick, char *host) {
 		host
 	);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
-		fprintf(stderr, "[-] Action/Count: SQL Error\n");
-	
 	/* Building list */
-	z = 0;
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			z++;
-			thisnick = (char *) sqlite3_column_text(stmt, 0);
+	nicklist = list_init(NULL);
+
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
+			nickcast = (char *) sqlite3_column_text(stmt, 0);
 			
 			// Skipping same name
-			if(!strncmp(thisnick, nick, nicklen))
+			if(!strcmp(nickcast, nick))
 				continue;
 			
+			thisnick = (char *) realloc(thisnick, strlen(nickcast) + 8);
+			strcpy(thisnick, nickcast);
+
 			printf("[ ] Action/known: appending: <%s>\n", thisnick);
-			
-			size += strlen((char *) thisnick) + 3;
-			nicklist = (char *) realloc(nicklist, size);
-			
-			strcat(nicklist, thisnick);
-			strcat(nicklist, ", ");
+			list_append(nicklist, thisnick, thisnick);
 		}
 	}
 	
-	if(z > 5) {
-		free(nicklist);
-		nicklist = (char *) malloc(sizeof(char) * 128);
-		sprintf(nicklist, "(list hidden, %d rows found)  ", z);
-	}
+	free(thisnick);
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
 	
-	if(size == 0) {
-		free(nicklist);
+	// list is empty
+	if(!nicklist->length) {
+		list_free(nicklist);
 		return NULL;
-		
-	} else nicklist[strlen(nicklist) - 2] = '\0';	
+	}
+
+	thisnick = list_implode(nicklist, 4);
+	list_free(nicklist);
 	
-	return nicklist;
+	return thisnick;
 }
 
 char *skip_header(char *data) {
@@ -521,4 +552,39 @@ char *md5ascii(char *source) {
 	}
 	
 	return output;
+}
+
+size_t words_count(char *str) {
+	size_t words = 0;
+
+	// empty string
+	if(!*str)
+		return 0;
+
+	while(*str) {
+		if(isspace(*str) && !isspace(*(str + 1)))
+			words++;
+
+		str++;
+	}
+
+	// last char was not a space
+	if(!isspace(*(str - 1)))
+		words++;
+
+	return words;
+}
+
+time_t today() {
+	time_t now;
+	struct tm *timeinfo;
+
+	time(&now);
+	timeinfo = localtime(&now);
+
+	timeinfo->tm_sec  = 0;
+	timeinfo->tm_min  = 0;
+	timeinfo->tm_hour = 0;
+
+	return mktime(timeinfo);
 }

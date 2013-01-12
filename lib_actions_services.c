@@ -45,7 +45,7 @@ void action_notes(ircmessage_t *message, char *args) {
 	);
 	
 	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			if((count = sqlite3_column_int(stmt, 0)) >= MAX_NOTES)
 				irc_privmsg(message->chan, "Message queue full");
 		}

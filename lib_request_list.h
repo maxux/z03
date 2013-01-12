@@ -36,6 +36,12 @@ request_t __request[] = {
 		.hidden   = 0,
 	},
 	{
+		.match    = ".chartlog",
+		.callback = action_chartlog,
+		.man      = "chart of lines log",
+		.hidden   = 0,
+	},
+	{
 		.match    = ".uptime",
 		.callback = action_uptime,
 		.man      = "print the bot's uptime",

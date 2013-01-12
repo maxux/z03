@@ -76,30 +76,6 @@ int db_simple_query(sqlite3 *db, char *sql) {
 	return 1;
 }
 
-
-int db_sqlite_parse(sqlite3 *db) {
-	sqlite3_stmt *stmt;
-	int i, row;
-	
-	/* Reading table content */
-	if((stmt = db_select_query(db, "SELECT * FROM url")) == NULL)
-		return 0;
-	
-	/* Counting... */
-	i = 0;
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW)
-			i++;
-	}
-	
-	/* Clearing */
-	sqlite3_finalize(stmt);
-	
-	printf("[+] SQLite: url parsed: %d rows returned\n", i);
-	
-	return 1;
-}
-
 unsigned int db_sqlite_num_rows(sqlite3_stmt *stmt) {
 	unsigned int nbrows = 0;
 	
