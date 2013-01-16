@@ -12,7 +12,7 @@
 	typedef struct lastfm_track_t {
 		enum lastfm_type_t type;
 		unsigned int total;
-		char *date;
+		time_t date;
 		char *artist;
 		char *title;
 		char *album;

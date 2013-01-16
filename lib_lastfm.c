@@ -66,7 +66,6 @@ void lastfm_free(lastfm_t *lastfm) {
 	free(lastfm->session);
 	
 	// free track
-	free(lastfm->track->date);
 	free(lastfm->track->artist);
 	free(lastfm->track->title);
 	free(lastfm->track->album);
@@ -154,6 +153,7 @@ static int lastfm_curl_download_text(char *url, curl_data_t *data, lastfm_reques
  */
 static lastfm_track_t *lastfm_build(json_t *track, lastfm_track_t *lastfm_track) {
 	json_t *node;
+	const char *temp;
 	
 	/* reading artist data */
 	node = json_object_get(track, "artist");
@@ -181,8 +181,9 @@ static lastfm_track_t *lastfm_build(json_t *track, lastfm_track_t *lastfm_track)
 	/* reading (or not) date data */
 	node = json_object_get(track, "date");
 	if(json_is_object(node)) {
-		lastfm_track->date = strdup(json_string_value(json_object_get(node, "#text")));
-		printf("[+] lastfm: date: <%s>\n", lastfm_track->date);
+		temp = json_string_value(json_object_get(node, "uts"));
+		lastfm_track->date = atoi(temp);
+		printf("[+] lastfm: date: <%ld>\n", lastfm_track->date);
 		
 	} else fprintf(stderr, "[-] lastfm: no date found\n");	
 	

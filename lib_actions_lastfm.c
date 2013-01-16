@@ -31,6 +31,8 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	char *user, answer[512];
 	lastfm_request_t *request;
 	lastfm_t *lastfm;
+	char date[128];
+	struct tm *timeinfo;
 	
 	if(*args) {
 		short_trim(args);
@@ -53,9 +55,12 @@ void action_lastfm(ircmessage_t *message, char *args) {
 			break;
 			
 			case LAST_PLAYED:
+				timeinfo = localtime(&lastfm->track->date);
+				strftime(date, sizeof(date), "%d/%m/%Y %X", timeinfo);
+			
 				zsnprintf(answer, "Last played: %s - %s [%s] (%s)",
 						  lastfm->track->artist, lastfm->track->title,
-						  lastfm->track->album, lastfm->track->date);
+						  lastfm->track->album, date);
 			break;
 			
 			default:
