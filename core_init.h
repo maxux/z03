@@ -2,6 +2,7 @@
 	#define __Z03_CORE_INIT_H
 	
 	#include <time.h>
+	#include "core_ssl.h"
 	
 	#define MAXBUFF			4096
 	
@@ -30,12 +31,12 @@
 		
 	} whois_t;
 	
-	extern int sockfd;
+	extern ssl_socket_t *ssl;
 	extern global_core_t global_core;
 	
-	int init_socket(char *server, int port);
-	void raw_socket(int sockfd, char *message);
-	int read_socket(int sockfd, char *data, char *next);
+	ssl_socket_t *init_socket(char *server, int port);
+	void raw_socket(char *message);
+	int read_socket(ssl_socket_t *ssl, char *data, char *next);
 	char *skip_server(char *data);
 	
 	void diep(char *str);

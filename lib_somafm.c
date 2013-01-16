@@ -101,7 +101,7 @@ int somafm_handle(char *chan, somafm_station_t *station) {
 	
 	// building response
 	sprintf(temp, "PRIVMSG %s :[SomaFM/%s] Now playing: %s", chan, station->name, (char *) node->children->content);
-	raw_socket(sockfd, temp);
+	raw_socket(temp);
 
 	// freeing all stuff
 	freeme:

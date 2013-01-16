@@ -381,6 +381,11 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 	curl_data_t curl;
 	json_t *root;
 	
+	if(strchr(lastfm->track->artist, '&') || strchr(lastfm->track->title, '&')) {
+		request->error = strdup("Sorry, names which contains '&' are not supported yet");
+		return lastfm_abort_request(NULL, request);
+	}
+
 	// FIXME: fix '&' on artist/title	
 	// building request
 	sig = lastfm_sig_love(lastfm);

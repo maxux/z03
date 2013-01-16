@@ -32,10 +32,11 @@
 #include <dlfcn.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <execinfo.h>
 #include "bot.h"
 #include "core_init.h"
 
-int sockfd;
+ssl_socket_t *ssl;
 
 global_core_t global_core;
 jmp_buf segfault_env;
@@ -70,10 +71,19 @@ int signal_intercept(int signal, void (*function)(int)) {
 }
 
 void sighandler(int signal) {
+	void * buffer[1024];
+	int calls;
+
 	switch(signal) {
 		case SIGSEGV:
-			raw_socket(sockfd, "PRIVMSG " IRC_HARDCHAN " :[System] Warning: segmentation fault, reloading.");
-			longjmp(segfault_env, 1);
+			fprintf(stderr, "[-] --- Segmentation fault ---\n");
+			calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
+			backtrace_symbols_fd(buffer, calls, 1);
+
+			raw_socket("PRIVMSG " IRC_HARDCHAN " :[System] Warning: segmentation fault, reloading.");
+			fprintf(stderr, "[-] ---    Rolling back    ---\n");
+
+			siglongjmp(segfault_env, 1);
 		break;
 	}
 }
@@ -159,7 +169,7 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 				loadlib(codemap);
 				
 			} else if(request[0] != '.')
-				raw_socket(sockfd, request);
+				raw_socket(request);
 		}
 		
 	} else printf("[-] Host <%s> is not admin\n", remote);
@@ -179,7 +189,7 @@ char *skip_server(char *data) {
 	return NULL;
 }
 
-int init_socket(char *server, int port) {
+ssl_socket_t *init_socket(char *server, int port) {
 	int fd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
@@ -197,23 +207,23 @@ int init_socket(char *server, int port) {
 	/* Creating Socket */
 	if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("[-] socket: socket");
-		return -1;
+		return NULL;
 	}
 
 	/* Init Connection */
 	if((connresult = connect(fd, (struct sockaddr *) &server_addr, sizeof(server_addr))) < 0) {
 		perror("[-] socket: connect");
 		close(fd);
-		return -1;
+		return NULL;
 	}
 	
 	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
 		diep("setsockopt SO_RCVTIMEO");
 	
-	return fd;
+	return ssl_init(fd);
 }
 
-void raw_socket(int sockfd, char *message) {
+void raw_socket(char *message) {
 	char *sending = (char *) malloc(sizeof(char *) * strlen(message) + 3);
 	
 	printf("[+] IRC: << %s\n", message);
@@ -221,13 +231,13 @@ void raw_socket(int sockfd, char *message) {
 	strcpy(sending, message);
 	strcat(sending, "\r\n");
 	
-	if(send(sockfd, sending, strlen(sending), 0) == -1)
+	if(ssl_write(ssl, sending) == -1)
 		perror("[-] IRC: send");
 	
 	free(sending);
 }
 
-int read_socket(int sockfd, char *data, char *next) {
+int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 	char buff[MAXBUFF];
 	int rlen, i, tlen;
 	char *temp = NULL;
@@ -256,7 +266,7 @@ int read_socket(int sockfd, char *data, char *next) {
 			}
 		}
 		
-		if((rlen = recv(sockfd, buff, MAXBUFF, 0)) >= 0) {
+		if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
 			if(rlen == 0) {
 				printf("[ ] Core: Warning: nothing read from socket\n");
 				usleep(120000);
@@ -282,7 +292,7 @@ int main(void) {
 		.destruct = NULL,
 	};
 	
-	printf("[+] Core: Loading...\n");
+	printf("[+] core: loading...\n");
 	
 	/* Init random */
 	srand(time(NULL));
@@ -298,18 +308,23 @@ int main(void) {
 	/* Loading dynamic code */
 	loadlib(&codemap);
 	
-	printf("[+] Core: Connecting...\n");
+	printf("[+] core: connecting...\n");
+
+	if(!(ssl = init_socket(IRC_SERVER, IRC_PORT))) {
+		fprintf(stderr, "[-] core: cannot create socket\n");
+		exit(EXIT_FAILURE);
+	}
 	
-	sockfd = init_socket(IRC_SERVER, IRC_PORT);
+	printf("[+] core: connected\n");
 	
 	while(1) {
 		/* Reloading lib on segmentation fault */
-		if(setjmp(segfault_env) == 1) {
+		if(sigsetjmp(segfault_env, 1) == 1) {
 			loadlib(&codemap);
 			continue;
 		}
 		
-		read_socket(sockfd, data, next);
+		read_socket(ssl, data, next);
 		printf("[ ] IRC: >> %s\n", data);
 		
 		if((request = skip_server(data)) == NULL) {
@@ -321,8 +336,8 @@ int main(void) {
 			core_handle_private_message(data + 1, &codemap);
 		
 		if(!global_core.auth && !strncmp(request, "NOTICE AUTH", 11)) {
-			raw_socket(sockfd, "NICK " IRC_NICK);
-			raw_socket(sockfd, "USER " IRC_USERNAME " " IRC_USERNAME " " IRC_USERNAME " :" IRC_REALNAME);
+			raw_socket("NICK " IRC_NICK);
+			raw_socket("USER " IRC_USERNAME " " IRC_USERNAME " " IRC_USERNAME " :" IRC_REALNAME);
 			
 			global_core.auth = 1;
 			continue;

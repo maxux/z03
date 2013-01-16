@@ -156,7 +156,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		snprintf(temp, sizeof(temp), "PRIVMSG %s :Station information is currently unavailable.", chan);
-		raw_socket(sockfd, temp);
+		raw_socket(temp);
 		
 		printf("[-] XPath: No values\n");
 		goto freeme;
@@ -189,7 +189,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	
 	// building response	
 	sprintf(temp, "PRIVMSG %s :%s: température: %.1f°C, humidité: %d%% [%s]", chan, station->name, weather.temp, weather.humidity, weather.date);
-	raw_socket(sockfd, temp);
+	raw_socket(temp);
 	
 	// freeing all stuff
 	freeme:

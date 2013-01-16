@@ -338,7 +338,7 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 		break;
 	}
 
-	raw_socket(sockfd, msg);
+	raw_socket(msg);
 }
 
 void check_round_count(ircmessage_t *message) {
@@ -357,7 +357,7 @@ void check_round_count(ircmessage_t *message) {
 		printf("[ ] URL: %d\n", urls);
 		if(urls % 500 == 0) {
 			sprintf(msg, "PRIVMSG %s :We just reached %d urls !", message->chan, urls);
-			raw_socket(sockfd, msg);
+			raw_socket(msg);
 		}
 		
 	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
@@ -485,7 +485,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	// Write error occure on data file
 	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
 		snprintf(temp, sizeof(temp), "PRIVMSG %s :URL (Error %d): %s", message->chan, curl.curlcode, curl_easy_strerror(curl.curlcode));
-		raw_socket(sockfd, temp);
+		raw_socket(temp);
 		
 		free(curl.data);		
 		return 2;
@@ -515,7 +515,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			decode_html_entities_utf8(stripped, NULL);
 			
 			snprintf(request, len, "PRIVMSG %s :URL%s: %s", message->chan, strcode, stripped);
-			raw_socket(sockfd, request);
+			raw_socket(request);
 			
 			/* Check Title Repost */
 			// redecoding entities for clear title update
@@ -558,7 +558,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	} else if(curl.type == IMAGE_ALL) {
 		if(curl.http_length > CURL_MAX_SIZE) {
 			sprintf(temp, "PRIVMSG %s :(Warning: image size: %u Mo)", message->chan, curl.http_length / 1024 / 1024);
-			raw_socket(sockfd, temp);
+			raw_socket(temp);
 			
 			return 1;
 		}
@@ -605,7 +605,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 		
 	} else if(curl.type == UNKNOWN_TYPE) {
 		snprintf(temp, sizeof(temp), "PRIVMSG %s :Content: %s (%.2f Mo)", message->chan, curl.http_type, (double) curl.http_length / 1024 / 1024);
-		raw_socket(sockfd, temp);
+		raw_socket(temp);
 		
 		free(curl.http_type);
 	}

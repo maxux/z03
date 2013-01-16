@@ -482,12 +482,12 @@ whois_t *irc_whois(char *nick) {
 		return NULL;
 	
 	snprintf(temp, sizeof(temp), "WHOIS %s", nick);
-	raw_socket(sockfd, temp);
+	raw_socket(temp);
 	
 	printf("[+] Misc: whois request: %s\n", nick);
 	
 	while(1) {
-		read_socket(sockfd, data, next);
+		read_socket(ssl, data, next);
 		printf("[ ] IRC: >> %s\n", data);
 		
 		if((request = skip_server(data)) == NULL) {

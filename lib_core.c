@@ -83,14 +83,14 @@ void irc_privmsg(char *dest, char *message) {
 	char buffer[2048];
 
 	zsnprintf(buffer, "PRIVMSG %s :%s", dest, message);
-	raw_socket(sockfd, buffer);
+	raw_socket(buffer);
 }
 
 void irc_notice(char *user, char *message) {
 	char buffer[2048];
 
 	zsnprintf(buffer, "NOTICE %s :%s", user, message);
-	raw_socket(sockfd, buffer);
+	raw_socket(buffer);
 }
 
 int nick_length_check(char *nick, char *channel) {
@@ -101,11 +101,11 @@ int nick_length_check(char *nick, char *channel) {
 		
 		/* Ban Nick */
 		sprintf(raw, "MODE %s +b %s!*@*", channel, nick);
-		raw_socket(sockfd, raw);
+		raw_socket(raw);
 		
 		/* Kick Nick */
 		sprintf(raw, "KICK %s %s :Nick too long (limit: %d). Please change your nick.", channel, nick, NICK_MAX_LENGTH);
-		raw_socket(sockfd, raw);
+		raw_socket(raw);
 		
 		return 1;
 	}
@@ -216,10 +216,10 @@ void handle_join(char *data) {
 			} else strcpy(timestring, "unknown");
 				
 			snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
-			raw_socket(sockfd, output);
+			raw_socket(output);
 			
 			snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
-			raw_socket(sockfd, output);
+			raw_socket(output);
 		}
 		
 		sqlite3_free(sqlquery);
@@ -291,7 +291,7 @@ void irc_kick(char *chan, char *nick, char *reason) {
 	request = (char *) malloc(sizeof(char) * ((strlen(chan) + strlen(nick) + strlen(reason)) + 16));
 	sprintf(request, "KICK %s %s :%s", chan, nick, reason);
 	
-	raw_socket(sockfd, request);
+	raw_socket(request);
 	free(request);
 }
 
@@ -468,7 +468,7 @@ void irc_joinall() {
 	
 	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char *); i++) {
 		sprintf(buffer, "JOIN %s", IRC_CHANNEL[i]);
-		raw_socket(sockfd, buffer);
+		raw_socket(buffer);
 	}
 }
 
@@ -477,16 +477,16 @@ void main_core(char *data, char *request) {
 
 	if(!strncmp(data, "PING", 4)) {
 		data[1] = 'O';		/* pOng */
-		raw_socket(sockfd, data);
+		raw_socket(data);
 		return;
 	}
 	
 	if(!strncmp(request, "376", 3)) {
 		if(IRC_NICKSERV) {
-			raw_socket(sockfd, "PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
+			raw_socket("PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
 		
 		/* if(IRC_OPER)
-			raw_socket(sockfd, "OPER " IRC_NICK " " IRC_OPER_PASS); */
+			raw_socket("OPER " IRC_NICK " " IRC_OPER_PASS); */
 		
 		} else irc_joinall();
 		
@@ -534,8 +534,10 @@ void main_construct(void) {
 	// opening sqlite
 	sqlite_db = db_sqlite_init();
 
-	// loading all stats
-	stats_load_all(global_lib.channels);
+	if(global_core.auth) {
+		// loading all stats
+		stats_load_all(global_lib.channels);
+	}
 
 	// grabbing SIGUSR1 for daily update
 	signal_intercept(SIGUSR1, lib_sighandler);
