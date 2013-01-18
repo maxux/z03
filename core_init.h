@@ -23,18 +23,14 @@
 		
 		char auth;
 		
-	} global_core_t;
-	
-	typedef struct whois_t {
-		char *host;
-		char *ip;
+		int sockfd;
 		
-	} whois_t;
+	} global_core_t;
 	
 	extern ssl_socket_t *ssl;
 	extern global_core_t global_core;
 	
-	ssl_socket_t *init_socket(char *server, int port);
+	int init_socket(char *server, int port);
 	void raw_socket(char *message);
 	int read_socket(ssl_socket_t *ssl, char *data, char *next);
 	char *skip_server(char *data);

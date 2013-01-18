@@ -46,6 +46,7 @@
 #include "lib_ircmisc.h"
 #include "lib_run.h"
 #include "lib_stats.h"
+#include "lib_known.h"
 
 #include "lib_actions.h"
 #include "lib_actions_binutils.h"
@@ -155,14 +156,7 @@ void handle_nick(char *data) {
 }
 
 void handle_join(char *data) {
-	sqlite3_stmt *stmt;
 	char *nick = NULL, *username, *host = NULL, *chan;
-	char *fnick, *message, nick2[64];
-	char *sqlquery, *list;
-	char output[1024], timestring[64];
-	struct tm * timeinfo;
-	int row;
-	time_t ts;
 	
 	chan = skip_header(data);
 	
@@ -182,57 +176,12 @@ void handle_join(char *data) {
 	if(!strcmp(nick, IRC_NICK))
 		list_append(global_lib.channels, chan, stats_channel_load(chan));
 	
-	/* Insert to db */
-	sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
-
-	if(db_simple_query(sqlite_db, sqlquery)) {
-		if((list = irc_knownuser(nick, host))) {
-			zsnprintf(nick2, "%s", nick);
-			anti_hl(nick2);
-
-			zsnprintf(output, "%s (host: %s) is also known as: %s", nick2, host, list);
-			irc_privmsg(chan, output);
-
-			free(list);
-		}
-		
-	} else printf("[-] lib/Join: cannot update db, probably because nick already exists.\n");
-		
-	/* Clearing */
-	sqlite3_free(sqlquery);
+	// check if the user is known
+	__action_known_add(nick, username, host, chan);
 	free(username);
 	
-	/* Checking notes */	
-	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
-			fnick   = (char *) sqlite3_column_text(stmt, 0);
-			message = (char *) sqlite3_column_text(stmt, 1);
-			
-			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
-				timeinfo = localtime(&ts);
-				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-				
-			} else strcpy(timestring, "unknown");
-				
-			snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
-			raw_socket(output);
-			
-			snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
-			raw_socket(output);
-		}
-		
-		sqlite3_free(sqlquery);
-		sqlite3_finalize(stmt);
-		
-		sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
-		if(!db_simple_query(sqlite_db, sqlquery))
-			printf("[-] lib/Join: cannot mark as read\n");
-	
-	} else fprintf(stderr, "[-] Action/Notes: SQL Error\n");
-	
-	/* Clearing */
-	sqlite3_free(sqlquery);
+	// check if there is pending notes
+	__action_notes_checknew(chan, nick);
 	
 	free(host);
 	free(nick);
@@ -335,9 +284,6 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	content = skip_server(data) + 1;
 	
-	/* Saving log */
-	log_privmsg(message->chan, message->nick, content);
-	
 	/* Special Check for BELL */
 	if(strchr(data, '\x07')) {
 		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
@@ -410,6 +356,9 @@ int handle_message(char *data, ircmessage_t *message) {
 		}
 	}
 	
+	/* Saving log */
+	log_privmsg(message->chan, message->nick, content);
+
 	for(i = 0; i < __request_count; i++) {
 		if((temp = match_prefix(content, __request[i].match))) {
 			message->command = content;

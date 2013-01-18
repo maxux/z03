@@ -26,30 +26,81 @@
 #include <netdb.h>
 #include <time.h>
 #include <unistd.h>
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include "../bot.h"
 #include "../core_init.h"
 #include "../lib_core.h"
 #include "../lib_urlmanager.h"
 #include "../lib_run.h"
 #include "../lib_ircmisc.h"
+#include "../core_ssl.h"
 
-int sockfd;
+ssl_socket_t *ssl;
+int sock, sockfd;
 
-void dies(int sock) {
+void dies(char *str) {
 	close(sock);
-	exit(EXIT_SUCCESS);
+	perror(str);
+	exit(EXIT_FAILURE);
 }
 
-void raw_socket(int sockfd, char *message) {
-	char *sending = (char*) malloc(sizeof(char*) * strlen(message) + 3);
+ssl_socket_t *ssl_init(int sockfd) {
+	ssl_socket_t *ssl;
+
+	if(!(ssl = (ssl_socket_t*) malloc(sizeof(ssl_socket_t))))
+		dies("[-] malloc");
+
+	ssl->socket     = NULL;
+	ssl->sslContext = NULL;
+
+	ssl->sockfd = sockfd;
+
+	// Register the error strings for libcrypto & libssl
+	SSL_load_error_strings();
+
+	// Register the available ciphers and digests
+	SSL_library_init();
+
+	// New context saying we are a client, and using SSL 2 or 3
+	ssl->sslContext = SSL_CTX_new(SSLv23_client_method());
+	if(ssl->sslContext == NULL)
+		ERR_print_errors_fp(stderr);
+
+	// Create an SSL struct for the connection
+	ssl->socket = SSL_new(ssl->sslContext);
+	if(ssl->socket == NULL)
+		ERR_print_errors_fp(stderr);
+
+	// Connect the SSL struct to our connection
+	if(!SSL_set_fd(ssl->socket, ssl->sockfd))
+		ERR_print_errors_fp(stderr);
+
+	// Initiate SSL handshake
+	if(SSL_connect(ssl->socket) != 1)
+		ERR_print_errors_fp(stderr);
+
+	return ssl;
+}
+
+int ssl_write(ssl_socket_t *ssl, char *data) {
+	if(ssl)
+		return SSL_write(ssl->socket, data, strlen(data));
+
+	else return 0;
+}
+
+void raw_socket(char *message) {
+	char *sending = (char *) malloc(sizeof(char *) * strlen(message) + 3);
 	
-	printf("[+] IRC: << %s\n", message);
+	printf("[+] execute-client: IRC: << %s\n", message);
 	
 	strcpy(sending, message);
 	strcat(sending, "\r\n");
 	
-	if(send(sockfd, sending, strlen(sending), 0) == -1)
-		perror("[-] IRC: send");
+	if(ssl_write(ssl, sending) == -1)
+		ERR_print_errors_fp(stderr);
 	
 	free(sending);
 }
@@ -58,13 +109,12 @@ void irc_privmsg(char *chan, char *message) {
 	char buffer[2048];
 	
 	snprintf(buffer, sizeof(buffer), "PRIVMSG %s :[%d] %s", chan, getpid(), message);
-	raw_socket(sockfd, buffer);
+	raw_socket(buffer);
 }
 
 int main(int argc, char *argv[]) {
 	char buffer[1024], length = 0, *match, *print;
 	char *chan;
-	int sock;
 	size_t rlen;
 	
 	if(argc < 4)
@@ -74,7 +124,8 @@ int main(int argc, char *argv[]) {
 	sock   = atoi(argv[2]);
 	chan   = argv[3];
 	
-	printf("[+] > Forked: sockfd: %d, sock: %d, chan: %s\n", sockfd, sock, chan);
+	// ssl = ssl_init(sockfd);
+	printf("[+] execute-client: forked: sockfd: %d, sock: %d, chan: %s\n", sockfd, sock, chan);
 		
 	buffer[0] = '\0';
 	
@@ -98,7 +149,7 @@ int main(int argc, char *argv[]) {
 			
 			if(length++ > 4) {
 				irc_privmsg(chan, "Output truncated. Too verbose.");
-				dies(sock);
+				dies("truncate");
 			}
 			
 			print = match + 1;
@@ -114,7 +165,7 @@ int main(int argc, char *argv[]) {
 			
 			if(length++ > 4) {
 				irc_privmsg(chan, "Output truncated. Too verbose.");
-				dies(sock);
+				dies("truncate");
 			}
 		}
 	}

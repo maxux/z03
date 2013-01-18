@@ -186,13 +186,15 @@ channel_t *stats_channel_load(char *chan) {
 	channel_t *channel;
 	char buffer[512];
 	
-	printf("[+] lib/Channel: creating <%s> environment...\n", chan);
+	printf("[+] lib/stats: channel: creating <%s> environment...\n", chan);
 	channel = stats_channel_read(chan);
 	channel->nicks = stats_nick_read(chan);
 	
-	zsnprintf(buffer, "[table rehashed: got %u total lines for %u nicks on database]",
+	/* zsnprintf(buffer, "[table rehashed: got %u total lines for %u nicks on database]",
 	                  channel->lines, channel->nicks->length);
-	irc_privmsg(chan, buffer);
+	irc_privmsg(chan, buffer); */
+	printf("[+] lib/stats: %s: table rehashed: got %u total lines for %u nicks\n",
+	       chan, channel->lines, channel->nicks->length);
 	
 	return channel;
 }
@@ -338,13 +340,14 @@ void stats_daily_update() {
 	int nicks, lines;
 	char buffer[512];
 	
-	printf("[ ] lib/stats: daily update database");
+	printf("[ ] lib/stats: daily update database\n");
 	
 	// updating database
-	db_simple_query(sqlite_db,
+	/* db_simple_query(sqlite_db,
 		"INSERT INTO stats_fast (nick, chan, lines, day) "
-		" SELECT nick, chan, COUNT(*), DATE(timestamp, 'unixepoch', 'localtime') "
-		" FROM logs WHERE timestamp > strftime('%s', date('now', '-1 day', 'localtime')) "
+		" SELECT nick, chan, COUNT(*), DATE('now', '-1 day', 'localtime') "
+		" FROM logs WHERE timestamp >= strftime('%s', DATE('now', '-1 day', 'localtime')) "
+		" AND timestamp <= strftime('%s', DATE('now', 'localtime')) "
 		" GROUP BY nick, chan"
 	);
 	
@@ -364,4 +367,5 @@ void stats_daily_update() {
 	}
 	
 	sqlite3_finalize(stmt);
+	*/
 }

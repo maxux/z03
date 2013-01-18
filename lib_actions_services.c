@@ -26,6 +26,46 @@
 #include "lib_chart.h"
 #include "lib_actions_services.h"
 
+void __action_notes_checknew(char *chan, char *nick) {
+	sqlite3_stmt *stmt;
+	char output[1024], timestring[64];
+	char *sqlquery, *fnick, *message;
+	struct tm * timeinfo;
+	time_t ts;
+
+	/* Checking notes */
+	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
+	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		while(sqlite3_step(stmt) == SQLITE_ROW) {
+			fnick   = (char *) sqlite3_column_text(stmt, 0);
+			message = (char *) sqlite3_column_text(stmt, 1);
+
+			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
+				timeinfo = localtime(&ts);
+				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+			} else strcpy(timestring, "unknown");
+
+			snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
+			raw_socket(output);
+
+			snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
+			raw_socket(output);
+		}
+
+		sqlite3_free(sqlquery);
+		sqlite3_finalize(stmt);
+
+		sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
+		if(!db_simple_query(sqlite_db, sqlquery))
+			printf("[-] lib/notes: cannot mark as read\n");
+
+	} else fprintf(stderr, "[-] lib/notes: sql error\n");
+
+	/* Clearing */
+	sqlite3_free(sqlquery);
+}
+
 void action_notes(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
 	char *sqlquery, *msg;

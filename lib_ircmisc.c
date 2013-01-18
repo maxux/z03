@@ -25,7 +25,6 @@
 #include <openssl/md5.h>
 #include "core_init.h"
 #include "lib_database.h"
-#include "lib_list.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
@@ -229,7 +228,7 @@ char *rtrim(char *str) {
 	char *back = str + strlen(str);
 	
 	while(isspace(*--back));
-		*(back+1) = '\0';
+		*(back + 1) = '\0';
 		
 	return str;
 }
@@ -245,6 +244,13 @@ char *crlftrim(char *str) {
 	}
 	
 	return keep;
+}
+
+void intswap(int *a, int *b) {
+	int c = *b;
+
+	*b = *a;
+	*a = c;
 }
 
 char *time_elapsed(time_t time) {
@@ -271,17 +277,6 @@ char *time_elapsed(time_t time) {
 	else sprintf(output, "%u days, %02u:%02u", days, hours, min);
 	
 	return output;
-}
-
-char *short_trim(char *str) {
-	size_t len = strlen(str);
-	
-	while(isspace(*(str + len - 1)))
-		len--;
-	
-	*(str + len) = '\0';
-		
-	return str;
 }
 
 char *irc_mstrncpy(char *src, size_t len) {
@@ -351,95 +346,6 @@ char *string_index(char *str, unsigned int index) {
 	} else return NULL;
 }
 
-char *list_implode(list_t *list, size_t limit) {
-	size_t alloc = 0, now = 0;
-	list_node_t *node;
-	char *implode;
-	char buffer[128];
-
-	/* compute the full list length */
-	node = list->nodes;
-
-	while(node) {
-		alloc += strlen(node->name) + 8;
-		node = node->next;
-	}
-
-	/* allocating string and re-iterate list */
-	implode = (char *) calloc(sizeof(char), alloc);
-	node = list->nodes;
-
-	while(node && ++now) {
-		// appending anti-hled nick
-		zsnprintf(buffer, "%s", node->name);
-		anti_hl(buffer);
-		strcat(implode, buffer);
-
-		if(now > limit) {
-			zsnprintf(buffer, " and %u others hidden",
-			                  list->length - now);
-
-			implode = (char *) realloc(implode, alloc + 64);
-			strcat(implode, buffer);
-			return implode;
-
-		} else if(node->next)
-			strcat(implode, ", ");
-
-		node = node->next;
-	}
-
-	return implode;
-}
-
-char *irc_knownuser(char *nick, char *host) {
-	sqlite3_stmt *stmt;
-	char *sqlquery;
-	char *thisnick = NULL, *nickcast;
-	list_t *nicklist;
-	int row;
-	
-	/* Query database */
-	sqlquery = sqlite3_mprintf(
-		"SELECT nick FROM hosts WHERE host = '%q'",
-		host
-	);
-	
-	/* Building list */
-	nicklist = list_init(NULL);
-
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
-			nickcast = (char *) sqlite3_column_text(stmt, 0);
-			
-			// Skipping same name
-			if(!strcmp(nickcast, nick))
-				continue;
-			
-			thisnick = (char *) realloc(thisnick, strlen(nickcast) + 8);
-			strcpy(thisnick, nickcast);
-
-			printf("[ ] Action/known: appending: <%s>\n", thisnick);
-			list_append(nicklist, thisnick, thisnick);
-		}
-	}
-	
-	free(thisnick);
-	sqlite3_free(sqlquery);
-	sqlite3_finalize(stmt);
-	
-	// list is empty
-	if(!nicklist->length) {
-		list_free(nicklist);
-		return NULL;
-	}
-
-	thisnick = list_implode(nicklist, 4);
-	list_free(nicklist);
-	
-	return thisnick;
-}
-
 char *skip_header(char *data) {
 	char *match;
 	
@@ -447,67 +353,6 @@ char *skip_header(char *data) {
 		return match + 1;
 		
 	else return NULL;
-}
-
-whois_t *whois_init() {
-	whois_t *whois;
-	
-	whois = (whois_t*) malloc(sizeof(whois));
-	
-	whois->host = NULL;
-	whois->ip   = NULL;
-	
-	return whois;
-}
-
-void whois_free(whois_t *whois) {
-	if(whois) {
-		free(whois->host);
-		free(whois->ip);
-	}
-	
-	free(whois);
-}
-
-whois_t *irc_whois(char *nick) {
-	char *data = (char *) malloc(sizeof(char *) * (2 * MAXBUFF));
-	char *next = (char *) malloc(sizeof(char *) * (2 * MAXBUFF));
-	char *request, temp[128];
-	whois_t *whois;
-	
-	// Init
-	*data = '\0';
-	*next = '\0';
-	if(!(whois = whois_init()))
-		return NULL;
-	
-	snprintf(temp, sizeof(temp), "WHOIS %s", nick);
-	raw_socket(temp);
-	
-	printf("[+] Misc: whois request: %s\n", nick);
-	
-	while(1) {
-		read_socket(ssl, data, next);
-		printf("[ ] IRC: >> %s\n", data);
-		
-		if((request = skip_server(data)) == NULL) {
-			printf("[-] IRC: Something wrong with protocol...\n");
-			continue;
-		}
-		
-		if(!strncmp(request, "311", 3)) {
-			whois->host = string_index(request, 4);
-			
-		} else if(!strncmp(request, "378", 3)) {
-			whois->ip = string_index(request, 7);
-			
-		} else if(!strncmp(request, "318", 3))
-			break;
-	}
-	
-	printf("[+] Misc: end of whois\n");
-	
-	return whois;
 }
 
 char *space_encode(char *str) {

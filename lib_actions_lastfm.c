@@ -25,6 +25,7 @@
 #include "lib_ircmisc.h"
 #include "lib_lastfm.h"
 #include "lib_settings.h"
+#include "lib_actions.h"
 #include "lib_actions_lastfm.h"
 
 void action_lastfm(ircmessage_t *message, char *args) {
@@ -34,8 +35,7 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	char date[128];
 	struct tm *timeinfo;
 	
-	if(*args) {
-		short_trim(args);
+	if(strlen((args = action_check_args(args)))) {
 		user = args;
 		
 	} else if(!(user = settings_get(message->nick, "lastfm"))) {

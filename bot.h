@@ -5,6 +5,7 @@
 	
 	#define IRC_SERVER		"192.168.20.1"
 	#define IRC_PORT		6697
+	#define IRC_USE_SSL             1
 	
 	#define IRC_REALNAME		"Zoé"
 	#define IRC_USERNAME		"z03"

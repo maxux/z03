@@ -101,15 +101,16 @@ void action_random(ircmessage_t *message, char *args) {
 	char buffer[512], *x;
 	int random, min = 0, max = 100;
 	
-	/* Trim last spaces */
-	short_trim(args);
-	
-	if(*args) {
+	if(strlen((args = action_check_args(args)))) {
 		/* Min/Max or just Max */
-		if((x = strchr(args, ' '))) {
+		if((x = strrchr(args, ' '))) {
+			printf("<%s> <%s>", args, x);
 			min = (atoi(args) <= 0) ? 0   : atoi(args);
 			max = (atoi(args) <= 0) ? 100 : atoi(x);
 			
+			if(max < min)
+				intswap(&min, &max);
+
 		} else max = (atoi(args) <= 0) ? 100 : atoi(args);
 	}
 	

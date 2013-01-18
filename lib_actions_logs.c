@@ -23,9 +23,11 @@
 #include "core_init.h"
 #include "lib_database.h"
 #include "lib_core.h"
+#include "lib_whois.h"
 #include "lib_actions.h"
 #include "lib_chart.h"
 #include "lib_ircmisc.h"
+#include "lib_known.h"
 #include "lib_actions_logs.h"
 
 void action_stats(ircmessage_t *message, char *args) {
@@ -171,10 +173,10 @@ void action_count(ircmessage_t *message, char *args) {
 	int words, lines, twords, tlines;
 	char found = 0;
 	
-	if(!*args)
+	if(!strlen((args = action_check_args(args))))
 		nick = message->nick;
 
-	else nick = short_trim(args);
+	else nick = args;
 	
 	sqlquery = sqlite3_mprintf(
 		"SELECT words, lines, ("
@@ -291,7 +293,7 @@ void action_url(ircmessage_t *message, char *args) {
 			output = (char *) malloc(sizeof(char) * len);
 				
 			snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s | %s", message->chan, date, anti_hl(url_nick), url, title);
-			raw_socket(sockfd, output);
+			raw_socket(output);
 			
 			free(output);
 			free(url_nick);
@@ -317,8 +319,7 @@ void action_backlog(ircmessage_t *message, char *args) {
 	char notfound[256];
 	size_t len, row;
 	
-	if(*args) {
-		short_trim(args);
+	if(strlen((args = action_check_args(args)))) {
 		sqlquery = sqlite3_mprintf(
 			"SELECT nick, timestamp, message FROM "
 			"  (SELECT nick, timestamp, message FROM logs "

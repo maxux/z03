@@ -28,7 +28,7 @@
 
 #include "core_ssl.h"
 
-ssl_socket_t *ssl_init(int sockfd) {
+ssl_socket_t *init_socket_ssl(int sockfd) {
 	ssl_socket_t *ssl;
 
 	if(!(ssl = (ssl_socket_t*) malloc(sizeof(ssl_socket_t))))

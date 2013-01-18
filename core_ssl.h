@@ -11,7 +11,7 @@
 	} ssl_socket_t;
 	
 	
-	ssl_socket_t *ssl_init(int sockfd);
+	ssl_socket_t *init_socket_ssl(int sockfd);
 	int ssl_read(ssl_socket_t *ssl, char *data, int max);
 	int ssl_write(ssl_socket_t *ssl, char *data);
 	void ssl_close(ssl_socket_t *ssl);

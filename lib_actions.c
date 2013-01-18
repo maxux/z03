@@ -25,15 +25,17 @@
 #include "lib_actions.h"
 #include "lib_ircmisc.h"
 
+char *action_check_args(char *args) {
+	return ltrim(rtrim(args));
+}
 
-int action_parse_args(ircmessage_t *message, char *args) {
-	if(!*args) {
+char *action_parse_args(ircmessage_t *message, char *args) {
+	if(!strlen(action_check_args(args))) {
 		irc_privmsg(message->chan, "Missing arguments");
-		return 0;
-		
-	} else short_trim(args);
+		return NULL;
+	}
 	
-	return 1;
+	return args;
 }
 
 void action_help(ircmessage_t *message, char *args) {

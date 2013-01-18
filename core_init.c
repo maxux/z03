@@ -189,7 +189,7 @@ char *skip_server(char *data) {
 	return NULL;
 }
 
-ssl_socket_t *init_socket(char *server, int port) {
+int init_socket(char *server, int port) {
 	int fd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
@@ -207,20 +207,20 @@ ssl_socket_t *init_socket(char *server, int port) {
 	/* Creating Socket */
 	if((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("[-] socket: socket");
-		return NULL;
+		return -1;
 	}
 
 	/* Init Connection */
 	if((connresult = connect(fd, (struct sockaddr *) &server_addr, sizeof(server_addr))) < 0) {
 		perror("[-] socket: connect");
 		close(fd);
-		return NULL;
+		return -1;
 	}
 	
 	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
-		diep("setsockopt SO_RCVTIMEO");
+		diep("[-] setsockopt: SO_RCVTIMEO");
 	
-	return ssl_init(fd);
+	return fd;
 }
 
 void raw_socket(char *message) {
@@ -275,7 +275,7 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 			buff[rlen] = '\0';
 			
 		} else if(errno != EAGAIN)
-			perror("[-] core: recv");
+			ERR_print_errors_fp(stderr);
 	}
 	
 	return 0;
@@ -310,11 +310,22 @@ int main(void) {
 	
 	printf("[+] core: connecting...\n");
 
-	if(!(ssl = init_socket(IRC_SERVER, IRC_PORT))) {
+	// connect the basic socket
+	if((global_core.sockfd = init_socket(IRC_SERVER, IRC_PORT)) < 0) {
 		fprintf(stderr, "[-] core: cannot create socket\n");
 		exit(EXIT_FAILURE);
 	}
 	
+	// enable ssl layer
+	if(IRC_USE_SSL) {
+		printf("[+] core: init ssl layer\n");
+		if(!(ssl = init_socket_ssl(global_core.sockfd))) {
+			fprintf(stderr, "[-] core: cannot link ssl to socket\n");
+			exit(EXIT_FAILURE);
+		}
+
+	} else printf("[-] core: ssl layer disabled\n");
+
 	printf("[+] core: connected\n");
 	
 	while(1) {

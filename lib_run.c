@@ -41,9 +41,6 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	int fd;
 	ircmessage_t *message;
 	
-	irc_privmsg(msg->chan, "Service down, please try again later");
-	return;
-
 	if((fd = init_socket(SRV_RUN_CLIENT, SRV_RUN_PORT)) < 0) {
 		irc_privmsg(msg->chan, "Cannot connect to the build machine");
 		return;
@@ -65,7 +62,7 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	}
 	
 	if(fork() <= 0) {
-		// sprintf(fd1, "%d", sockfd);
+		sprintf(fd1, "%d", global_core.sockfd);
 		sprintf(fd2, "%d", fd);
 		
 		execl("execute-daemon/execute-client", "execute-client", fd1, fd2, message->chan, NULL);
