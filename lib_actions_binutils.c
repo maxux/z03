@@ -64,11 +64,11 @@ void action_uptime(ircmessage_t *message, char *args) {
 	
 	now  = time(NULL);
 		
-	uptime = time_elapsed(now - global_core.startup_time);
-	rehash = time_elapsed(now - global_core.rehash_time);
+	uptime = time_elapsed(now - global_core->startup_time);
+	rehash = time_elapsed(now - global_core->rehash_time);
 	
 	zsnprintf(msg, "Bot uptime: %s (rehashed %d times, rehash uptime: %s)", 
-	               uptime, global_core.rehash_count, rehash);
+	               uptime, global_core->rehash_count, rehash);
 		
 	free(uptime);
 	free(rehash);

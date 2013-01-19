@@ -184,7 +184,7 @@ size_t stats_get_words(char *nick, char *chan) {
 
 channel_t *stats_channel_load(char *chan) {
 	channel_t *channel;
-	char buffer[512];
+	// char buffer[512];
 	
 	printf("[+] lib/stats: channel: creating <%s> environment...\n", chan);
 	channel = stats_channel_read(chan);
@@ -343,11 +343,12 @@ void stats_daily_update() {
 	printf("[ ] lib/stats: daily update database\n");
 	
 	// updating database
-	/* db_simple_query(sqlite_db,
+	db_simple_query(sqlite_db,
 		"INSERT INTO stats_fast (nick, chan, lines, day) "
 		" SELECT nick, chan, COUNT(*), DATE('now', '-1 day', 'localtime') "
-		" FROM logs WHERE timestamp >= strftime('%s', DATE('now', '-1 day', 'localtime')) "
-		" AND timestamp <= strftime('%s', DATE('now', 'localtime')) "
+		" FROM logs "
+		" WHERE timestamp >= strftime('%s', date('now', '-1 day', 'localtime'), 'utc') "
+		"   AND timestamp < strftime('%s', date('now', 'localtime'), 'utc') "
 		" GROUP BY nick, chan"
 	);
 	
@@ -361,11 +362,10 @@ void stats_daily_update() {
 			lines = sqlite3_column_int(stmt, 1);
 			nicks = sqlite3_column_int(stmt, 2);
 			
-			zsnprintf(buffer, "[Day changed, yesterday: %d nicks said %d lines]", nicks, lines);			
+			zsnprintf(buffer, "Day changed, yesterday: %d nicks said %d lines", nicks, lines);
 			irc_privmsg(chan, buffer);
 		}
 	}
 	
 	sqlite3_finalize(stmt);
-	*/
 }

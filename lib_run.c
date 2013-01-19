@@ -35,37 +35,127 @@
 #include "lib_run.h"
 #include "lib_ircmisc.h"
 
-void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
-	char buffer[2048], fd1[32], fd2[32];
-	char *prefix[] = {"C ", "PY ", "HS ", "PHP "};
-	int fd;
+typedef struct lib_run_data_t {
+	pthread_t thread;
 	ircmessage_t *message;
+	int codefd;
+
+} lib_run_data_t;
+
+void lib_run_privmsg(ircmessage_t *message, char *data) {
+	char buffer[1500];
+	zsnprintf(buffer, "[%p] %s", (void *) message, data);
+	irc_privmsg(message->chan, buffer);
+}
+
+// void lib_run_fork(ircmessage_t *message, int codefd) {
+void *lib_run_fork(void *_data) {
+	lib_run_data_t *data = (lib_run_data_t *) _data;
+	struct timeval tv = {tv.tv_sec = 0, tv.tv_usec = 0};
+	char buffer[1024], length = 0;
+	char *match = NULL, *print;
+	size_t rlen;
+
+	printf("[+] lib/run: thread %u: starting...\n", (unsigned int) pthread_self());
+
+	buffer[rlen] = '\0';
+	while((rlen = recv(data->codefd, buffer, sizeof(buffer), 0))) {
+		buffer[rlen] = '\0';
+		printf("[ ] lib/run: raw: <%s>\n", buffer);
+
+		if(strchr(buffer, 0x07)) {
+			lib_run_privmsg(data->message, "Bell detected, closing thread.");
+			break;
+		}
+
+		/* multiple lines */
+		print = buffer;
+		while((match = strchr(print, '\n')) || rlen) {
+			if(match)
+				*match = '\0';
+
+			if(strlen(print) > 180)
+				strcpy(print + 172, " [...]");
+
+			lib_run_privmsg(data->message, print);
+
+			if(length++ > 4) {
+				lib_run_privmsg(data->message, "Output truncated. Too verbose.");
+				goto eot;
+			}
+
+			if(match)
+				print = match + 1;
+
+			rlen = 0;
+		}
+	}
+
+	eot:
+		close(data->codefd);
+		free(data->message);
+		free(data);
+
+	printf("[+] lib/run: thread %u: closing...\n", (unsigned int) pthread_self());
+
+	// removing client from list and restoring timeout if last client
+	pthread_mutex_lock(&global_core->mutex_client);
+	if(!--global_core->extraclient) {
+		tv.tv_sec = SOCKET_TIMEOUT;
+
+		if(setsockopt(ssl->sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
+			diep("[-] setsockopt: SO_RCVTIMEO");
+	}
+	pthread_mutex_unlock(&global_core->mutex_client);
+
+	return data;
+}
+
+void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
+	struct timeval tv = {tv.tv_sec = 0, tv.tv_usec = 0};
+	char buffer[2048];
+	char *prefix[] = {"C ", "PY ", "HS ", "PHP "};
+	lib_run_data_t *data;
+	int fd;
 	
 	if((fd = init_socket(SRV_RUN_CLIENT, SRV_RUN_PORT)) < 0) {
-		irc_privmsg(msg->chan, "Cannot connect to the build machine");
+		irc_privmsg(msg->chan, "Build machine seems te be down");
 		return;
 	}
 	
-	/* Linking message */
-	if(!(message = (ircmessage_t*) malloc(sizeof(ircmessage_t))))
+	/* removing timeout */
+	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
+		diep("[-] setsockopt: SO_RCVTIMEO");
+
+	/* creating environment */
+	if(!(data = malloc(sizeof(lib_run_data_t))))
 		return;
 	
-	strcpy(message->chan, msg->chan);
+	/* linking message */
+	if(!(data->message = (ircmessage_t*) malloc(sizeof(ircmessage_t))))
+		return;
+
+	strcpy(data->message->chan, msg->chan);
 	
-	/* Starting */
+	/* starting request */
 	snprintf(buffer, sizeof(buffer), "%s%s", prefix[lang], code);	
 	
 	/* Sending code */
-	if(send(fd, buffer, strlen(buffer), 0) == -1) {
+	if(send(fd, buffer, strlen(buffer), 0) < 0) {
 		perror("[-] send");
 		return;
 	}
 	
-	if(fork() <= 0) {
-		sprintf(fd1, "%d", global_core.sockfd);
-		sprintf(fd2, "%d", fd);
-		
-		execl("execute-daemon/execute-client", "execute-client", fd1, fd2, message->chan, NULL);
-		
-	} else printf("[+] Forked, see ya soon biatch.\n");
+	data->codefd = fd;
+	global_core->extraclient++;
+
+	/* reducing main socket timeout */
+	tv.tv_sec = 1;
+	if(setsockopt(ssl->sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
+		diep("[-] setsockopt: SO_RCVTIMEO");
+
+	/* threading operation */
+	printf("[+] lib/run: starting thread\n");
+	pthread_create(&data->thread, NULL, lib_run_fork, data);
+	pthread_detach(data->thread);
 }

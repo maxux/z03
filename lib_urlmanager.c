@@ -250,7 +250,7 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
 		
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
 		if(post) {
@@ -471,6 +471,15 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	printf("[+] Downloaded Type  : %d\n", curl.type);
 	// printf("%s\n", curl.data);
 	
+	// Write error occure on data file
+	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
+		zsnprintf(temp, "URL (Error %d): %s", curl.curlcode, curl_easy_strerror(curl.curlcode));
+		irc_privmsg(message->chan, temp);
+
+		free(curl.data);
+		return 2;
+	}
+
 	if(!curl.data && !curl.http_length) {
 		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
 		return 2;
@@ -479,15 +488,6 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	if(!curl.length && curl.type != UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
 		free(curl.data);
-		return 2;
-	}
-	
-	// Write error occure on data file
-	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
-		snprintf(temp, sizeof(temp), "PRIVMSG %s :URL (Error %d): %s", message->chan, curl.curlcode, curl_easy_strerror(curl.curlcode));
-		raw_socket(temp);
-		
-		free(curl.data);		
 		return 2;
 	}
 

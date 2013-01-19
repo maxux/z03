@@ -11,6 +11,7 @@
 	
 	char *space_encode(char *str);
 	char *string_index(char *str, unsigned int index);
+	void intswap(int *a, int *b);
 	
 	char *anti_hl(char *nick);
 	char *anti_hl_each_words(char *str, size_t len, charset_t charset);

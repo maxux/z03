@@ -5,6 +5,7 @@
 	#include "core_ssl.h"
 	
 	#define MAXBUFF			4096
+	#define SOCKET_TIMEOUT		10
 	
 	typedef struct codemap_t {
 		char *filename;                /* library filename */
@@ -22,13 +23,18 @@
 		unsigned int rehash_count;
 		
 		char auth;
-		
 		int sockfd;
 		
+		pthread_mutex_t mutex_ssl;
+		ssl_socket_t ssl;
+
+		pthread_mutex_t mutex_client;
+		int extraclient;
+
 	} global_core_t;
 	
 	extern ssl_socket_t *ssl;
-	extern global_core_t global_core;
+	extern global_core_t *global_core;
 	
 	int init_socket(char *server, int port);
 	void raw_socket(char *message);

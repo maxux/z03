@@ -483,7 +483,7 @@ void main_construct(void) {
 	// opening sqlite
 	sqlite_db = db_sqlite_init();
 
-	if(global_core.auth) {
+	if(global_core->auth) {
 		// loading all stats
 		stats_load_all(global_lib.channels);
 	}

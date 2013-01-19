@@ -33,12 +33,14 @@
 #include <signal.h>
 #include <setjmp.h>
 #include <execinfo.h>
+#include <sys/mman.h>
+#include <pthread.h>
 #include "bot.h"
 #include "core_init.h"
 
 ssl_socket_t *ssl;
 
-global_core_t global_core;
+global_core_t *global_core;
 jmp_buf segfault_env;
 
 void diep(char *str) {
@@ -136,8 +138,8 @@ void loadlib(codemap_t *codemap) {
 		exit(EXIT_FAILURE);
 	}
 	
-	global_core.rehash_time = time(NULL);
-	global_core.rehash_count++;
+	global_core->rehash_time = time(NULL);
+	global_core->rehash_count++;
 	
 	printf("[+] Core: calling constructor...\n");
 	codemap->construct();
@@ -193,7 +195,7 @@ int init_socket(char *server, int port) {
 	int fd = -1, connresult;
 	struct sockaddr_in server_addr;
 	struct hostent *he;
-	struct timeval tv = {tv.tv_sec = 30, tv.tv_usec = 0};
+	struct timeval tv = {tv.tv_sec = SOCKET_TIMEOUT, tv.tv_usec = 0};
 	
 	/* Resolving name */
 	if((he = gethostbyname(server)) == NULL)
@@ -266,16 +268,28 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 			}
 		}
 		
-		if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
-			if(rlen == 0) {
-				printf("[ ] Core: Warning: nothing read from socket\n");
-				usleep(120000);
-			}
+		do {
+			pthread_mutex_lock(&global_core->mutex_ssl);
+
+			if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
+				if(rlen == 0) {
+					ssl_error();
+					printf("[ ] Core: Warning: nothing read from socket\n");
+					usleep(120000);
+				}
+
+				buff[rlen] = '\0';
 				
-			buff[rlen] = '\0';
+			} else if(errno != EAGAIN)
+				ssl_error();
+
+			pthread_mutex_unlock(&global_core->mutex_ssl);
+
+			// if threads, waiting for mutex match
+			if(remain_client())
+				usleep(420000);
 			
-		} else if(errno != EAGAIN)
-			ERR_print_errors_fp(stderr);
+		} while(errno == EAGAIN);
 	}
 	
 	return 0;
@@ -298,10 +312,24 @@ int main(void) {
 	srand(time(NULL));
 	
 	/* Initializing global variables */
-	global_core.startup_time = time(NULL);
-	global_core.rehash_count = 0;
-	global_core.auth         = 0;
+	/* mmap and mutex */
+	global_core = mmap(NULL, sizeof(global_core_t), PROT_READ | PROT_WRITE,
+	                   MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+
+	if(!global_core)
+		diep("mmap");
+
+	// init mutex
+	pthread_mutex_init(&global_core->mutex_ssl, NULL);
+	pthread_mutex_init(&global_core->mutex_client, NULL);
+
+	// settings variable
+	global_core->startup_time = time(NULL);
+	global_core->rehash_count = 0;
+	global_core->auth         = 0;
+	global_core->extraclient  = 0;
 	
+	/* signals */
 	signal_intercept(SIGSEGV, sighandler);
 	signal_intercept(SIGCHLD, sighandler);
 	
@@ -311,7 +339,7 @@ int main(void) {
 	printf("[+] core: connecting...\n");
 
 	// connect the basic socket
-	if((global_core.sockfd = init_socket(IRC_SERVER, IRC_PORT)) < 0) {
+	if((global_core->sockfd = init_socket(IRC_SERVER, IRC_PORT)) < 0) {
 		fprintf(stderr, "[-] core: cannot create socket\n");
 		exit(EXIT_FAILURE);
 	}
@@ -319,7 +347,7 @@ int main(void) {
 	// enable ssl layer
 	if(IRC_USE_SSL) {
 		printf("[+] core: init ssl layer\n");
-		if(!(ssl = init_socket_ssl(global_core.sockfd))) {
+		if(!(ssl = init_socket_ssl(global_core->sockfd, &global_core->ssl))) {
 			fprintf(stderr, "[-] core: cannot link ssl to socket\n");
 			exit(EXIT_FAILURE);
 		}
@@ -346,11 +374,11 @@ int main(void) {
 		if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1))
 			core_handle_private_message(data + 1, &codemap);
 		
-		if(!global_core.auth && !strncmp(request, "NOTICE AUTH", 11)) {
+		if(!global_core->auth && !strncmp(request, "NOTICE AUTH", 11)) {
 			raw_socket("NICK " IRC_NICK);
 			raw_socket("USER " IRC_USERNAME " " IRC_USERNAME " " IRC_USERNAME " :" IRC_REALNAME);
 			
-			global_core.auth = 1;
+			global_core->auth = 1;
 			continue;
 		}
 		

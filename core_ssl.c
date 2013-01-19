@@ -28,15 +28,9 @@
 
 #include "core_ssl.h"
 
-ssl_socket_t *init_socket_ssl(int sockfd) {
-	ssl_socket_t *ssl;
-
-	if(!(ssl = (ssl_socket_t*) malloc(sizeof(ssl_socket_t))))
-		diep("[-] malloc");
-		
+ssl_socket_t *init_socket_ssl(int sockfd, ssl_socket_t *ssl) {
 	ssl->socket     = NULL;
 	ssl->sslContext = NULL;
-
 	ssl->sockfd = sockfd;
 	
 	// Register the error strings for libcrypto & libssl
@@ -90,4 +84,8 @@ void ssl_close(ssl_socket_t *ssl) {
 		SSL_CTX_free(ssl->sslContext);
 
 	free(ssl);
+}
+
+void ssl_error() {
+	ERR_print_errors_fp(stderr);
 }
