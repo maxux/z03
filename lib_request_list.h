@@ -179,4 +179,10 @@ request_t __request[] = {
 		.man      = "",
 		.hidden   = 1,
 	},
+	{
+		.match    = ".blowjob",
+		.callback = action_blowjob,
+		.man      = "",
+		.hidden   = 1,
+	},
 };

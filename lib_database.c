@@ -29,47 +29,47 @@
 sqlite3 *sqlite_db;
 
 /*
- * SQLite Management
+ * sqlite Management
  */
 sqlite3 *db_sqlite_init() {
 	sqlite3 *db;
 	
-	printf("[+] SQLite: loading <%s>\n", SQL_DATABASE_FILE);
+	printf("[+] sqlite: loading <%s>\n", SQL_DATABASE_FILE);
 	
 	if(sqlite3_open(SQL_DATABASE_FILE, &db) != SQLITE_OK) {
-		fprintf(stderr, "[-] SQLite: cannot open sqlite databse: <%s>\n", sqlite3_errmsg(db));
+		fprintf(stderr, "[-] sqlite: cannot open sqlite databse: <%s>\n", sqlite3_errmsg(db));
 		return NULL;
 	}
 	
 	sqlite3_busy_timeout(db, 10000);
 	
-	printf("[+] SQLite: database loaded\n");
+	printf("[+] sqlite: database loaded\n");
 	
 	return db;
 }
 
-sqlite3_stmt *db_select_query(sqlite3 *db, char *sql) {
+sqlite3_stmt *db_sqlite_select_query(sqlite3 *db, char *sql) {
 	sqlite3_stmt *stmt;
 	
 	/* Debug SQL */
-	printf("[+] SQLite: <%s>\n", sql);
+	printf("[+] sqlite: <%s>\n", sql);
 	
 	/* Query */
 	if(sqlite3_prepare_v2(db, sql, strlen(sql) + 1, &stmt, NULL) != SQLITE_OK) {
-		fprintf(stderr, "[-] SQLite: query <%s> failed: %s\n", sql, sqlite3_errmsg(db));
+		fprintf(stderr, "[-] sqlite: query <%s> failed: %s\n", sql, sqlite3_errmsg(db));
 		return NULL;
 	}
 	
 	return stmt;
 }
 
-int db_simple_query(sqlite3 *db, char *sql) {
+int db_sqlite_simple_query(sqlite3 *db, char *sql) {
 	/* Debug SQL */
-	printf("[+] SQLite: <%s>\n", sql);
+	printf("[+] sqlite: <%s>\n", sql);
 	
 	/* Query */
 	if(sqlite3_exec(db, sql, NULL, NULL, NULL) != SQLITE_OK) {
-		fprintf(stderr, "[-] SQLite: query <%s> failed: %s\n", sql, sqlite3_errmsg(db));
+		fprintf(stderr, "[-] sqlite: query <%s> failed: %s\n", sql, sqlite3_errmsg(db));
 		return 0;
 	}
 	
@@ -91,9 +91,9 @@ int db_sqlite_close(sqlite3 *db) {
 	int err;
 	
 	if((err = sqlite3_close(db)) != SQLITE_OK) {
-		fprintf(stderr, "[-] SQLite: cannot close database: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "[-] sqlite: cannot close database: %s\n", sqlite3_errmsg(db));
 		
-	} else printf("[+] SQLite: database closed.\n");
+	} else printf("[+] sqlite: database closed.\n");
 	
 	return err;
 }

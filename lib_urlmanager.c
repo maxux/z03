@@ -348,7 +348,7 @@ void check_round_count(ircmessage_t *message) {
 
 	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {		
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 			if(row == SQLITE_ROW)
 				urls = sqlite3_column_int(stmt, 0);
@@ -387,7 +387,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	 *   Quering database
 	 */
 	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q' AND chan = '%q'", url, message->chan);
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL) {
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 		return 1;
 	}
@@ -419,7 +419,7 @@ int handle_url(ircmessage_t *message, char *url) {
 		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time, chan) VALUES ('%q', '%q', 1, %d, '%q')", message->nick, url, time(NULL), message->chan);
 	}
 	
-	if(!db_simple_query(sqlite_db, sqlquery))
+	if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 		printf("[-] URL Parser: cannot update db\n");
 	
 	/* Clearing */
@@ -521,7 +521,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			// redecoding entities for clear title update
 			decode_html_entities_utf8(title, NULL);
 			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q' AND nick != '%q' AND chan = '%q' LIMIT 1", title, message->nick, message->chan);
-			if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
 			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
@@ -544,7 +544,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			sqlite3_finalize(stmt);
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
-			if(!db_simple_query(sqlite_db, sqlquery))
+			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 				printf("[-] URL Parser: cannot update db\n");
 			
 			/* Clearing */
@@ -568,7 +568,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			SHA1((unsigned char *) curl.data, curl.length, sha1_hexa);
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET sha1 = '%s' WHERE url = '%q'", sha1_string(sha1_hexa, sha1_char), url);
-			if(!db_simple_query(sqlite_db, sqlquery))
+			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 				printf("[-] URL Parser: cannot update db\n");
 				
 			/* Clearing */
@@ -576,7 +576,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			
 			/* Checking checksum repost */
 			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE sha1 = '%s' AND url != '%q' AND chan = '%q'", sha1_char, url, message->chan);
-			if((stmt = db_select_query(sqlite_db, sqlquery))) {
+			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 				while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 					if(row == SQLITE_ROW) {
 						/* Skip repost from same nick */

@@ -47,7 +47,7 @@ void action_stats(ircmessage_t *message, char *args) {
 		message->chan, message->chan, message->chan
 	);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			count = sqlite3_column_int(stmt, 0);
 			cnick = sqlite3_column_int(stmt, 1);
@@ -77,7 +77,7 @@ void action_stats(ircmessage_t *message, char *args) {
 
 	cnick = 0;
 	lines = 0;
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			cnick++;
 			lines += sqlite3_column_int(stmt, 0);
@@ -119,7 +119,7 @@ void action_chart(ircmessage_t *message, char *args) {
 		message->chan
 	);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		/* sqlite3_column_int auto-finalize */
 		nbrows = db_sqlite_num_rows(stmt);
 		values = (int *) malloc(sizeof(int) * nbrows);
@@ -127,7 +127,7 @@ void action_chart(ircmessage_t *message, char *args) {
 	
 		printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
 		
-		if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 			i = nbrows - 1;
 			
 			while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -188,7 +188,7 @@ void action_count(ircmessage_t *message, char *args) {
 		message->chan, message->chan, nick, message->chan
 	);
 	                           
-	if((stmt = db_select_query(sqlite_db, sqlquery)) == NULL)
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] action/count: sql error\n");
 	
 	while(sqlite3_step(stmt) == SQLITE_ROW) {
@@ -273,7 +273,7 @@ void action_url(ircmessage_t *message, char *args) {
 		args, args, message->chan
 	);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			url   = (char *) sqlite3_column_text(stmt, 0);
 			title = (char *) sqlite3_column_text(stmt, 1);
@@ -310,17 +310,20 @@ void action_url(ircmessage_t *message, char *args) {
 }
 
 void action_backlog(ircmessage_t *message, char *args) {
-	sqlite3_stmt *stmt;
-	char *sqlquery, *msg;
+	sqlite3_stmt *stmt1, *stmt2;
+	char *sqlquery1, *sqlquery2, *msg;
 	const unsigned char *row_nick, *row_msg;
 	time_t row_time;
 	struct tm * timeinfo;
-	char date[128], *log_nick, found = 0;
-	char notfound[256];
+	char date[128], *log_nick;
+	char temp[256];
+	unsigned int nrows, found = 0;
 	size_t len, row;
 	
 	if(strlen((args = action_check_args(args)))) {
-		sqlquery = sqlite3_mprintf(
+		sqlquery1 = NULL;
+
+		sqlquery2 = sqlite3_mprintf(
 			"SELECT nick, timestamp, message FROM "
 			"  (SELECT nick, timestamp, message FROM logs "
 			"   WHERE chan = '%q' AND nick = '%q' "
@@ -330,30 +333,61 @@ void action_backlog(ircmessage_t *message, char *args) {
 		);
 				   
 	} else {
-		/* Flood Protection */
-		if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
+		/* if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
 			irc_privmsg(message->chan, "Avoiding flood, bitch !");
 			return;
 			
-		} else message->channel->last_backlog_request = time(NULL);
+		} else message->channel->last_backlog_request = time(NULL); */
 		
-		sqlquery = sqlite3_mprintf(
-			"SELECT nick, timestamp, message FROM "
-			"  (SELECT nick, timestamp, message "
-			"   FROM logs WHERE chan = '%q' "
-			"   ORDER BY id DESC LIMIT 1, 7) "
-			"ORDER BY timestamp ASC",
-			message->chan
+		sqlquery1 = sqlite3_mprintf(
+			"SELECT COUNT(*) FROM (                     "
+			"   SELECT id FROM logs                     "
+			"   WHERE chan = '%q' AND timestamp > (     "
+			"      SELECT MAX(timestamp)                "
+			"      FROM logs                            "
+			"      WHERE chan = '%q' AND nick = '%q'    "
+			"      AND timestamp < %d                   "
+			"   )                                       "
+			"   ORDER BY id ASC                         "
+			")                                          ",
+			message->chan, message->chan, message->nick, time(NULL) - 2
+		);
+
+		sqlquery2 = sqlite3_mprintf(
+			"SELECT nick, timestamp, message FROM (     "
+			"   SELECT nick, timestamp, message         "
+			"   FROM logs                               "
+			"   WHERE chan = '%q'                       "
+			"   ORDER BY timestamp DESC LIMIT 20        "
+			") ORDER BY timestamp ASC                   ",
+			message->chan, message->chan, message->nick, time(NULL) - 2
 		);
 	}
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
-		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
+	if((stmt2 = db_sqlite_select_query(sqlite_db, sqlquery2))) {
+		if(sqlquery1) {
+			if((stmt1 = db_sqlite_select_query(sqlite_db, sqlquery1))) {
+				nrows = sqlite3_column_int(stmt1, 0);
+				if(nrows < 1) {
+					zsnprintf(temp, "%s: %u lines since last talk, noticing last lines...",
+							message->nickhl, nrows);
+
+				} else zsnprintf(temp, "%s: noticing last lines...",  message->nickhl);
+
+				irc_privmsg(message->chan, temp);
+
+			} else fprintf(stderr, "[-] backlog: cannot select\n");
+
+			sqlite3_finalize(stmt1);
+			sqlite3_free(sqlquery1);
+		}
+
+		while((row = sqlite3_step(stmt2)) == SQLITE_ROW) {
 			found = 1;
 			
-			row_nick  = sqlite3_column_text(stmt, 0);
-			row_time  = sqlite3_column_int(stmt, 1);
-			row_msg   = sqlite3_column_text(stmt, 2);
+			row_nick  = sqlite3_column_text(stmt2, 0);
+			row_time  = sqlite3_column_int(stmt2, 1);
+			row_msg   = sqlite3_column_text(stmt2, 2);
 			
 			/* Date formating */
 			timeinfo = localtime(&row_time);
@@ -367,7 +401,10 @@ void action_backlog(ircmessage_t *message, char *args) {
 				
 			snprintf(msg, len, "[%s] <%s> %s", date, anti_hl(log_nick), row_msg);
 			
-			irc_privmsg(message->chan, msg);
+			if(sqlquery1)
+				irc_notice(message->nick, msg);
+
+			else irc_privmsg(message->chan, msg);
 			
 			free(log_nick);
 			free(msg);
@@ -376,13 +413,13 @@ void action_backlog(ircmessage_t *message, char *args) {
 	} else fprintf(stderr, "[-] URL Parser: cannot select logs\n");
 	
 	if(!found) {
-		zsnprintf(notfound, "No match found for <%s>", args);
-		irc_privmsg(message->chan, notfound);
+		zsnprintf(temp, "No match found for <%s>", args);
+		irc_privmsg(message->chan, temp);
 	}
 	
 	/* Clearing */
-	sqlite3_finalize(stmt);
-	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt2);
+	sqlite3_free(sqlquery2);
 }
 
 void action_chartlog(ircmessage_t *message, char *args) {
@@ -412,7 +449,7 @@ void action_chartlog(ircmessage_t *message, char *args) {
 		message->chan, now
 	);
 
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		/* sqlite3_column_int auto-finalize */
 		nbrows = db_sqlite_num_rows(stmt);
 		values = (int *) malloc(sizeof(int) * nbrows);
@@ -420,7 +457,7 @@ void action_chartlog(ircmessage_t *message, char *args) {
 
 		printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
 
-		if((stmt = db_select_query(sqlite_db, sqlquery))) {
+		if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 			i = nbrows - 1;
 
 			while((row = sqlite3_step(stmt)) == SQLITE_ROW) {

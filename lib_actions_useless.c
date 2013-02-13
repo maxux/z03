@@ -25,3 +25,8 @@ void action_sudo(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_privmsg(message->chan, "sudo: you are not sudoers");
 }
+
+void action_blowjob(ircmessage_t *message, char *args) {
+	(void) args;
+	irc_kick(message->chan, message->nick, "Tu vois, ça marche, connard !");
+}

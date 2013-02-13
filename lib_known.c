@@ -83,7 +83,7 @@ char *irc_knownuser(char *nick, char *host) {
 	/* Building list */
 	nicklist = list_init(NULL);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			nickcast = (char *) sqlite3_column_text(stmt, 0);
 			
@@ -122,7 +122,7 @@ void __action_known_add(char *nick, char *username, char *host, char *chan) {
 	/* Insert to db */
 	sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
 
-	if(db_simple_query(sqlite_db, sqlquery)) {
+	if(db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		if((list = irc_knownuser(nick, host))) {
 			zsnprintf(nick2, "%s", nick);
 			anti_hl(nick2);

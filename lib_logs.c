@@ -35,7 +35,7 @@ int log_privmsg(char *chan, char *nick, char *message) {
 	
 	sqlquery = sqlite3_mprintf("INSERT INTO `logs` (id, chan, timestamp, nick, message) VALUES (NULL, '%q', %u, '%q', '%q')", chan, ts, nick, message);
 	
-	if(!db_simple_query(sqlite_db, sqlquery)) {
+	if(!db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		printf("[-] URL Parser: cannot update db\n");
 		ts = 0;
 	}

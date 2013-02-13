@@ -29,16 +29,17 @@
 void __action_notes_checknew(char *chan, char *nick) {
 	sqlite3_stmt *stmt;
 	char output[1024], timestring[64];
-	char *sqlquery, *fnick, *message;
+	char *sqlquery, *fnick, *message, *host;
 	struct tm * timeinfo;
 	time_t ts;
 
 	/* Checking notes */
-	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts, host FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			fnick   = (char *) sqlite3_column_text(stmt, 0);
 			message = (char *) sqlite3_column_text(stmt, 1);
+			host    = (char *) sqlite3_column_text(stmt, 3);
 
 			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
 				timeinfo = localtime(&ts);
@@ -46,18 +47,18 @@ void __action_notes_checknew(char *chan, char *nick) {
 
 			} else strcpy(timestring, "unknown");
 
-			snprintf(output, sizeof(output), "PRIVMSG %s :┌── [%s] %s sent a message to %s", chan, timestring, fnick, nick);
-			raw_socket(output);
+			zsnprintf(output, "┌── [%s] %s (%s) sent you a message, %s", timestring, fnick, host, nick);
+			irc_privmsg(chan, output);
 
-			snprintf(output, sizeof(output), "PRIVMSG %s :└─> %s", chan, message);
-			raw_socket(output);
+			zsnprintf(output, "└─> %s: %s", nick, message);
+			irc_privmsg(chan, output);
 		}
 
 		sqlite3_free(sqlquery);
 		sqlite3_finalize(stmt);
 
 		sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
-		if(!db_simple_query(sqlite_db, sqlquery))
+		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 			printf("[-] lib/notes: cannot mark as read\n");
 
 	} else fprintf(stderr, "[-] lib/notes: sql error\n");
@@ -84,7 +85,7 @@ void action_notes(ircmessage_t *message, char *args) {
 		message->chan, args
 	);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			if((count = sqlite3_column_int(stmt, 0)) >= MAX_NOTES)
 				irc_privmsg(message->chan, "Message queue full");
@@ -100,12 +101,12 @@ void action_notes(ircmessage_t *message, char *args) {
 	
 	/* Inserting */
 	sqlquery = sqlite3_mprintf(
-		"INSERT INTO notes (fnick, tnick, chan, message, seen, ts) "
-		"VALUES ('%q', '%q', '%q', '%q', 0, %u)",
-		message->nick, args, message->chan, msg, time(NULL)
+		"INSERT INTO notes (fnick, tnick, chan, message, seen, ts, host) "
+		"VALUES ('%q', '%q', '%q', '%q', 0, %u, '%q')",
+		message->nick, args, message->chan, msg, time(NULL), message->host
 	);
 	
-	if(db_simple_query(sqlite_db, sqlquery)) {
+	if(db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		irc_privmsg(message->chan, "Message saved");
 		
 	} else irc_privmsg(message->chan, "Cannot sent your message. Try again later.");

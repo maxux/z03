@@ -28,6 +28,7 @@
 	
 	typedef struct ircmessage_t {
 		char nick[32];
+		char host[64];
 		char nickhl[36];
 		
 		/* Warning: not clear:

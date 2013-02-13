@@ -46,7 +46,7 @@ list_t *stats_words_read(char *chan) {
 	
 	printf("[ ] lib/stats: loading nick words list for <%s>...\n", chan);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
 				diep("malloc");
@@ -86,7 +86,7 @@ list_t *stats_nick_read(char *chan) {
 	
 	printf("[ ] lib/stats: loading nick list for <%s>...\n", chan);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
 				diep("malloc");
@@ -127,7 +127,7 @@ channel_t *stats_channel_read(char *chan) {
 	
 	printf("[ ] lib/stats: loading channel <%s> length...\n", chan);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery)))
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
 		while(sqlite3_step(stmt) == SQLITE_ROW)
 			channel->lines = (size_t) sqlite3_column_int(stmt, 0);
 	
@@ -150,7 +150,7 @@ size_t stats_get_lasttime(char *nick, char *chan) {
 	
 	printf("[ ] lib/stats: loading <%s/%s> lastime...\n", chan, nick);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery)))
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
 		while(sqlite3_step(stmt) == SQLITE_ROW)	
 			lasttime = (size_t) sqlite3_column_int(stmt, 0);
 	
@@ -170,7 +170,7 @@ size_t stats_get_words(char *nick, char *chan) {
 		chan, nick
 	);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery)))
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
 		while(sqlite3_step(stmt) == SQLITE_ROW)	
 			words = (size_t) sqlite3_column_int(stmt, 0);
 	
@@ -217,7 +217,7 @@ void stats_update(ircmessage_t *message, nick_t *nick, char new) {
 		);
 	}
 	
-	db_simple_query(sqlite_db, sqlquery);
+	db_sqlite_simple_query(sqlite_db, sqlquery);
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);
@@ -235,7 +235,7 @@ size_t stats_words_count(char *nick, char *chan) {
 	
 	printf("[ ] lib/stats: loading <%s/%s> words...\n", chan, nick);
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery)))
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
 		while(sqlite3_step(stmt) == SQLITE_ROW)	
 			words += words_count((char *) sqlite3_column_text(stmt, 0));
 	
@@ -253,18 +253,18 @@ void stats_set_words(char *nick, char *chan, size_t words) {
 		words, nick, chan
 	);
 	
-	db_simple_query(sqlite_db, sqlquery);
+	db_sqlite_simple_query(sqlite_db, sqlquery);
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);
 }
 
 void stats_clear_db() {
-	db_simple_query(sqlite_db, "DELETE FROM stats");
+	db_sqlite_simple_query(sqlite_db, "DELETE FROM stats");
 }
 
 void stats_build_db() {
-	db_simple_query(sqlite_db,
+	db_sqlite_simple_query(sqlite_db,
 		"INSERT INTO stats (nick, chan, words, lines) "
 		"SELECT nick, chan, 0, count(*) FROM logs GROUP BY nick, chan"
 	);
@@ -285,7 +285,7 @@ void stats_rebuild_all(list_t *channels) {
 	// building and updating current words
 	node_channel = channels->nodes;
 	
-	db_simple_query(sqlite_db, "BEGIN TRANSACTION");
+	db_sqlite_simple_query(sqlite_db, "BEGIN TRANSACTION");
 	
 	while(node_channel) {
 		channel = node_channel->data;
@@ -310,7 +310,7 @@ void stats_rebuild_all(list_t *channels) {
 		node_channel = node_channel->next;
 	}
 	
-	db_simple_query(sqlite_db, "END TRANSACTION");
+	db_sqlite_simple_query(sqlite_db, "END TRANSACTION");
 	
 	printf("[+] lib/stats: table rebuilt\n");
 }
@@ -322,7 +322,7 @@ void stats_load_all(list_t *root) {
 	
 	printf("[ ] lib/stats: reloading all...\n");
 		
-	if((stmt = db_select_query(sqlite_db, "SELECT DISTINCT chan FROM stats"))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, "SELECT DISTINCT chan FROM stats"))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			channel = (char *) sqlite3_column_text(stmt, 0);
 			newchan = stats_channel_load(channel);
@@ -343,7 +343,7 @@ void stats_daily_update() {
 	printf("[ ] lib/stats: daily update database\n");
 	
 	// updating database
-	db_simple_query(sqlite_db,
+	db_sqlite_simple_query(sqlite_db,
 		"INSERT INTO stats_fast (nick, chan, lines, day) "
 		" SELECT nick, chan, COUNT(*), DATE('now', '-1 day', 'localtime') "
 		" FROM logs "
@@ -356,7 +356,7 @@ void stats_daily_update() {
 	sqlquery = "SELECT chan, SUM(lines) lines, COUNT(*) nicks FROM stats_fast "
 	           "WHERE day = date('now', '-1 day', 'localtime') GROUP BY chan";
 		
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW)	{
 			chan  = (char *) sqlite3_column_text(stmt, 0);
 			lines = sqlite3_column_int(stmt, 1);

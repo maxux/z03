@@ -32,6 +32,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <signal.h>
+#include <pthread.h>
 
 #define __LIB_CORE_C
 #include "bot.h"
@@ -62,7 +63,7 @@
 #include "lib_request_list.h"
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
 
-#define LASTTIME_CHECK     2 * 24 * 60 * 60 // 2 days
+#define LASTTIME_CHECK     5 * 24 * 60 * 60 // 5 days
 
 global_lib_t global_lib = {
 	.channels = NULL,
@@ -72,6 +73,7 @@ global_lib_t global_lib = {
 void lib_sighandler(int signal) {
 	switch(signal) {
 		case SIGUSR1:
+			pthread_mutex_unlock(&global_core->mutex_ssl);
 			stats_daily_update();
 		break;
 	}
@@ -115,9 +117,22 @@ int nick_length_check(char *nick, char *channel) {
 }
 
 int pre_handle(char *data, ircmessage_t *message) {
+	char *nick, *username, *host;
 	channel_t *channel;
+
+	if(!irc_extract_userdata(data, &nick, &username, &host)) {
+		printf("[-] lib/prehandle: extract data info failed\n");
+		return 1;
+	}
+
+	free(username);
+
 	/* Extracting nick */
-	extract_nick(data, message->nick, sizeof(message->nick));
+	zsnprintf(message->nick, "%s", nick);
+	zsnprintf(message->host, "%s", host);
+
+	free(nick);
+	free(host);
 	
 	/* Highlight protection */
 	strcpy(message->nickhl, message->nick);
@@ -177,7 +192,7 @@ void handle_join(char *data) {
 		list_append(global_lib.channels, chan, stats_channel_load(chan));
 	
 	// check if the user is known
-	__action_known_add(nick, username, host, chan);
+	// __action_known_add(nick, username, host, chan);
 	free(username);
 	
 	// check if there is pending notes
@@ -442,9 +457,8 @@ void main_core(char *data, char *request) {
 		return;
 	}
 	
-	if(!strncmp(request, "MODE", 4)) {
-		/* Bot identified */
-		if(!strncmp(request, "MODE " IRC_NICK " :+r", 9 + sizeof(IRC_NICK)) && IRC_NICKSERV)
+	if(!strncmp(request, "NOTICE", 6)) {
+		if(strstr(request, ":Password accepted - you are now recognized."))
 			irc_joinall();
 	}
 	

@@ -33,7 +33,7 @@ int settings_set(char *nick, char *key, char *value) {
 	
 	sqlquery = sqlite3_mprintf("REPLACE INTO settings (nick, key, value) VALUES ('%q', LOWER('%q'), LOWER('%q'))", nick, key, value);
 	
-	if(!db_simple_query(sqlite_db, sqlquery)) {
+	if(!db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		fprintf(stderr, "[-] settings/set: cannot insert data\n");
 		retcode = 1;
 	
@@ -52,7 +52,7 @@ char *settings_get(char *nick, char *key) {
 	
 	sqlquery = sqlite3_mprintf("SELECT value FROM settings WHERE nick = '%q' AND key = LOWER('%q')", nick, key);
 	
-	if((stmt = db_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE && row == SQLITE_ROW)
 			row_value = strdup((char *) sqlite3_column_text(stmt, 0));
 	
@@ -71,7 +71,7 @@ int settings_unset(char *nick, char *key) {
 	
 	sqlquery = sqlite3_mprintf("DELETE FROM settings WHERE nick = '%q' AND key = LOWER('%q')", nick, key);
 	
-	if(!db_simple_query(sqlite_db, sqlquery)) {
+	if(!db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		fprintf(stderr, "[-] settings/set: cannot insert data\n");
 		retcode = 1;
 	

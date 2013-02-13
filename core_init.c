@@ -233,10 +233,24 @@ void raw_socket(char *message) {
 	strcpy(sending, message);
 	strcat(sending, "\r\n");
 	
+	pthread_mutex_lock(&global_core->mutex_ssl);
+
 	if(ssl_write(ssl, sending) == -1)
 		perror("[-] IRC: send");
 	
+	pthread_mutex_unlock(&global_core->mutex_ssl);
+
 	free(sending);
+}
+
+int remain_client() {
+	int back;
+
+	pthread_mutex_lock(&global_core->mutex_client);
+	back = global_core->extraclient;
+	pthread_mutex_unlock(&global_core->mutex_client);
+
+	return back;
 }
 
 int read_socket(ssl_socket_t *ssl, char *data, char *next) {
@@ -275,7 +289,7 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 				if(rlen == 0) {
 					ssl_error();
 					printf("[ ] Core: Warning: nothing read from socket\n");
-					usleep(120000);
+					diep("recv");
 				}
 
 				buff[rlen] = '\0';
