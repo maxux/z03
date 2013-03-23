@@ -33,20 +33,19 @@
 #include "lib_ircmisc.h"
 
 weather_station_t weather_stations[] = {
-	{.id = 29,  .ref = "liege",   .type = STATION_STATION, .name = "Thier-à-Liège"},
-	{.id = 96,  .ref = "slins",   .type = STATION_STATION, .name = "Slins"},
-	{.id = 125, .ref = "oupeye",  .type = STATION_STATION, .name = "Oupeye"},
-	{.id = 14,  .ref = "lille",   .type = STATION_METAR,   .name = "Lille (France)"},
-	{.id = 77,  .ref = "knokke",  .type = STATION_STATION, .name = "Knokke"},
-	{.id = 1,   .ref = "bxl",     .type = STATION_STATION, .name = "Bruxelles"},
-	{.id = 80,  .ref = "seraing", .type = STATION_STATION, .name = "Boncelles (Seraing)"},
-	{.id = 106, .ref = "namur",   .type = STATION_STATION, .name = "Floriffoux (Namur)"},
-	{.id = 48,  .ref = "spa",     .type = STATION_STATION, .name = "Spa"},
-	{.id = 13,  .ref = "beauve",  .type = STATION_METAR,   .name = "Beauvechain"},
+	{.id = 96,  .ref = "slins",        .type = STATION_STATION, .name = "Slins"},
+	{.id = 125, .ref = "oupeye",       .type = STATION_STATION, .name = "Oupeye"},
+	{.id = 14,  .ref = "lille",        .type = STATION_METAR,   .name = "Lille (France)"},
+	{.id = 77,  .ref = "knokke",       .type = STATION_STATION, .name = "Knokke"},
+	{.id = 1,   .ref = "bxl",          .type = STATION_STATION, .name = "Bruxelles"},
+	{.id = 80,  .ref = "seraing",      .type = STATION_STATION, .name = "Boncelles (Seraing)"},
+	{.id = 106, .ref = "namur",        .type = STATION_STATION, .name = "Floriffoux (Namur)"},
+	{.id = 48,  .ref = "spa",          .type = STATION_STATION, .name = "Spa"},
+	{.id = 13,  .ref = "beauvechain",  .type = STATION_METAR,   .name = "Beauvechain"},
 };
 
 unsigned int weather_stations_count = sizeof(weather_stations) / sizeof(weather_station_t);
-int weather_default_station = 2;
+int weather_default_station = 1;
 
 char *__weather_internal_station_url[] = {
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datametar.php&Itemid=69&id=%d",

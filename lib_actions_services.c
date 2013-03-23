@@ -32,7 +32,7 @@ void __action_notes_checknew(char *chan, char *nick) {
 	char *sqlquery, *fnick, *message, *host;
 	struct tm * timeinfo;
 	time_t ts;
-
+	
 	/* Checking notes */
 	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts, host FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
@@ -40,29 +40,29 @@ void __action_notes_checknew(char *chan, char *nick) {
 			fnick   = (char *) sqlite3_column_text(stmt, 0);
 			message = (char *) sqlite3_column_text(stmt, 1);
 			host    = (char *) sqlite3_column_text(stmt, 3);
-
+			
 			if((ts = sqlite3_column_int(stmt, 2)) > 0) {
 				timeinfo = localtime(&ts);
 				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-
+				
 			} else strcpy(timestring, "unknown");
-
+				
 			zsnprintf(output, "┌── [%s] %s (%s) sent you a message, %s", timestring, fnick, host, nick);
 			irc_privmsg(chan, output);
-
+			
 			zsnprintf(output, "└─> %s: %s", nick, message);
 			irc_privmsg(chan, output);
 		}
-
+		
 		sqlite3_free(sqlquery);
 		sqlite3_finalize(stmt);
-
+		
 		sqlquery = sqlite3_mprintf("UPDATE notes SET seen = 1 WHERE tnick = '%q' AND chan = '%q'", nick, chan);
 		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 			printf("[-] lib/notes: cannot mark as read\n");
-
+	
 	} else fprintf(stderr, "[-] lib/notes: sql error\n");
-
+	
 	/* Clearing */
 	sqlite3_free(sqlquery);
 }

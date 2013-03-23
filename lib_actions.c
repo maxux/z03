@@ -51,11 +51,13 @@ void action_help(ircmessage_t *message, char *args) {
 			strcat(list, __request[i].match);
 			strcat(list, " ");
 		}
-
+		
 		if((!(i % 15) && i > 0) || i == __request_count - 1) {
-			zsnprintf(buffer, "Commands: %s", list);
-			irc_privmsg(message->chan, buffer);
-
+			if(*list) {
+				zsnprintf(buffer, "Commands: %s", list);
+				irc_privmsg(message->chan, buffer);
+			}
+			
 			// reset list
 			list[0] = '\0';
 		}
@@ -65,7 +67,7 @@ void action_help(ircmessage_t *message, char *args) {
 void action_man(ircmessage_t *message, char *args) {
 	char buffer[512];
 	unsigned int i;
-
+	
 	if(!action_parse_args(message, args))
 		return;
 	

@@ -248,7 +248,7 @@ char *crlftrim(char *str) {
 
 void intswap(int *a, int *b) {
 	int c = *b;
-
+	
 	*b = *a;
 	*a = c;
 }
@@ -401,35 +401,35 @@ char *md5ascii(char *source) {
 
 size_t words_count(char *str) {
 	size_t words = 0;
-
+	
 	// empty string
 	if(!*str)
 		return 0;
-
+	
 	while(*str) {
 		if(isspace(*str) && !isspace(*(str + 1)))
 			words++;
-
+		
 		str++;
 	}
-
+	
 	// last char was not a space
 	if(!isspace(*(str - 1)))
 		words++;
-
+	
 	return words;
 }
 
 time_t today() {
 	time_t now;
 	struct tm *timeinfo;
-
+	
 	time(&now);
 	timeinfo = localtime(&now);
-
+	
 	timeinfo->tm_sec  = 0;
 	timeinfo->tm_min  = 0;
 	timeinfo->tm_hour = 0;
-
+	
 	return mktime(timeinfo);
 }

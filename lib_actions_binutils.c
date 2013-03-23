@@ -97,6 +97,30 @@ void action_dns(ircmessage_t *message, char *args) {
 	irc_privmsg(message->chan, buffer);
 }
 
+void action_rdns(ircmessage_t *message, char *args) {
+	struct hostent *he;
+	char buffer[256];
+	in_addr_t ip;
+	
+	if(!action_parse_args(message, args))
+		return;
+	
+	if((ip = inet_addr(args)) == INADDR_NONE) {
+		zsnprintf(buffer, "Invalid address <%s>", args);
+		irc_privmsg(message->chan, buffer);
+		return;
+	}
+		
+	if((he = gethostbyaddr(&ip, sizeof(in_addr_t), AF_INET)) == NULL) {
+		zsnprintf(buffer, "Cannot resolve host %s", args);
+		irc_privmsg(message->chan, buffer);
+		return;
+	}
+	
+	zsnprintf(buffer, "%s -> %s", args, he->h_name);
+	irc_privmsg(message->chan, buffer);
+}
+
 void action_random(ircmessage_t *message, char *args) {
 	char buffer[512], *x;
 	int random, min = 0, max = 100;
@@ -110,7 +134,7 @@ void action_random(ircmessage_t *message, char *args) {
 			
 			if(max < min)
 				intswap(&min, &max);
-
+			
 		} else max = (atoi(args) <= 0) ? 100 : atoi(args);
 	}
 	

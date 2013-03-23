@@ -65,16 +65,16 @@ void action_stats(ircmessage_t *message, char *args) {
 	/* Clearing */
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
-
+	
 	/* Today */
 	timestamp = today();
-
+	
 	sqlquery = sqlite3_mprintf(
 		"SELECT COUNT(*) FROM logs "
 		"WHERE chan = '%q' AND timestamp > %u GROUP BY nick",
 		message->chan, timestamp
 	);
-
+	
 	cnick = 0;
 	lines = 0;
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
@@ -83,15 +83,15 @@ void action_stats(ircmessage_t *message, char *args) {
 			lines += sqlite3_column_int(stmt, 0);
 		}
 	}
-
+			
 	zsnprintf(msg, "Today: %d lines for %d nicks", lines, cnick);
 	irc_privmsg(message->chan, msg);
-
+	
 	/* Clearing */
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
-
-
+	
+	
 }
 
 void action_chart(ircmessage_t *message, char *args) {
@@ -175,7 +175,7 @@ void action_count(ircmessage_t *message, char *args) {
 	
 	if(!strlen((args = action_check_args(args))))
 		nick = message->nick;
-
+		
 	else nick = args;
 	
 	sqlquery = sqlite3_mprintf(
@@ -200,19 +200,19 @@ void action_count(ircmessage_t *message, char *args) {
 		tlines = sqlite3_column_int(stmt, 3);
 		
 		printf("[ ] action/count: %d / %d / %d / %d\n", words, lines, twords, tlines);
-
+		
 		// avoid divide by zero
 		if(tlines && twords) {
 			if(!*args)
 				nick = message->nickhl;
-
+				
 			else nick = anti_hl(args);
 		
 			zsnprintf(output, "Got %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words for <%s>",
 			                  lines, ((float) lines / tlines) * 100, tlines,
 			                  words, ((float) words / twords) * 100, twords,
 			                  nick);
-
+			                  
 			irc_privmsg(message->chan, output);
 		}
 	}
@@ -322,7 +322,7 @@ void action_backlog(ircmessage_t *message, char *args) {
 	
 	if(strlen((args = action_check_args(args)))) {
 		sqlquery1 = NULL;
-
+		
 		sqlquery2 = sqlite3_mprintf(
 			"SELECT nick, timestamp, message FROM "
 			"  (SELECT nick, timestamp, message FROM logs "
@@ -340,19 +340,16 @@ void action_backlog(ircmessage_t *message, char *args) {
 		} else message->channel->last_backlog_request = time(NULL); */
 		
 		sqlquery1 = sqlite3_mprintf(
-			"SELECT COUNT(*) FROM (                     "
-			"   SELECT id FROM logs                     "
+			"   SELECT COUNT(*) FROM logs               "
 			"   WHERE chan = '%q' AND timestamp > (     "
 			"      SELECT MAX(timestamp)                "
 			"      FROM logs                            "
 			"      WHERE chan = '%q' AND nick = '%q'    "
 			"      AND timestamp < %d                   "
-			"   )                                       "
-			"   ORDER BY id ASC                         "
-			")                                          ",
+			"   )                                       ",
 			message->chan, message->chan, message->nick, time(NULL) - 2
 		);
-
+		
 		sqlquery2 = sqlite3_mprintf(
 			"SELECT nick, timestamp, message FROM (     "
 			"   SELECT nick, timestamp, message         "
@@ -368,20 +365,20 @@ void action_backlog(ircmessage_t *message, char *args) {
 		if(sqlquery1) {
 			if((stmt1 = db_sqlite_select_query(sqlite_db, sqlquery1))) {
 				nrows = sqlite3_column_int(stmt1, 0);
-				if(nrows < 1) {
-					zsnprintf(temp, "%s: %u lines since last talk, noticing last lines...",
+				if(nrows > 1) {
+					zsnprintf(temp, "%s: %u lines since last talk, noticing last 20 lines...", 
 							message->nickhl, nrows);
 
-				} else zsnprintf(temp, "%s: noticing last lines...",  message->nickhl);
-
+				} else zsnprintf(temp, "%s: noticing last 20 lines...",  message->nickhl);
+				
 				irc_privmsg(message->chan, temp);
-
+				
 			} else fprintf(stderr, "[-] backlog: cannot select\n");
-
+			
 			sqlite3_finalize(stmt1);
 			sqlite3_free(sqlquery1);
 		}
-
+	
 		while((row = sqlite3_step(stmt2)) == SQLITE_ROW) {
 			found = 1;
 			
@@ -403,7 +400,7 @@ void action_backlog(ircmessage_t *message, char *args) {
 			
 			if(sqlquery1)
 				irc_notice(message->nick, msg);
-
+				
 			else irc_privmsg(message->chan, msg);
 			
 			free(log_nick);
@@ -432,14 +429,14 @@ void action_chartlog(ircmessage_t *message, char *args) {
 	char temp[256];
 	time_t now;
 	(void) args;
-
+	
 	/* Flood Protection */
 	if(time(NULL) - (60 * 10) < message->channel->last_chart_request) {
 		irc_privmsg(message->chan, "Avoiding flood, bitch !");
 		return;
-
+		
 	} else message->channel->last_chart_request = time(NULL);
-
+	
 	/* Working */
 	now = today() - (60 * 24 * 60 * 60); // days paste
 	sqlquery = sqlite3_mprintf(
@@ -448,50 +445,50 @@ void action_chartlog(ircmessage_t *message, char *args) {
 		"GROUP BY d ORDER BY d DESC LIMIT 31",
 		message->chan, now
 	);
-
+	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		/* sqlite3_column_int auto-finalize */
 		nbrows = db_sqlite_num_rows(stmt);
 		values = (int *) malloc(sizeof(int) * nbrows);
 		days   = (char *) malloc(sizeof(char) * nbrows);
-
+	
 		printf("[ ] Action: Chart: %u rows fetched.\n", nbrows);
-
+		
 		if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 			i = nbrows - 1;
-
+			
 			while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 				values[i] = sqlite3_column_int(stmt, 0);	/* count value */
 				days[i]   = (char) sqlite3_column_int(stmt, 2);	/* day of week */
-
-				printf("[ ] Action: Chart: Day %s (url %d) is %d\n",
+				
+				printf("[ ] Action: Chart: Day %s (url %d) is %d\n", 
 				       sqlite3_column_text(stmt, 1), values[i], days[i]);
-
+				
 				if(i == 0)
 					strcpy(first_date, (char *) sqlite3_column_text(stmt, 1));
-
+					
 				if(i == nbrows - 1)
 					strcpy(last_date, (char *) sqlite3_column_text(stmt, 1));
-
+				
 				i--;
 			}
 		}
-
+			
 	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
-
+	
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
-
+	
 	chart = ascii_chart(values, nbrows, lines, days);
-
+	
 	/* Chart Title */
 	zsnprintf(temp, "Chart: lines per day from %s to %s", first_date, last_date);
 	irc_privmsg(message->chan, temp);
-
+	
 	/* Chart data */
 	for(i = lines - 1; i >= 0; i--)
 		irc_privmsg(message->chan, *(chart + i));
-
+	
 	free(values);
 	free(days);
 }

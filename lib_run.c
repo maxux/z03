@@ -39,7 +39,7 @@ typedef struct lib_run_data_t {
 	pthread_t thread;
 	ircmessage_t *message;
 	int codefd;
-
+	
 } lib_run_data_t;
 
 void lib_run_privmsg(ircmessage_t *message, char *data) {
@@ -55,59 +55,59 @@ void *lib_run_fork(void *_data) {
 	char buffer[1024], length = 0;
 	char *match = NULL, *print;
 	size_t rlen;
-
+	
 	printf("[+] lib/run: thread %u: starting...\n", (unsigned int) pthread_self());
-
+	
 	buffer[rlen] = '\0';
 	while((rlen = recv(data->codefd, buffer, sizeof(buffer), 0))) {
 		buffer[rlen] = '\0';
 		printf("[ ] lib/run: raw: <%s>\n", buffer);
-
+		
 		if(strchr(buffer, 0x07)) {
 			lib_run_privmsg(data->message, "Bell detected, closing thread.");
 			break;
 		}
-
+		
 		/* multiple lines */
 		print = buffer;
 		while((match = strchr(print, '\n')) || rlen) {
 			if(match)
 				*match = '\0';
-
+			
 			if(strlen(print) > 180)
 				strcpy(print + 172, " [...]");
-
+				
 			lib_run_privmsg(data->message, print);
-
+			
 			if(length++ > 4) {
 				lib_run_privmsg(data->message, "Output truncated. Too verbose.");
 				goto eot;
 			}
-
+			
 			if(match)
 				print = match + 1;
-
+			
 			rlen = 0;
 		}
 	}
-
+	
 	eot:
 		close(data->codefd);
 		free(data->message);
 		free(data);
-
+	
 	printf("[+] lib/run: thread %u: closing...\n", (unsigned int) pthread_self());
-
+	
 	// removing client from list and restoring timeout if last client
 	pthread_mutex_lock(&global_core->mutex_client);
 	if(!--global_core->extraclient) {
 		tv.tv_sec = SOCKET_TIMEOUT;
-
+		
 		if(setsockopt(ssl->sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
 			diep("[-] setsockopt: SO_RCVTIMEO");
 	}
 	pthread_mutex_unlock(&global_core->mutex_client);
-
+	
 	return data;
 }
 
@@ -126,7 +126,7 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	/* removing timeout */
 	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
 		diep("[-] setsockopt: SO_RCVTIMEO");
-
+	
 	/* creating environment */
 	if(!(data = malloc(sizeof(lib_run_data_t))))
 		return;
@@ -134,7 +134,7 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	/* linking message */
 	if(!(data->message = (ircmessage_t*) malloc(sizeof(ircmessage_t))))
 		return;
-
+	
 	strcpy(data->message->chan, msg->chan);
 	
 	/* starting request */
@@ -148,12 +148,12 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	
 	data->codefd = fd;
 	global_core->extraclient++;
-
+	
 	/* reducing main socket timeout */
 	tv.tv_sec = 1;
 	if(setsockopt(ssl->sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
 		diep("[-] setsockopt: SO_RCVTIMEO");
-
+	
 	/* threading operation */
 	printf("[+] lib/run: starting thread\n");
 	pthread_create(&data->thread, NULL, lib_run_fork, data);

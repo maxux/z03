@@ -5,5 +5,6 @@
 	void action_time(ircmessage_t *message, char *args);
 	void action_uptime(ircmessage_t *message, char *args);
 	void action_dns(ircmessage_t *message, char *args);
+	void action_rdns(ircmessage_t *message, char *args);
 	void action_random(ircmessage_t *message, char *args);
 #endif

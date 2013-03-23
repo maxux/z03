@@ -250,7 +250,7 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
 		
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15);
 		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
 		
 		if(post) {
@@ -348,7 +348,7 @@ void check_round_count(ircmessage_t *message) {
 
 	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
 	
-	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {		
 		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
 			if(row == SQLITE_ROW)
 				urls = sqlite3_column_int(stmt, 0);
@@ -475,11 +475,11 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
 		zsnprintf(temp, "URL (Error %d): %s", curl.curlcode, curl_easy_strerror(curl.curlcode));
 		irc_privmsg(message->chan, temp);
-
-		free(curl.data);
+		
+		free(curl.data);		
 		return 2;
 	}
-
+	
 	if(!curl.data && !curl.http_length) {
 		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
 		return 2;

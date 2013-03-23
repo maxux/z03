@@ -157,7 +157,11 @@ void action_google(ircmessage_t *message, char *args) {
 	if(!action_parse_args(message, args))
 		return;
 	
-	google = google_search(args);	
+	if(!(google = google_search(args))) {
+		irc_privmsg(message->chan, "Cannot download request, please try again");
+		return;
+	}
+	
 	if(google->length) {
 		if(!strncmp(message->command, ".google", 7))
 			max = (google->length < 3) ? google->length : 3;

@@ -42,6 +42,7 @@ ssl_socket_t *ssl;
 
 global_core_t *global_core;
 jmp_buf segfault_env;
+char lastchan[32] = "Maxux";
 
 void diep(char *str) {
 	perror(str);
@@ -74,17 +75,20 @@ int signal_intercept(int signal, void (*function)(int)) {
 
 void sighandler(int signal) {
 	void * buffer[1024];
+	char raw[1024];
 	int calls;
-
+	
 	switch(signal) {
 		case SIGSEGV:
 			fprintf(stderr, "[-] --- Segmentation fault ---\n");
 			calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
 			backtrace_symbols_fd(buffer, calls, 1);
-
-			raw_socket("PRIVMSG " IRC_HARDCHAN " :[System] Warning: segmentation fault, reloading.");
+	
+			sprintf(raw, "PRIVMSG %s :[System] Warning: segmentation fault, reloading.", lastchan);
+			raw_socket(raw);
+			
 			fprintf(stderr, "[-] ---    Rolling back    ---\n");
-
+			
 			siglongjmp(segfault_env, 1);
 		break;
 	}
@@ -234,22 +238,22 @@ void raw_socket(char *message) {
 	strcat(sending, "\r\n");
 	
 	pthread_mutex_lock(&global_core->mutex_ssl);
-
+	
 	if(ssl_write(ssl, sending) == -1)
 		perror("[-] IRC: send");
 	
 	pthread_mutex_unlock(&global_core->mutex_ssl);
-
+	
 	free(sending);
 }
 
 int remain_client() {
 	int back;
-
+	
 	pthread_mutex_lock(&global_core->mutex_client);
 	back = global_core->extraclient;
 	pthread_mutex_unlock(&global_core->mutex_client);
-
+	
 	return back;
 }
 
@@ -259,7 +263,7 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 	char *temp = NULL;
 	
 	buff[0] = '\0';		// Be sure that buff is empty
-	data[0] = '\0';		// Be sure that data is empty
+	data[0] = '\0';		// Be sure that data is empty	
 	
 	while(1)  {
 		free(temp);
@@ -284,21 +288,21 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 		
 		do {
 			pthread_mutex_lock(&global_core->mutex_ssl);
-
+			
 			if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
 				if(rlen == 0) {
 					ssl_error();
 					printf("[ ] Core: Warning: nothing read from socket\n");
 					diep("recv");
 				}
-
+					
 				buff[rlen] = '\0';
 				
 			} else if(errno != EAGAIN)
 				ssl_error();
-
+			
 			pthread_mutex_unlock(&global_core->mutex_ssl);
-
+			
 			// if threads, waiting for mutex match
 			if(remain_client())
 				usleep(420000);
@@ -329,14 +333,14 @@ int main(void) {
 	/* mmap and mutex */
 	global_core = mmap(NULL, sizeof(global_core_t), PROT_READ | PROT_WRITE,
 	                   MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-
+	
 	if(!global_core)
 		diep("mmap");
-
+	
 	// init mutex
 	pthread_mutex_init(&global_core->mutex_ssl, NULL);
 	pthread_mutex_init(&global_core->mutex_client, NULL);
-
+	
 	// settings variable
 	global_core->startup_time = time(NULL);
 	global_core->rehash_count = 0;
@@ -351,7 +355,7 @@ int main(void) {
 	loadlib(&codemap);
 	
 	printf("[+] core: connecting...\n");
-
+	
 	// connect the basic socket
 	if((global_core->sockfd = init_socket(IRC_SERVER, IRC_PORT)) < 0) {
 		fprintf(stderr, "[-] core: cannot create socket\n");
@@ -365,9 +369,9 @@ int main(void) {
 			fprintf(stderr, "[-] core: cannot link ssl to socket\n");
 			exit(EXIT_FAILURE);
 		}
-
+		
 	} else printf("[-] core: ssl layer disabled\n");
-
+	
 	printf("[+] core: connected\n");
 	
 	while(1) {

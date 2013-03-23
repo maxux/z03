@@ -84,14 +84,14 @@ void lib_sighandler(int signal) {
  */
 void irc_privmsg(char *dest, char *message) {
 	char buffer[2048];
-
+	
 	zsnprintf(buffer, "PRIVMSG %s :%s", dest, message);
 	raw_socket(buffer);
 }
 
 void irc_notice(char *user, char *message) {
 	char buffer[2048];
-
+	
 	zsnprintf(buffer, "NOTICE %s :%s", user, message);
 	raw_socket(buffer);
 }
@@ -119,18 +119,18 @@ int nick_length_check(char *nick, char *channel) {
 int pre_handle(char *data, ircmessage_t *message) {
 	char *nick, *username, *host;
 	channel_t *channel;
-
+	
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
 		printf("[-] lib/prehandle: extract data info failed\n");
 		return 1;
 	}
-
+	
 	free(username);
-
+	
 	/* Extracting nick */
 	zsnprintf(message->nick, "%s", nick);
 	zsnprintf(message->host, "%s", host);
-
+	
 	free(nick);
 	free(host);
 	
@@ -150,7 +150,7 @@ int pre_handle(char *data, ircmessage_t *message) {
 	if(!(message->channel = list_search(global_lib.channels, message->chan))) {
 		printf("[-] lib/PreHandle: cannot find channel, reloading.\n");
 		channel = stats_channel_load(message->chan);
-
+		
 		list_append(global_lib.channels, message->chan, channel);
 		message->channel = channel;
 	}
@@ -263,29 +263,29 @@ int handle_query(char *data) {
 	char remote[256], *request;
 	char *diff = NULL;
 	unsigned char length;
-
+	
 	if((diff = strstr(data, "PRIVMSG"))) {
 		length = diff - data - 1;
-
+		
 		strncpy(remote, data, length);
 		remote[length] = '\0';
-
+		
 	} else return 0;
-
+	
 	if(!strcmp(remote, IRC_ADMIN_HOST)) {
 		request = strstr(data, ":");
-
+		
 		if(request++) {
 			printf("[ ] lib/admin: host <%s> request: <%s>\n", remote, request);
-
+			
 			if(!strncmp(request, ".rebuild", 7)) {
 				printf("[+] lib/admin: rebuilding all...\n");
 				stats_rebuild_all(global_lib.channels);
 			}
 		}
-
+		
 	} else printf("[-] lib/admin: host <%s> is not admin\n", remote);
-
+	
 	return 0;
 }
 
@@ -314,7 +314,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	/* Updating nick lines count */
 	if((nick = list_search(message->channel->nicks, message->nick))) {
 		time(&now);
-
+		
 		// update nick lines
 		if(progression_match(++nick->lines)) {
 			snprintf(buffer, sizeof(buffer), "Hey, %s just reached %u lines (%.2f%% of %s) !\n", 
@@ -322,16 +322,16 @@ int handle_message(char *data, ircmessage_t *message) {
 				
 			irc_privmsg(message->chan, buffer);
 		}
-
+		
 		if(!nick->words) {
 			printf("[ ] lib/message: count of words not set, reading it...\n");
 			nick->words = stats_get_words(message->nick, message->chan);
 		}
-
+		
 		// update nick words
 		nick->words += words_count(content);
 		stats_update(message, nick, 0);
-
+		
 		// check last time
 		if(!nick->lasttime) {
 			printf("[ ] lib/message: lasttime not set, reading it\n");
@@ -341,23 +341,23 @@ int handle_message(char *data, ircmessage_t *message) {
 		printf("[ ] lib/message: %s/%s, lines: %u/%u, words: %u, lasttime: %ld\n",
 		       message->chan, message->nickhl, nick->lines, message->channel->lines,
 		       nick->words, nick->lasttime);
-
+		
 		if(nick->lasttime < now - LASTTIME_CHECK) {
 			temp = time_elapsed(now - nick->lasttime);
 			zsnprintf(buffer, "%s had not been seen on this channel for %s", message->nickhl, temp);
 			irc_privmsg(message->chan, buffer);
 			free(temp);
 		}
-
+		
 		nick->lasttime = now;
-
+		
 	/* New user, adding it */
 	} else {
 		if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
 			diep("malloc");
 		
 		printf("[+] lib/message: new user <%s>\n", message->nick);
-
+		
 		nick->lines    = 1;
 		nick->lasttime = time(NULL);
 		nick->words    = words_count(content);
@@ -373,7 +373,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	/* Saving log */
 	log_privmsg(message->chan, message->nick, content);
-
+	
 	for(i = 0; i < __request_count; i++) {
 		if((temp = match_prefix(content, __request[i].match))) {
 			message->command = content;
@@ -458,7 +458,7 @@ void main_core(char *data, char *request) {
 	}
 	
 	if(!strncmp(request, "NOTICE", 6)) {
-		if(strstr(request, ":Password accepted - you are now recognized."))
+		if(strstr(request, ":You are now identified"))
 			irc_joinall();
 	}
 	
@@ -496,12 +496,12 @@ void main_construct(void) {
 	
 	// opening sqlite
 	sqlite_db = db_sqlite_init();
-
+	
 	if(global_core->auth) {
 		// loading all stats
 		stats_load_all(global_lib.channels);
 	}
-
+	
 	// grabbing SIGUSR1 for daily update
 	signal_intercept(SIGUSR1, lib_sighandler);
 }

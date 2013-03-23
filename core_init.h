@@ -27,14 +27,15 @@
 		
 		pthread_mutex_t mutex_ssl;
 		ssl_socket_t ssl;
-
+		
 		pthread_mutex_t mutex_client;
 		int extraclient;
-
+		
 	} global_core_t;
 	
 	extern ssl_socket_t *ssl;
 	extern global_core_t *global_core;
+	extern char lastchan[32];
 	
 	int init_socket(char *server, int port);
 	void raw_socket(char *message);
@@ -44,6 +45,6 @@
 	void diep(char *str);
 	
 	void handle_private_message(char *data);
-
+	
 	int signal_intercept(int signal, void (*function)(int));
 #endif

@@ -60,6 +60,12 @@ request_t __request[] = {
 		.hidden   = 0,
 	},
 	{
+		.match    = ".rdns",
+		.callback = action_rdns,
+		.man      = "resolve a reverse dns address: .dns ip-address",
+		.hidden   = 0,
+	},
+	{
 		.match    = ".count",
 		.callback = action_count,
 		.man      = "print the number of line posted by a given nick: .count nick",

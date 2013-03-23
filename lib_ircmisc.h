@@ -27,6 +27,6 @@
 	
 	char *md5ascii(char *source);
 	size_t words_count(char *str);
-
+	
 	time_t today();
 #endif
