@@ -202,6 +202,26 @@ void handle_join(char *data) {
 	free(nick);
 }
 
+void handle_kick(char *data) {
+	char *nick, *chan, query[512];
+	
+	if(!(nick = string_index(data, 3)))
+		return;
+	
+	if(!strcmp(nick, IRC_NICK)) {
+		if((chan = string_index(data, 2))) {
+			printf("[-] kick: bot kicked from %s, rejoins...\n", chan);
+			
+			zsnprintf(query, "JOIN %s", chan);
+			raw_socket(query);
+			
+			free(chan);
+		}
+	}	
+	
+	free(nick);
+}
+
 void handle_part(char *data) {
 	char *nick = NULL, *username, *host = NULL, *chan;
 	
@@ -474,6 +494,11 @@ void main_core(char *data, char *request) {
 	
 	if(!strncmp(request, "NICK", 4)) {
 		handle_nick(data + 1);
+		return;
+	}
+	
+	if(!strncmp(request, "KICK", 4)) {
+		handle_kick(data + 1);
 		return;
 	}
 	
