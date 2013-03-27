@@ -56,7 +56,7 @@ void action_weather(ircmessage_t *message, char *args) {
 		/* Searching station */
 		id = weather_get_station(args);
 		
-	} else if((value = settings_get(message->nick, "weather"))) {
+	} else if((value = settings_get(message->nick, "weather", PUBLIC))) {
 			id = weather_get_station(value);
 			free(value);
 			

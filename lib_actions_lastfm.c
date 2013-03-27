@@ -38,7 +38,7 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	if(strlen((args = action_check_args(args)))) {
 		user = args;
 		
-	} else if(!(user = settings_get(message->nick, "lastfm"))) {
+	} else if(!(user = settings_get(message->nick, "lastfm", PUBLIC))) {
 		irc_privmsg(message->chan, "Lastfm username not set. Please set it with: .set lastfm <username>");
 		return;
 	}
@@ -81,7 +81,7 @@ void action_lastfmlove(ircmessage_t *message, char *args) {
 	lastfm_t *lastfm;
 	(void) args;
 	
-	if(!(user = settings_get(message->nick, "lastfm"))) {
+	if(!(user = settings_get(message->nick, "lastfm", PUBLIC))) {
 		irc_privmsg(message->chan, "Lastfm username not set. Please set it with: .set lastfm <username>");
 		return;
 	}
@@ -89,7 +89,7 @@ void action_lastfmlove(ircmessage_t *message, char *args) {
 	lastfm = lastfm_new(LASTFM_APIKEY, LASTFM_APISECRET);
 	
 	/* check if there is a pending token */
-	if((key = settings_get(message->nick, "lastfm_token"))) {
+	if((key = settings_get(message->nick, "lastfm_token", PUBLIC))) {
 		printf("[+] lastfm/love: pending token found, validating...\n");
 		
 		// removing token, if failed a new will be created next time
@@ -100,7 +100,7 @@ void action_lastfmlove(ircmessage_t *message, char *args) {
 		request = lastfm_api_getsession(lastfm, request);
 		if(request->reply) {
 			// saving and copy session
-			settings_set(message->nick, "lastfm_session", request->reply);
+			settings_set(message->nick, "lastfm_session", request->reply, PRIVATE);
 			lastfm->session = strdup(request->reply);
 			
 			zsnprintf(answer, "Token validated: %s", key);
@@ -122,7 +122,7 @@ void action_lastfmlove(ircmessage_t *message, char *args) {
 	}
 	
 	/* check if we have a session key */
-	if(!(key = settings_get(message->nick, "lastfm_session"))) {
+	if(!(key = settings_get(message->nick, "lastfm_session", PRIVATE))) {
 		printf("[+] lastfm/love: session not found, creating it...\n");
 		request = lastfm_request_new();
 		
@@ -130,7 +130,7 @@ void action_lastfmlove(ircmessage_t *message, char *args) {
 		
 		if(request->reply) {
 			// saving and copy token
-			settings_set(message->nick, "lastfm_token", request->reply);
+			settings_set(message->nick, "lastfm_token", request->reply, PUBLIC);
 			lastfm->token = strdup(request->reply);
 			
 			url = lastfm_api_authorize(lastfm);

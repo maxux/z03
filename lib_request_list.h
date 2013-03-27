@@ -162,6 +162,12 @@ request_t __request[] = {
 		.hidden   = 0,
 	},
 	{
+		.match    = ".get",
+		.callback = action_get,
+		.man      = "get a variable value: .get [user] key",
+		.hidden   = 0,
+	},
+	{
 		.match    = ".unset",
 		.callback = action_unset,
 		.man      = "unset a variable value: .unset var1",

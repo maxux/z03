@@ -41,13 +41,46 @@ void action_set(ircmessage_t *message, char *args) {
 	key = strdup(args);
 	key[match - args] = '\0';
 	
-	settings_set(message->nick, key, match + 1);
+	if(settings_getview(message->nick, key) == PRIVATE) {
+		zsnprintf(answer, "%s.%s is a private value", message->nickhl, key);
+		
+	} else {
+		settings_set(message->nick, key, match + 1, PUBLIC);
+		zsnprintf(answer, "%s.%s = %s", message->nickhl, key, match + 1);
+	}
 	
-	zsnprintf(answer, "%s.%s = %s", message->nickhl, key, match + 1);
+	
 	irc_privmsg(message->chan, answer);
 	
 	free(key);
 }
+
+void action_get(ircmessage_t *message, char *args) {
+	char *match, *key = NULL, *value, answer[512];
+	
+	if(!action_parse_args(message, args))
+		return;
+	
+	// someone else
+	if((match = strchr(args, ' '))) {
+		key = strdup(args);
+		key[match - args] = '\0';
+		
+		if((value = settings_get(key, match + 1, PUBLIC)))
+			zsnprintf(answer, "%s.%s = %s", key, match + 1, value);
+			
+		else zsnprintf(answer, "%s.%s is not set", key, match + 1);
+		
+	// itself
+	} else if((value = settings_get(message->nick, args, PUBLIC)))
+		zsnprintf(answer, "%s.%s = %s", message->nickhl, args, value);
+			
+	else zsnprintf(answer, "%s.%s is not set", message->nickhl, args);
+	
+	irc_privmsg(message->chan, answer);
+	free(key);
+}
+
 
 void action_unset(ircmessage_t *message, char *args) {
 	char answer[512];
