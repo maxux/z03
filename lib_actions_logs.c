@@ -223,10 +223,11 @@ void action_count(ircmessage_t *message, char *args) {
 				
 			else nick = anti_hl(args);
 		
-			zsnprintf(output, "Got %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words for <%s>",
+			zsnprintf(output, "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per lines)",
+			                  nick,
 			                  lines, ((float) lines / tlines) * 100, tlines,
 			                  words, ((float) words / twords) * 100, twords,
-			                  nick);
+			                  ((float) words / lines));
 			                  
 			irc_privmsg(message->chan, output);
 		}

@@ -91,6 +91,34 @@ void lastfm_request_free(lastfm_request_t *request) {
 	free(request);
 }
 
+char *lastfm_ampersand(char *original) {
+	char *temp = strdup(original);
+	char *work, *save;
+	
+	// FIXME: poor method
+	original = (char *) malloc(sizeof(char) * strlen(original) * 4);
+	
+	save = temp;
+	work = original;
+	
+	while(*temp) {
+		if(*temp == '&') {
+			strcpy(work, "%26");
+			work += 3;
+			
+		} else *work++ = *temp;
+		
+		temp++;
+	}
+	
+	*work = '\0';
+	
+	// freeing previous string
+	free(save);
+	
+	return original;
+}
+
 /* lastfm error setter and cleaner */
 static json_t *lastfm_json_load(char *json, size_t length, lastfm_request_t *request) {
 	json_t *root;
@@ -107,7 +135,7 @@ static json_t *lastfm_json_load(char *json, size_t length, lastfm_request_t *req
 		return NULL;
 	}
 	
-	// clear json, warning: must be malloc
+	// clear json, warning: must be malloc before
 	free(json);
 	
 	if(!json_is_object(root)) {
@@ -380,18 +408,21 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 	char post[512], *sig;
 	curl_data_t curl;
 	json_t *root;
+	char *artist, *title;
 	
-	if(strchr(lastfm->track->artist, '&') || strchr(lastfm->track->title, '&')) {
-		request->error = strdup("Sorry, names which contains '&' are not supported yet");
-		return lastfm_abort_request(NULL, request);
-	}
-	
-	// FIXME: fix '&' on artist/title	
-	// building request
+	// signature with original names
 	sig = lastfm_sig_love(lastfm);
+	
+	// fix artist and title name (ampersand on request)
+	artist = lastfm_ampersand(lastfm->track->artist);
+	title  = lastfm_ampersand(lastfm->track->title);
+	
+	// building request	
 	snprintf(post, sizeof(post), "format=json&method=track.love&api_key=%s&sk=%s&api_sig=%s&artist=%s&track=%s",
-                                     lastfm->apikey, lastfm->session, sig, lastfm->track->artist, lastfm->track->title);
+                                     lastfm->apikey, lastfm->session, sig, artist, title);
 	free(sig);
+	free(artist);
+	free(title);
 	
 	if(curl_download_text_post(LASTFM_API_BASE, &curl, space_encode(post)))
 		return request;
