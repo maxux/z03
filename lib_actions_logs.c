@@ -83,15 +83,30 @@ void action_stats(ircmessage_t *message, char *args) {
 			lines += sqlite3_column_int(stmt, 0);
 		}
 	}
-			
-	zsnprintf(msg, "Today: %d lines for %d nicks", lines, cnick);
-	irc_privmsg(message->chan, msg);
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);
 	sqlite3_finalize(stmt);
 	
+	sqlquery = sqlite3_mprintf(
+		"SELECT COUNT(*) FROM url "
+		"WHERE chan = '%q' "
+		"  AND time > %u",
+		message->chan, timestamp
+	);
 	
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+		while(sqlite3_step(stmt) == SQLITE_ROW)
+			count = sqlite3_column_int(stmt, 0);
+	
+	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
+			
+	zsnprintf(msg, "Today: %d urls and %d lines for %d nicks", count, lines, cnick);
+	irc_privmsg(message->chan, msg);	
 }
 
 void action_chart(ircmessage_t *message, char *args) {

@@ -15,4 +15,5 @@
 	
 	void google_free(google_search_t *search);
 	google_search_t * google_search(char *keywords);
+	char *google_calc(char *keywords);
 #endif

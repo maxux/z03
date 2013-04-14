@@ -146,13 +146,13 @@ request_t __request[] = {
 	{
 		.match    = ".wi",
 		.callback = action_wiki,
-		.man      = "summary an english wikipedia's article: .wiki keywords",
+		.man      = "summary a wiki's international article: .wiki lang keywords",
 		.hidden   = 0,
 	},
 	{
 		.match    = ".wiki",
 		.callback = action_wiki,
-		.man      = "summary a wiki's international article: .wiki lang keywords",
+		.man      = "summary an english wikipedia's article: .wiki keywords",
 		.hidden   = 0,
 	},
 	{
@@ -183,6 +183,12 @@ request_t __request[] = {
 		.match    = ".fmlove",
 		.callback = action_lastfmlove,
 		.man      = "love your current track on last.fm",
+		.hidden   = 0,
+	},
+	{
+		.match    = ".calc",
+		.callback = action_calc,
+		.man      = "google calculator query",
 		.hidden   = 0,
 	},
 	{

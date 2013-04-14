@@ -24,6 +24,7 @@
 #include "lib_database.h"
 #include "lib_core.h"
 #include "lib_chart.h"
+#include "lib_ircmisc.h"
 #include "lib_actions_services.h"
 
 void __action_notes_checknew(char *chan, char *nick) {
@@ -37,7 +38,7 @@ void __action_notes_checknew(char *chan, char *nick) {
 	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts, host FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
-			fnick   = (char *) sqlite3_column_text(stmt, 0);
+			fnick   = strdup((char *) sqlite3_column_text(stmt, 0));
 			message = (char *) sqlite3_column_text(stmt, 1);
 			host    = (char *) sqlite3_column_text(stmt, 3);
 			
@@ -46,12 +47,16 @@ void __action_notes_checknew(char *chan, char *nick) {
 				sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 				
 			} else strcpy(timestring, "unknown");
-				
-			zsnprintf(output, "┌── [%s] %s (%s) sent you a message, %s", timestring, fnick, host, nick);
+			
+			fnick = (char *) realloc(fnick, (sizeof(char) * strlen(fnick) + 16));
+			
+			zsnprintf(output, "┌── [%s] %s (%s) sent you a message, %s", timestring, anti_hl(fnick), host, nick);
 			irc_privmsg(chan, output);
 			
 			zsnprintf(output, "└─> %s: %s", nick, message);
 			irc_privmsg(chan, output);
+			
+			free(fnick);
 		}
 		
 		sqlite3_free(sqlquery);

@@ -111,7 +111,7 @@ void action_wiki(ircmessage_t *message, char *args) {
 		return;
 	
 	/* Wiki International */
-	if(!strncmp(message->command, ".wiki", 5)) {
+	if(!strncmp(message->command, ".wi ", 4)) {
 		if(!(match = strchr(args, ' ')) || (match - args >= (signed) sizeof(lang))) {
 			irc_privmsg(message->chan, "Wiki Intl: wrong arguments");
 			return;
@@ -180,4 +180,17 @@ void action_google(ircmessage_t *message, char *args) {
 	} else irc_privmsg(message->chan, "No result");
 	
 	google_free(google);
+}
+
+void action_calc(ircmessage_t *message, char *args) {
+	char *answer;
+	
+	if(!action_parse_args(message, args))
+		return;
+	
+	if((answer = google_calc(args))) {
+		irc_privmsg(message->chan, answer);
+		free(answer);
+		
+	} else irc_privmsg(message->chan, "No result from Google Calculator");
 }

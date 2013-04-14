@@ -5,4 +5,5 @@
 	void action_somafm(ircmessage_t *message, char *args);
 	void action_wiki(ircmessage_t *message, char *args);
 	void action_google(ircmessage_t *message, char *args);
+	void action_calc(ircmessage_t *message, char *args);
 #endif

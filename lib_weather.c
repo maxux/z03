@@ -42,6 +42,8 @@ weather_station_t weather_stations[] = {
 	{.id = 106, .ref = "namur",        .type = STATION_STATION, .name = "Floriffoux (Namur)"},
 	{.id = 48,  .ref = "spa",          .type = STATION_STATION, .name = "Spa"},
 	{.id = 13,  .ref = "beauvechain",  .type = STATION_METAR,   .name = "Beauvechain"},
+	{.id = 36,  .ref = "vaux",         .type = STATION_STATION, .name = "Vaux-sous-Chèvremont"},
+	{.id = 59,  .ref = "herve",        .type = STATION_STATION, .name = "Herve (Outre-Cour)"},
 };
 
 unsigned int weather_stations_count = sizeof(weather_stations) / sizeof(weather_station_t);
