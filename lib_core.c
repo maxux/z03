@@ -145,7 +145,7 @@ int pre_handle(char *data, ircmessage_t *message) {
 	
 	/* Check Nick Length */
 	if(nick_length_check(message->nick, message->chan))
-		return 0;
+		return 1;
 	
 	if(!(message->channel = list_search(global_lib.channels, message->chan))) {
 		printf("[-] lib/PreHandle: cannot find channel, reloading.\n");
@@ -162,12 +162,13 @@ void handle_nick(char *data) {
 	char *nick = data;
 	unsigned int i = 0;
 	
-	
 	while(*(nick + i) && *(nick + i) != ':')
 		nick++;
 	
 	/* Skipping ':' */
 	nick++;
+	
+	printf("[+] handle/nick: new nick: <%s>\n", nick);
 }
 
 void handle_join(char *data) {
@@ -184,20 +185,18 @@ void handle_join(char *data) {
 	printf("[+] lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
 	
 	/* Check Nick Length */
-	if(nick_length_check(nick, chan))
-		return;
-	
-	/* Checking if it's the bot itself */
-	if(!strcmp(nick, IRC_NICK))
-		list_append(global_lib.channels, chan, stats_channel_load(chan));
+	if(!nick_length_check(nick, chan)) {
+		/* Checking if it's the bot itself */
+		if(!strcmp(nick, IRC_NICK))
+			list_append(global_lib.channels, chan, stats_channel_load(chan));
+		
+		// check if there is pending notes
+		__action_notes_checknew(chan, nick);
+	}
 	
 	// check if the user is known
 	// __action_known_add(nick, username, host, chan);
-	free(username);
-	
-	// check if there is pending notes
-	__action_notes_checknew(chan, nick);
-	
+	free(username);	
 	free(host);
 	free(nick);
 }
