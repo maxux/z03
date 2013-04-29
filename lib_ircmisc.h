@@ -14,6 +14,7 @@
 	void intswap(int *a, int *b);
 	
 	char *anti_hl(char *nick);
+	char *anti_hl_alloc(char *nick);
 	char *anti_hl_each_words(char *str, size_t len, charset_t charset);
 	
 	char *time_elapsed(time_t time);
@@ -29,4 +30,6 @@
 	size_t words_count(char *str);
 	
 	time_t today();
+	
+	char *list_nick_implode(list_t *list);
 #endif

@@ -24,6 +24,7 @@
 #include "bot.h"
 #include "core_init.h"
 #include "lib_list.h"
+#include "lib_database.h"
 #include "lib_core.h"
 #include "lib_urlmanager.h"
 #include "lib_ircmisc.h"
@@ -66,6 +67,7 @@ void lastfm_free(lastfm_t *lastfm) {
 	free(lastfm->session);
 	
 	// free track
+	free(lastfm->track->user);
 	free(lastfm->track->artist);
 	free(lastfm->track->title);
 	free(lastfm->track->album);
@@ -262,8 +264,9 @@ lastfm_request_t *lastfm_getplaying(lastfm_t *lastfm, lastfm_request_t *request,
 	char url[512];
 	json_t *root, *recents;
 	
+	lastfm->track->user = strdup(user);
 	lastfm_url(url, "&method=user.getrecenttracks&api_key=%s&user=%s", lastfm->apikey, user);
-
+	
 	if(lastfm_curl_download_text(url, &curl, request))
 		return request;
 	
@@ -439,4 +442,59 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 		request->reply = strdup(json_string_value(json_object_get(root, "status")));
 	
 	return request;
+}
+
+/*
+ * Tracks backlog
+ */
+list_t *lastfm_backlog(lastfm_t *lastfm) {
+	list_t *list;
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	
+	if(!lastfm->track->user || !lastfm->track->artist || !lastfm->track->title) {
+		fprintf(stderr, "[-] lastfm/backlog: user, artist or title not set\n");
+		return NULL;
+	}
+	
+	list = list_init(NULL);
+
+	/* insert current track */
+	sqlquery = sqlite3_mprintf(
+		"INSERT INTO lastfm_logs (lastfm_nick, artist, title) VALUES "
+		"('%q', '%q', '%q')",
+		lastfm->track->user, lastfm->track->artist, lastfm->track->title
+	);
+	
+	if(!db_sqlite_simple_query(sqlite_db, sqlquery))
+		fprintf(stderr, "[-] lastfm/backlog: insertion error\n");
+	
+	sqlite3_free(sqlquery);
+	
+	/* select backlog */
+	sqlquery = sqlite3_mprintf(
+		"SELECT s.nick FROM lastfm_logs l, settings s "
+		"WHERE s.key = 'lastfm' "
+		"  AND s.value = l.lastfm_nick"
+		"  AND l.artist = '%q' "
+		"  AND l.title = '%q' "
+		"  AND l.lastfm_nick != '%q'",
+		lastfm->track->artist, lastfm->track->title, lastfm->track->user		
+	);
+	                           
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] lastfm/backlog: sql select error\n");
+	
+	while(sqlite3_step(stmt) == SQLITE_ROW)
+		list_append(list, (char *) sqlite3_column_text(stmt, 0), (char *) sqlite3_column_text(stmt, 0));
+	
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	if(!list->length) {
+		list_free(list);
+		return NULL;
+	}
+	
+	return list;
 }

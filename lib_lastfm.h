@@ -13,6 +13,8 @@
 		enum lastfm_type_t type;
 		unsigned int total;
 		time_t date;
+		
+		char *user;
 		char *artist;
 		char *title;
 		char *album;
@@ -44,6 +46,7 @@
 	void lastfm_request_free(lastfm_request_t *request);
 	
 	lastfm_request_t *lastfm_getplaying(lastfm_t *lastfm, lastfm_request_t *request, char *user);
+	list_t *lastfm_backlog(lastfm_t *lastfm);
 	
 	lastfm_request_t *lastfm_api_gettoken(lastfm_t *lastfm, lastfm_request_t *request);
 	char *lastfm_api_authorize(lastfm_t *lastfm);

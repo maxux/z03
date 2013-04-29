@@ -102,6 +102,18 @@ char *anti_hl(char *nick) {
 	return nick;
 }
 
+char *anti_hl_alloc(char *nick) {
+	char *newnick;
+	
+	if(!(newnick = (char *) malloc(sizeof(char) * strlen(nick) + 5)))
+		return NULL;
+	
+	strcpy(newnick, nick);
+	anti_hl(newnick);
+	
+	return newnick;
+}
+
 void anti_hl_append(char **write, char **read) {
 	int s;
 	
@@ -432,4 +444,37 @@ time_t today() {
 	timeinfo->tm_hour = 0;
 	
 	return mktime(timeinfo);
+}
+
+char *list_nick_implode(list_t *list) {
+	list_node_t *node;
+	char *implode = NULL;
+	char buffer[128];
+	size_t length = 0;
+	
+	if(!list->length)
+		return strdup(" ");
+	
+	/* allocating string and re-iterate list */
+	node = list->nodes;
+	implode = (char *) calloc(1, sizeof(char));
+	
+	while(node) {
+		implode = (char *) realloc(implode, length + strlen(node->name) + 3);
+		
+		// appending anti-hled nick
+		zsnprintf(buffer, "%s", node->name);
+		anti_hl(buffer);
+		
+		strcat(implode, buffer);
+		strcat(implode, ", ");
+		
+		length = strlen(implode);
+		node = node->next;
+	}
+	
+	// removing last coma
+	*(implode + length - 2) = '\0';
+	
+	return implode;
 }

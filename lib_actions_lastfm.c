@@ -32,8 +32,9 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	char *user, answer[512];
 	lastfm_request_t *request;
 	lastfm_t *lastfm;
-	char date[128];
+	char date[128], *userlist;
 	struct tm *timeinfo;
+	list_t *backlog;
 	
 	if(strlen((args = action_check_args(args)))) {
 		user = args;
@@ -70,6 +71,16 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	} else zsnprintf(answer, "Error: %s", request->error);
 	
 	irc_privmsg(message->chan, answer);
+	
+	/* check backlog */
+	if((backlog = lastfm_backlog(lastfm))) {
+		userlist = list_nick_implode(backlog);
+		
+		zsnprintf(answer, "Also listened by: %s", userlist);
+		irc_privmsg(message->chan, answer);
+		
+		list_free(backlog);
+	}
 	
 	lastfm_request_free(request);
 	lastfm_free(lastfm);
