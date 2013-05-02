@@ -56,6 +56,10 @@ host_cookies_t __host_cookies[] = {
 	{.host = NULL,              .cookie = NULL},
 };
 
+char *__user_agent_hosts[] = {
+	"t.co", "gks.gs", "google.com"
+};
+
 char *extract_url(char *url) {
 	int i = 0, braks = 0;
 	char *out;
@@ -101,6 +105,7 @@ char *curl_gethost(char *url) {
 
 char *curl_useragent(char *url) {
 	char *host, *useragent;
+	unsigned int i;
 	
 	useragent = CURL_USERAGENT;
 	
@@ -108,11 +113,10 @@ char *curl_useragent(char *url) {
 	if((host = curl_gethost(url))) {
 		printf("[+] CURL/Init: host is <%s>\n", host);
 		
-		if(!strcmp(host, "t.co"))
-			useragent = CURL_USERAGENT_LEGACY;
-		
-		if(!strcmp(host, "gks.gs"))
-			useragent = CURL_USERAGENT_LEGACY;
+		for(i = 0; i < sizeof(__user_agent_hosts) / sizeof(char *); i++) {
+			if(!strcmp(host, "t.co"))
+				useragent = CURL_USERAGENT_LEGACY;
+		}
 			
 		free(host);
 	}
@@ -150,7 +154,7 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	
 	printf("[ ] CURL/Header: %s", ptr);
 	
-	if(!strncmp(ptr, "Content-Type: ", 14) || !strncmp(ptr, "Content-type: ", 14)) {
+	if(!strncasecmp(ptr, "Content-Type: ", 14)) {
 		free(curl->http_type);
 		curl->http_type = NULL;
 			
@@ -182,7 +186,7 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 		printf("[-] CURL/Header: unhandled mime type: <%s>\n", curl->http_type);
 	}
 	
-	if(!strncmp(ptr, "Content-Length: ", 16) || !strncmp(ptr, "Content-length: ", 16)) {
+	if(!strncasecmp(ptr, "Content-Length: ", 16)) {
 		curl->http_length = atoll(ptr + 16);
 		printf("[+] CURL/Header: length %d bytes\n", curl->http_length);
 	}

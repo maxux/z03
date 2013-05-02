@@ -49,11 +49,13 @@ google_search_t * google_search(char *keywords) {
 	if(curl_download_text(url, &curl))
 		return NULL;
 	
+	// printf("%s\n", curl.data);
+	
 	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
-	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//a[@class='l']", ctx);
+	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//li/div/h3/a", ctx);
 	
 	search = (google_search_t *) calloc(1, sizeof(google_search_t));
 	
