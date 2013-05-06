@@ -60,6 +60,10 @@ char *__user_agent_hosts[] = {
 	"t.co", "gks.gs", "google.com"
 };
 
+char *__title_host_exceptions[] = {
+	"facebook.com", "imgur.com", "soundcloud.com", "ecolevirtuelle.provincedeliege.be"
+};
+
 char *extract_url(char *url) {
 	int i = 0, braks = 0;
 	char *out;
@@ -114,7 +118,7 @@ char *curl_useragent(char *url) {
 		printf("[+] CURL/Init: host is <%s>\n", host);
 		
 		for(i = 0; i < sizeof(__user_agent_hosts) / sizeof(char *); i++) {
-			if(!strcmp(host, "t.co"))
+			if(!strcmp(host, __user_agent_hosts[i]))
 				useragent = CURL_USERAGENT_LEGACY;
 		}
 			
@@ -319,6 +323,8 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 	char timestring[64];
 	struct tm * timeinfo;
 	char op[48], msg[512];
+	char *host = NULL;
+	unsigned int i;
 	
 	strcpy(op, (char *) nick);
 	
@@ -338,7 +344,25 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 		break;
 		
 		case TITLE_MATCH:
-			snprintf(msg, sizeof(msg), "PRIVMSG %s :(title match on database, OP is %s, at %s. URL waz: %s)", chan, anti_hl(op), timestring, url);
+			if(!(host = curl_gethost(url)))
+				break;
+			
+			for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++) {
+				printf(">> %s %s\n", host, __title_host_exceptions[i]);
+				
+				if(!strstr(host, __title_host_exceptions[i])) {
+					printf("[-] urlmanager/repost: title match disabled for host <%s>\n", host);
+					free(host);
+					
+					host = NULL;
+					break;
+				}
+			}
+			
+			if(host) {
+				snprintf(msg, sizeof(msg), "PRIVMSG %s :(title match on database, OP is %s, at %s. URL waz: %s)", chan, anti_hl(op), timestring, url);
+				free(host);
+			}
 		break;
 	}
 

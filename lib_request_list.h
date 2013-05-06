@@ -192,6 +192,12 @@ request_t __request[] = {
 		.hidden   = 0,
 	},
 	{
+		.match    = ".ghost",
+		.callback = action_ghost,
+		.man      = "ghost nickserv helper: .ghost nick-to-ghost",
+		.hidden   = 0,
+	},
+	{
 		.match    = "sudo",
 		.callback = action_sudo,
 		.man      = "",

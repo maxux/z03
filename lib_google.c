@@ -49,8 +49,6 @@ google_search_t * google_search(char *keywords) {
 	if(curl_download_text(url, &curl))
 		return NULL;
 	
-	// printf("%s\n", curl.data);
-	
 	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	/* creating xpath request */
