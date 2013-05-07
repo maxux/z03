@@ -31,16 +31,18 @@
 #include "lib_ircmisc.h"
 
 char * wiki_head(char *url) {
-	curl_data_t curl;
+	curl_data_t *curl;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
 	char *text = NULL;
 	
-	if(curl_download_text(url, &curl))
+	curl = curl_data_new();
+	
+	if(curl_download_text(url, curl))
 		return NULL;
 	
-	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
+	doc = (xmlDoc *) htmlReadMemory(curl->data, strlen(curl->data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
@@ -54,7 +56,7 @@ char * wiki_head(char *url) {
 	xmlXPathFreeObject(xpathObj);
 	xmlXPathFreeContext(ctx);
 	xmlFreeDoc(doc);
-	free(curl.data);
+	curl_data_free(curl);
 	
 	return text;
 }

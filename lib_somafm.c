@@ -22,7 +22,6 @@
 #include <libxml/HTMLparser.h>
 #include <libxml/tree.h>
 #include <libxml/xpath.h>
-#include <curl/curl.h>
 #include "lib_somafm.h"
 #include "bot.h"
 #include "core_init.h"
@@ -72,20 +71,22 @@ int somafm_handle(char *chan, somafm_station_t *station) {
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
 	xmlNode *node = NULL;
-	curl_data_t curl;
+	curl_data_t *curl;
 	char temp[512];
+	
+	curl = curl_data_new();
 	
 	// downloading page
 	sprintf(temp, "http://somafm.com/%s/", station->ref);
 	
-	if(curl_download_text(temp, &curl))
+	if(curl_download_text(temp, curl))
 		return 1;
 	
-	if(!curl.length)
+	if(!curl->length)
 		return 1;
 
 	// loading xml
-	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
+	doc = (xmlDoc *) htmlReadMemory(curl->data, strlen(curl->data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	// creating xpath request
 	ctx = xmlXPathNewContext(doc);
@@ -108,7 +109,7 @@ int somafm_handle(char *chan, somafm_station_t *station) {
 		xmlXPathFreeObject(xpathObj);
 		xmlXPathFreeContext(ctx);
 		xmlFreeDoc(doc);
-		free(curl.data);
+		curl_data_free(curl);
 	
 	return 0;
 }

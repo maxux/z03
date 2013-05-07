@@ -55,4 +55,8 @@
 	lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request);
 	
 	#define lastfm_url(x, ...)     snprintf(x, sizeof(x), LASTFM_API_ROOT __VA_ARGS__)
+	
+	#define MALLOC_DEFAULT     2048
+	#define LASTFM_API_BASE    "http://ws.audioscrobbler.com/2.0/"
+	#define LASTFM_API_ROOT    LASTFM_API_BASE "?format=json"
 #endif

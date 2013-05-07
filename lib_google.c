@@ -35,7 +35,7 @@ char *baseurlen = "https://www.google.com/search?hl=en&q=";
 char *baseurlfr = "https://www.google.com/search?hl=fr&q=";
 
 google_search_t * google_search(char *keywords) {
-	curl_data_t curl;
+	curl_data_t *curl;
 	google_search_t *search;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
@@ -44,12 +44,14 @@ google_search_t * google_search(char *keywords) {
 	char url[2048];
 	int i;
 	
+	curl = curl_data_new();
+	
 	snprintf(url, sizeof(url), "%s%s", baseurlen, space_encode(keywords));
 	
-	if(curl_download_text(url, &curl))
+	if(curl_download_text(url, curl))
 		return NULL;
 	
-	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
+	doc = (xmlDoc *) htmlReadMemory(curl->data, strlen(curl->data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
@@ -75,13 +77,13 @@ google_search_t * google_search(char *keywords) {
 	xmlXPathFreeObject(xpathObj);
 	xmlXPathFreeContext(ctx);	
 	xmlFreeDoc(doc);
-	free(curl.data);
+	curl_data_free(curl);
 	
 	return search;
 }
 
 char *google_calc(char *keywords) {
-	curl_data_t curl;
+	curl_data_t *curl;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
@@ -89,12 +91,14 @@ char *google_calc(char *keywords) {
 	char url[2048], *value = NULL;
 	int i;
 	
+	curl = curl_data_new();
+	
 	snprintf(url, sizeof(url), "%s%s", baseurlfr, space_encode(keywords));
 	
-	if(curl_download_text(url, &curl))
+	if(curl_download_text(url, curl))
 		return NULL;
 	
-	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
+	doc = (xmlDoc *) htmlReadMemory(curl->data, strlen(curl->data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
@@ -114,7 +118,7 @@ char *google_calc(char *keywords) {
 	xmlXPathFreeObject(xpathObj);
 	xmlXPathFreeContext(ctx);	
 	xmlFreeDoc(doc);
-	free(curl.data);
+	curl_data_free(curl);
 	
 	return value;
 }

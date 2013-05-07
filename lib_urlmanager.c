@@ -130,21 +130,22 @@ char *curl_useragent(char *url) {
 	return useragent;
 }
 
-char * curl_cookie(char *url) {
+char *curl_cookie(char *url) {
 	char *host, *cookie = NULL;
 	int i;
 	
-	if((host = curl_gethost(url))) {
-		for(i = 0; __host_cookies[i].host; i++) {
-			if(strstr(host, __host_cookies[i].host)) {
-				printf("[ ] URL/Cookie: special cookie for host %s (%s) found\n", __host_cookies[i].host, host);
-				cookie = __host_cookies[i].cookie;
-				break;
-			}
+	if(!(host = curl_gethost(url)))
+		return NULL;
+	
+	for(i = 0; __host_cookies[i].host; i++) {
+		if(strstr(host, __host_cookies[i].host)) {
+			printf("[ ] URL/Cookie: cookie %s (%s) found\n", __host_cookies[i].host, host);
+			cookie = __host_cookies[i].cookie;
+			break;
 		}
-		
-		free(host);
 	}
+		
+	free(host);
 	
 	return cookie;
 }
@@ -223,22 +224,35 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 	return size * nmemb;
 }
 
+curl_data_t *curl_data_new() {
+	curl_data_t *data;
+	
+	if(!(data = (curl_data_t *) calloc(1, sizeof(curl_data_t))))
+		return NULL;
+	
+	data->type        = UNKNOWN_TYPE;
+	data->charset     = UNKNOWN_CHARSET;
+	
+	return data;
+}
+
+void curl_data_free(curl_data_t *data) {
+	free(data->data);
+	free(data->http_type);
+	free(data);
+}
+
 static int curl_download_process(char *url, curl_data_t *data, char forcedl, char *post) {
 	CURL *curl;
 	char *useragent = CURL_USERAGENT;
 	char *cookie;
 	
 	curl = curl_easy_init();
+
+	// FIXME: set it in other way
+	data->forcedl = forcedl;
 	
-	data->data        = NULL;
-	data->type        = UNKNOWN_TYPE;
-	data->length      = 0;
-	data->http_length = 0;
-	data->charset     = UNKNOWN_CHARSET;
-	data->http_type   = NULL;
-	data->forcedl     = forcedl;
-	
-	printf("[+] CURL: %s\n", url);
+	printf("[+] CURL: %s, force dl: %d\n", url, data->forcedl);
 	
 	useragent = curl_useragent(url);
 	
@@ -270,6 +284,9 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		/* Checking Host for specific Cookies */
 		if((cookie = curl_cookie(url)))
 			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
+			
+		else if(data->cookie)
+			curl_easy_setopt(curl, CURLOPT_COOKIE, data->cookie);
 		
 		data->curlcode = curl_easy_perform(curl);
 		
@@ -326,21 +343,39 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 	char *host = NULL;
 	unsigned int i;
 	
-	strcpy(op, (char *) nick);
+	strcpy(op, nick);
 	
 	if(ts != 0) {
 		timeinfo = localtime(&ts);
-		sprintf(timestring, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mday, timeinfo->tm_mon + 1, (timeinfo->tm_year + 1900 - 2000), timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+		sprintf(timestring,
+		        "%02d/%02d/%02d %02d:%02d:%02d",
+		        timeinfo->tm_mday,
+		        timeinfo->tm_mon + 1,
+		        (timeinfo->tm_year + 1900 - 2000),
+		        timeinfo->tm_hour,
+		        timeinfo->tm_min,
+		        timeinfo->tm_sec
+		);
 		
 	} else strcpy(timestring, "unknown");
 
 	switch(type) {
 		case URL_MATCH:
-			sprintf(msg, "PRIVMSG %s :(url match, OP is %s (%s), hit %d times)", chan, anti_hl(op), timestring, hit + 1);
+			zsnprintf(msg,
+				"(url match, OP is %s (%s), hit %d times)",
+				anti_hl(op), timestring, hit + 1
+			);
+			
+			irc_privmsg(chan, msg);
 		break;
 		
 		case CHECKSUM_MATCH:
-			snprintf(msg, sizeof(msg), "PRIVMSG %s :(checksum match, OP is %s (%s), hit %d times. URL waz: %s)", chan, anti_hl(op), timestring, hit + 1, url);
+			zsnprintf(msg,
+				"(checksum match, OP is %s (%s), hit %d times. URL waz: %s)",
+				anti_hl(op), timestring, hit + 1, url
+			);
+			
+			irc_privmsg(chan, msg);
 		break;
 		
 		case TITLE_MATCH:
@@ -348,47 +383,43 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 				break;
 			
 			for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++) {
-				printf(">> %s %s\n", host, __title_host_exceptions[i]);
-				
 				if(!strstr(host, __title_host_exceptions[i])) {
 					printf("[-] urlmanager/repost: title match disabled for host <%s>\n", host);
 					free(host);
-					
-					host = NULL;
 					break;
 				}
 			}
 			
-			if(host) {
-				snprintf(msg, sizeof(msg), "PRIVMSG %s :(title match on database, OP is %s, at %s. URL waz: %s)", chan, anti_hl(op), timestring, url);
-				free(host);
-			}
+			zsnprintf(msg, 
+				"(title match on database, OP is %s, at %s. URL waz: %s)",
+				anti_hl(op), timestring, url
+			);
+			
+			irc_privmsg(chan, msg);				
+			free(host);
 		break;
 	}
-
-	raw_socket(msg);
 }
 
 void check_round_count(ircmessage_t *message) {
 	sqlite3_stmt *stmt;
 	char *sqlquery, msg[128];
-	int row, urls = -1;
+	int urls = -1;
 
 	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
 	
-	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {		
-		while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-			if(row == SQLITE_ROW)
-				urls = sqlite3_column_int(stmt, 0);
-		}
+	if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
+		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+		
+	if((sqlite3_step(stmt)) == SQLITE_ROW) {
+		urls = sqlite3_column_int(stmt, 0);
 		
 		printf("[ ] URL: %d\n", urls);
 		if(urls % 500 == 0) {
 			sprintf(msg, "PRIVMSG %s :We just reached %d urls !", message->chan, urls);
 			raw_socket(msg);
 		}
-		
-	} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
+	}
 	
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
@@ -396,12 +427,10 @@ void check_round_count(ircmessage_t *message) {
 
 int handle_url(ircmessage_t *message, char *url) {
 	sqlite3_stmt *stmt;
-	char *sqlquery, op[48];
-	const unsigned char *_op = NULL;
-	int row, id = -1, hit = 0;
+	char *sqlquery, *op;
+	int id = -1, hit = 0;
 	char match = 0;
 	time_t ts = 0;
-	
 	
 	printf("[+] URL Parser: %s\n", url);
 		
@@ -410,26 +439,21 @@ int handle_url(ircmessage_t *message, char *url) {
 		return 2;
 	}
 	
+	sqlquery = sqlite3_mprintf(
+		"SELECT id, nick, hit, time FROM url WHERE url = '%q' AND chan = '%q'",
+		url, message->chan
+	);
 	
-	/*
-	 *   Quering database
-	 */
-	sqlquery = sqlite3_mprintf("SELECT id, nick, hit, time FROM url WHERE url = '%q' AND chan = '%q'", url, message->chan);
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL) {
 		fprintf(stderr, "[-] URL Parser: cannot select url\n");
 		return 1;
 	}
 	
-	while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if(row == SQLITE_ROW) {
-			id  = sqlite3_column_int(stmt, 0);
-			_op = sqlite3_column_text(stmt, 1);
-			hit = sqlite3_column_int(stmt, 2);
-			ts  = sqlite3_column_int(stmt, 3);
-			
-			strncpy(op, (char *) _op, sizeof(op));
-			op[sizeof(op) - 1] = '\0';
-		}
+	if(sqlite3_step(stmt) == SQLITE_ROW) {
+		id  = sqlite3_column_int(stmt, 0);
+		op  = (char *) sqlite3_column_text(stmt, 1);
+		hit = sqlite3_column_int(stmt, 2);
+		ts  = sqlite3_column_int(stmt, 3);
 	}
 	
 	/* Updating Database */
@@ -444,7 +468,11 @@ int handle_url(ircmessage_t *message, char *url) {
 		
 	} else {
 		printf("[+] URL Parser: New url, inserting...\n");
-		sqlquery = sqlite3_mprintf("INSERT INTO url (nick, url, hit, time, chan) VALUES ('%q', '%q', 1, %d, '%q')", message->nick, url, time(NULL), message->chan);
+		sqlquery = sqlite3_mprintf(
+			"INSERT INTO url (nick, url, hit, time, chan) "
+			"VALUES ('%q', '%q', 1, %d, '%q')", 
+			message->nick, url, time(NULL), message->chan
+		);
 	}
 	
 	if(!db_sqlite_simple_query(sqlite_db, sqlquery))
@@ -463,10 +491,8 @@ int handle_url(ircmessage_t *message, char *url) {
 }
 
 char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
-	char sha1_hex[3];
+	char sha1_hex[3] = {0};
 	unsigned int i;
-	
-	*sha1_char = '\0';
 	
 	for(i = 0; i < SHA_DIGEST_LENGTH; i++) {
 		sprintf(sha1_hex, "%02x", sha1_hexa[i]);
@@ -477,69 +503,71 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 }
 
 int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
-	curl_data_t curl;
+	curl_data_t *curl;
 	char *title = NULL, *stripped = NULL;
 	char *strcode, temp[256];
 	unsigned int len;
 	char *sqlquery, *request;
 	sqlite3_stmt *stmt;
 	
+	curl = curl_data_new();
+	
 	unsigned char sha1_hexa[SHA_DIGEST_LENGTH];
 	char sha1_char[(SHA_DIGEST_LENGTH * 2) + 1];
 	
-	const unsigned char *sqlurl = NULL, *nick = NULL;
+	char *sqlurl = NULL, *nick = NULL;
 	time_t ts = 0;
-	int hit = -1, row;
+	int hit = -1;
 	
-	
-	if(curl_download(url, &curl, 0))
+	if(curl_download(url, curl, 0))
 		printf("[-] Warning: special download\n");
 		
-	printf("[+] Downloaded Length: %d\n", curl.length);
-	printf("[+] Downloaded Type  : %d\n", curl.type);
-	// printf("%s\n", curl.data);
+	printf("[+] Downloaded Length: %d\n", curl->length);
+	printf("[+] Downloaded Type  : %d\n", curl->type);
+	// printf("%s\n", curl->data);
 	
 	// Write error occure on data file
-	if(curl.curlcode != CURLE_OK && curl.curlcode != CURLE_WRITE_ERROR) {
-		zsnprintf(temp, "URL (Error %d): %s", curl.curlcode, curl_easy_strerror(curl.curlcode));
+	if(curl->curlcode != CURLE_OK && curl->curlcode != CURLE_WRITE_ERROR) {
+		zsnprintf(temp, "URL (Error %d): %s", curl->curlcode, curl_easy_strerror(curl->curlcode));
 		irc_privmsg(message->chan, temp);
 		
-		free(curl.data);		
+		curl_data_free(curl);
 		return 2;
 	}
 	
-	if(!curl.data && !curl.http_length) {
+	if(!curl->data && !curl->http_length) {
 		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
+		curl_data_free(curl);
 		return 2;
 	}
 	
-	if(!curl.length && curl.type != UNKNOWN_TYPE) {
+	if(!curl->length && curl->type != UNKNOWN_TYPE) {
 		/* realloc should not be occured, but not sure... */
-		free(curl.data);
+		curl_data_free(curl);
 		return 2;
 	}
 
-	if(curl.type == TEXT_HTML) {
+	if(curl->type == TEXT_HTML) {
 		/* Checking ignored hosts */
 		/* for(i = 0; i < sizeof(__host_ignore) / sizeof(char *); i++) {
 			if(strstr(url, __host_ignore[i])) {
-				free(curl.data);
+				free(curl->data);
 				return 3;
 			}
 		} */
 		
 		/* Extract title */
-		if((title = url_extract_title(curl.data, title)) != NULL) {
+		if((title = url_extract_title(curl->data, title)) != NULL) {
 			len = strlen(title) + 256;
 			request = (char *) malloc(sizeof(char) * len);
 			
-			if(curl.code == 404)
+			if(curl->code == 404)
 				strcode = " (Error 404)";
 				
 			else strcode = "";
 			
 			/* Notify Title */
-			stripped = anti_hl_each_words(title, strlen(title), curl.charset);
+			stripped = anti_hl_each_words(title, strlen(title), curl->charset);
 			decode_html_entities_utf8(stripped, NULL);
 			
 			snprintf(request, len, "PRIVMSG %s :URL%s: %s", message->chan, strcode, stripped);
@@ -548,23 +576,28 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			/* Check Title Repost */
 			// redecoding entities for clear title update
 			decode_html_entities_utf8(title, NULL);
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE title = '%q' AND nick != '%q' AND chan = '%q' LIMIT 1", title, message->nick, message->chan);
+			sqlquery = sqlite3_mprintf(
+				"SELECT url, nick, time, hit "
+				"FROM url           "
+				"WHERE title = '%q' "
+				"  AND nick != '%q' "
+				"  AND chan = '%q'  "
+				"LIMIT 1            ",
+				title, message->nick, message->chan
+			);
+			
 			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 				fprintf(stderr, "[-] URL Parser: cannot select url\n");
 			
-			while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-				if(row == SQLITE_ROW) {
-					// Skip repost from same nick
-					nick   = sqlite3_column_text(stmt, 1);					
-					sqlurl = sqlite3_column_text(stmt, 0);
-					ts     = sqlite3_column_int(stmt, 2);
-					hit    = sqlite3_column_int(stmt, 3);
-					
-					if(curl.code == 200 && !already_match)
-						handle_repost(TITLE_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
-				}
+			if(sqlite3_step(stmt) == SQLITE_ROW) {
+				// Skip repost from same nick
+				nick   = (char *) sqlite3_column_text(stmt, 1);					
+				sqlurl = (char *) sqlite3_column_text(stmt, 0);
+				ts     = sqlite3_column_int(stmt, 2);
+				hit    = sqlite3_column_int(stmt, 3);
 				
-				break;
+				if(curl->code == 200 && !already_match)
+					handle_repost(TITLE_MATCH, sqlurl, message->chan, nick, ts, hit);
 			}
 			
 			// Clearing
@@ -583,19 +616,28 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			
 		} else printf("[-] URL: Cannot extract title\n");
 		
-	} else if(curl.type == IMAGE_ALL) {
-		if(curl.http_length > CURL_MAX_SIZE) {
-			sprintf(temp, "PRIVMSG %s :(Warning: image size: %u Mo)", message->chan, curl.http_length / 1024 / 1024);
+	} else if(curl->type == IMAGE_ALL) {
+		if(curl->http_length > CURL_MAX_SIZE) {
+			zsnprintf(temp,
+				"PRIVMSG %s :(Warning: image size: %u Mo)",
+				message->chan,
+				curl->http_length / 1024 / 1024
+			);
+			
 			raw_socket(temp);
 			
 			return 1;
 		}
 			
-		if(!handle_url_image(url, &curl)) {
+		if(!handle_url_image(url, curl)) {
 			/* Calculing data checksum */
-			SHA1((unsigned char *) curl.data, curl.length, sha1_hexa);
+			SHA1((unsigned char *) curl->data, curl->length, sha1_hexa);
 			
-			sqlquery = sqlite3_mprintf("UPDATE url SET sha1 = '%s' WHERE url = '%q'", sha1_string(sha1_hexa, sha1_char), url);
+			sqlquery = sqlite3_mprintf(
+				"UPDATE url SET sha1 = '%s' WHERE url = '%q'",
+				sha1_string(sha1_hexa, sha1_char), url
+			);
+			
 			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
 				printf("[-] URL Parser: cannot update db\n");
 				
@@ -603,42 +645,52 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			sqlite3_free(sqlquery);
 			
 			/* Checking checksum repost */
-			sqlquery = sqlite3_mprintf("SELECT url, nick, time, hit FROM url WHERE sha1 = '%s' AND url != '%q' AND chan = '%q'", sha1_char, url, message->chan);
-			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
-				while((row = sqlite3_step(stmt)) != SQLITE_DONE) {
-					if(row == SQLITE_ROW) {
-						/* Skip repost from same nick */
-						nick   = sqlite3_column_text(stmt, 1);
-						
-						if(!strcmp((char *) nick, message->nick))
-							continue;
-							
-						sqlurl = sqlite3_column_text(stmt, 0);
-						ts     = sqlite3_column_int(stmt, 2);
-						hit    = sqlite3_column_int(stmt, 3);
-						
-						if(!already_match)
-							handle_repost(CHECKSUM_MATCH, (char *) sqlurl, message->chan, (char *) nick, ts, hit);
-					}
-					
-					break;
-				}
+			sqlquery = sqlite3_mprintf(
+				"SELECT url, nick, time, hit "
+				"FROM url          "
+				"WHERE sha1 = '%s' "
+				"  AND url != '%q' "
+				"  AND chan = '%q' ",
+				sha1_char, url, message->chan
+			);
 			
-			} else fprintf(stderr, "[-] URL Parser: cannot select url\n");
+			if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
+				fprintf(stderr, "[-] URL Parser: cannot select url\n");
+				
+			while(sqlite3_step(stmt) == SQLITE_ROW) {
+				/* Skip repost from same nick */
+				nick   = (char *) sqlite3_column_text(stmt, 1);
+				
+				if(!strcmp((char *) nick, message->nick))
+					continue;
+					
+				sqlurl = (char *) sqlite3_column_text(stmt, 0);
+				ts     = sqlite3_column_int(stmt, 2);
+				hit    = sqlite3_column_int(stmt, 3);
+				
+				if(!already_match)
+					handle_repost(CHECKSUM_MATCH, sqlurl, message->chan, nick, ts, hit);
+			}
 			
 			/* Clearing */
 			sqlite3_free(sqlquery);
 			sqlite3_finalize(stmt);
 		}
 		
-	} else if(curl.type == UNKNOWN_TYPE) {
-		snprintf(temp, sizeof(temp), "PRIVMSG %s :Content: %s (%.2f Mo)", message->chan, curl.http_type, (double) curl.http_length / 1024 / 1024);
+	} else if(curl->type == UNKNOWN_TYPE) {
+		zsnprintf(temp,
+			"PRIVMSG %s :Content: %s (%.2f Mo)",
+			message->chan, 
+			curl->http_type, 
+			(double) curl->http_length / 1024 / 1024
+		);
+		
 		raw_socket(temp);
 		
-		free(curl.http_type);
+		free(curl->http_type);
 	}
 	
-	free(curl.data);
+	curl_data_free(curl);
 	
 	return 0;
 }
@@ -723,26 +775,28 @@ charset_t url_extract_charset(char *body) {
 
 char * shurl(char *url) {
 	char *baseurl = "http://x.maxux.net/index.php?url=", *request;
-	curl_data_t curl;
+	curl_data_t *curl;
 	size_t len;
+	
+	curl = curl_data_new();
 	
 	len = (strlen(baseurl) + strlen(url)) + 8;
 	request = (char *) malloc(sizeof(char) * len);
 	
 	sprintf(request, "%s%s", baseurl, url);
 	
-	if(curl_download_text(request, &curl)) {
+	if(curl_download_text(request, curl)) {
 		free(request);
 		return NULL;
 	}
 	
-	if(curl.length > len)
-		curl.length = len - 1;
+	if(curl->length > len)
+		curl->length = len - 1;
 	
-	strncpy(request, curl.data, curl.length);
-	request[curl.length] = '\0';
+	strncpy(request, curl->data, curl->length);
+	request[curl->length] = '\0';
 	
-	free(curl.data);
+	curl_data_free(curl);
 	
 	printf("[+] Shurl: <%s>\n", request);
 	

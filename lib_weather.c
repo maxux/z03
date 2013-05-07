@@ -132,24 +132,26 @@ int weather_handle(char *chan, weather_station_t *station) {
 	xmlXPathObject *xpathObj = NULL;
 	xmlNode *node = NULL;
 	int i, n;
-	curl_data_t curl;
+	curl_data_t *curl;
 	char temp[512];
 	weather_data_t weather = {
 		.temp_min_time = {'\0'},
 		.temp_max_time = {'\0'},
 	};
 	
+	curl = curl_data_new();
+	
 	/* Downloading page */
 	sprintf(temp, __weather_internal_station_url[station->type], station->id);
 	
-	if(curl_download_text(temp, &curl))
+	if(curl_download_text(temp, curl))
 		return 1;
 	
-	if(!curl.length)
+	if(!curl->length)
 		return 1;
 
 	// loading xml
-	doc = (xmlDoc *) htmlReadMemory(curl.data, strlen(curl.data), "/", "utf-8", HTML_PARSE_NOERROR);
+	doc = (xmlDoc *) htmlReadMemory(curl->data, strlen(curl->data), "/", "utf-8", HTML_PARSE_NOERROR);
 	
 	// creating xpath request
 	ctx = xmlXPathNewContext(doc);
@@ -197,7 +199,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 		xmlXPathFreeObject(xpathObj);
 		xmlXPathFreeContext(ctx);
 		xmlFreeDoc(doc);
-		free(curl.data);
+		curl_data_free(curl);
 	
 	return 0;
 }

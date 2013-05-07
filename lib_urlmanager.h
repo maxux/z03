@@ -42,6 +42,7 @@
 		enum charset_t charset;
 		CURLcode curlcode;
 		char forcedl;
+		char *cookie;
 		
 	} curl_data_t;
 	
@@ -52,6 +53,9 @@
 	} host_cookies_t;
 	
 	char *extract_url(char *url);
+	
+	curl_data_t *curl_data_new();
+	void curl_data_free(curl_data_t *data);
 	
 	size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata);
 	size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata);
