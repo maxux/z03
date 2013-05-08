@@ -11,4 +11,5 @@
 	int settings_unset(char *nick, char *key);
 	
 	settings_view settings_getview(char *nick, char *key);
+	list_t *settings_by_key(char *key, settings_view view);
 #endif

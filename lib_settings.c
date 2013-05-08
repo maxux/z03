@@ -33,7 +33,7 @@ int settings_set(char *nick, char *key, char *value, settings_view view) {
 	
 	sqlquery = sqlite3_mprintf(
 		"REPLACE INTO settings (nick, key, value, private) "
-		"VALUES ('%q', LOWER('%q'), LOWER('%q'), '%d')",
+		"VALUES ('%q', '%q', '%q', '%d')",
 		nick, key, value, view
 	);
 	
@@ -56,16 +56,17 @@ char *settings_get(char *nick, char *key, settings_view view) {
 	
 	if(view == PRIVATE)
 		sqlquery = sqlite3_mprintf(
-			"SELECT value FROM settings             "
-			"WHERE nick = '%q' AND key = LOWER('%q')",
+			"SELECT value FROM settings      "
+			"WHERE LOWER(nick) = LOWER('%q') "
+			"  AND LOWER(key) = LOWER('%q')  ",
 			nick, key
 		);
 		
 	else sqlquery = sqlite3_mprintf(
-		"SELECT value FROM settings "
-		"WHERE nick = '%q'          "
-		"  AND key = LOWER('%q')    "
-		"  AND private = 0          ", 
+		"SELECT value FROM settings      "
+		"WHERE LOWER(nick) = LOWER('%q') "
+		"  AND LOWER(key) = LOWER('%q')  "
+		"  AND private = 0               ", 
 		nick, key
 	);
 	
@@ -86,7 +87,12 @@ int settings_unset(char *nick, char *key) {
 	char *sqlquery;
 	int retcode;
 	
-	sqlquery = sqlite3_mprintf("DELETE FROM settings WHERE nick = '%q' AND key = LOWER('%q')", nick, key);
+	sqlquery = sqlite3_mprintf(
+		"DELETE FROM settings            "
+		"WHERE LOWER(nick) = LOWER('%q') "
+		"  AND LOWER(key) = LOWER('%q')  ",
+		nick, key
+	);
 	
 	if(!db_sqlite_simple_query(sqlite_db, sqlquery)) {
 		fprintf(stderr, "[-] settings/set: cannot insert data\n");
@@ -107,8 +113,9 @@ settings_view settings_getview(char *nick, char *key) {
 	int row;
 	
 	sqlquery = sqlite3_mprintf(
-		"SELECT private FROM settings          "
-		"WHERE nick = '%q' AND key = LOWER('%q')",
+		"SELECT private FROM settings    "
+		"WHERE LOWER(nick) = LOWER('%q') "
+		"  AND LOWER(key) = LOWER('%q')  ",
 		nick, key
 	);
 	
@@ -123,4 +130,44 @@ settings_view settings_getview(char *nick, char *key) {
 	sqlite3_free(sqlquery);
 	
 	return view;
+}
+
+list_t *settings_by_key(char *key, settings_view view) {
+	sqlite3_stmt *stmt;
+	char *row_nick = NULL, *row_value = NULL;
+	char *sqlquery;
+	list_t *list;
+	
+	if(view == PRIVATE)
+		sqlquery = sqlite3_mprintf(
+			"SELECT nick, value FROM settings "
+			"WHERE LOWER(key) = LOWER('%q')   ",
+			key
+		);
+		
+	else sqlquery = sqlite3_mprintf(
+		"SELECT nick, value FROM settings "
+		"WHERE LOWER(key) = LOWER('%q')   "
+		"  AND private = 0                ", 
+		key
+	);
+	
+	if(!(list = list_init(NULL)))
+		return NULL;
+	
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+		while((sqlite3_step(stmt)) == SQLITE_ROW) {
+			row_nick  = (char *) sqlite3_column_text(stmt, 0);
+			row_value = (char *) sqlite3_column_text(stmt, 1);
+			
+			list_append(list, row_nick, row_value);
+		}
+	
+	} else fprintf(stderr, "[-] settings/bykey: cannot select data\n");
+	
+	/* Clearing */
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	return list;
 }

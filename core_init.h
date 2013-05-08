@@ -5,7 +5,7 @@
 	#include "core_ssl.h"
 	
 	#define MAXBUFF			4096
-	#define SOCKET_TIMEOUT		10
+	#define SOCKET_TIMEOUT		1
 	
 	typedef struct codemap_t {
 		char *filename;                /* library filename */

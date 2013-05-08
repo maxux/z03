@@ -48,6 +48,7 @@
 #include "lib_run.h"
 #include "lib_stats.h"
 #include "lib_known.h"
+#include "lib_periodic.h"
 
 #include "lib_actions.h"
 #include "lib_actions_binutils.h"
@@ -69,6 +70,8 @@ global_lib_t global_lib = {
 	.channels = NULL,
 };
 
+pthread_t __periodic_thread;
+
 /* Signals */
 void lib_sighandler(int signal) {
 	switch(signal) {
@@ -76,6 +79,19 @@ void lib_sighandler(int signal) {
 			pthread_mutex_unlock(&global_core->mutex_ssl);
 			stats_daily_update();
 		break;
+	}
+}
+
+/*
+ * Channels
+ */
+static void irc_joinall() {
+	unsigned int i;
+	char buffer[128];
+	
+	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char *); i++) {
+		sprintf(buffer, "JOIN %s", IRC_CHANNEL[i]);
+		raw_socket(buffer);
 	}
 }
 
@@ -196,7 +212,7 @@ void handle_join(char *data) {
 	
 	// check if the user is known
 	// __action_known_add(nick, username, host, chan);
-	free(username);	
+	free(username);
 	free(host);
 	free(nick);
 }
@@ -245,6 +261,7 @@ void handle_part(char *data) {
 		list_remove(global_lib.channels, chan);
 	}
 	
+	free(username);
 	free(host);
 	free(nick);
 }
@@ -321,6 +338,12 @@ int handle_message(char *data, ircmessage_t *message) {
 	/* Special Check for BELL */
 	if(strchr(data, '\x07')) {
 		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
+		return 0;
+	}
+	
+	/* Temp FIXME: for T4g1 */
+	if(strstr(data, "mére")) {
+		irc_kick(message->chan, message->nick, "ta mére ouais");
 		return 0;
 	}
 	
@@ -412,6 +435,32 @@ int handle_message(char *data, ircmessage_t *message) {
 	return 1;
 }
 
+void handle_notice(char *data, ircmessage_t *message) {
+	char *nick = NULL, *username, *host = NULL, *payload;
+	
+	/* Extracting data */
+	if(!irc_extract_userdata(data, &nick, &username, &host)) {
+		printf("[-] lib/Part: Extract data info failed\n");
+		return;
+	}
+	
+	free(username);
+	free(host);
+	
+	zsnprintf(message->nick, "%s", nick);
+	payload = strchr(data, ':') + 1;
+	
+	printf("[+] lib/notice: from: %s: %s\n", nick, payload);
+	
+	if(strstr(data, "You are now identified") && !strcasecmp(nick, "nickserv"))
+		irc_joinall();
+	
+	if(!strncmp(payload, ".whatcd ", 8))
+		action_whatcd(message, payload + 8);
+	
+	free(nick);
+}
+
 /*
  * IRC Protocol
  */
@@ -445,18 +494,21 @@ size_t extract_nick(char *data, char *destination, size_t size) {
 	return len;
 }
 
-void irc_joinall() {
-	unsigned int i;
-	char buffer[128];
-	
-	for(i = 0; i < sizeof(IRC_CHANNEL) / sizeof(char *); i++) {
-		sprintf(buffer, "JOIN %s", IRC_CHANNEL[i]);
-		raw_socket(buffer);
-	}
-}
-
 void main_core(char *data, char *request) {
 	ircmessage_t message;
+	
+	if(!strncmp(request, "PRIVMSG #", 9)) {
+		if(pre_handle(data + 1, &message))
+			return;
+			
+		handle_message(skip_server(request), &message);
+		return;
+	}
+	
+	if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1)) {
+		handle_query(data + 1);
+		return;
+	}
 
 	if(!strncmp(data, "PING", 4)) {
 		data[1] = 'O';		/* pOng */
@@ -464,21 +516,9 @@ void main_core(char *data, char *request) {
 		return;
 	}
 	
-	if(!strncmp(request, "376", 3)) {
-		if(IRC_NICKSERV) {
-			raw_socket("PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
-		
-		/* if(IRC_OPER)
-			raw_socket("OPER " IRC_NICK " " IRC_OPER_PASS); */
-		
-		} else irc_joinall();
-		
-		return;
-	}
-	
 	if(!strncmp(request, "NOTICE", 6)) {
-		if(strstr(request, ":You are now identified"))
-			irc_joinall();
+		handle_notice(data + 1, &message);
+		return;
 	}
 	
 	if(!strncmp(request, "JOIN", 4)) {
@@ -501,16 +541,15 @@ void main_core(char *data, char *request) {
 		return;
 	}
 	
-	if(!strncmp(request, "PRIVMSG #", 9)) {
-		if(pre_handle(data + 1, &message))
-			return;
-			
-		handle_message(skip_server(request), &message);
-		return;
-	}
-	
-	if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1)) {
-		handle_query(data + 1);
+	if(!strncmp(request, "376", 3)) {
+		if(IRC_NICKSERV) {
+			raw_socket("PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
+		
+		/* if(IRC_OPER)
+			raw_socket("OPER " IRC_NICK " " IRC_OPER_PASS); */
+		
+		} else irc_joinall();
+		
 		return;
 	}
 }
@@ -528,9 +567,19 @@ void main_construct(void) {
 	
 	// grabbing SIGUSR1 for daily update
 	signal_intercept(SIGUSR1, lib_sighandler);
+	
+	// starting timing thread
+	printf("[+] lib: init deferred threads\n");
+	pthread_create(&__periodic_thread, NULL, periodic_each_minutes, NULL);
 }
 
 void main_destruct(void) {
 	// closing sqitite
 	db_sqlite_close(sqlite_db);
+	
+	// cleaning threads
+	pthread_cancel(__periodic_thread);
+	
+	printf("[+] lib: waiting theads...\n");
+	pthread_join(__periodic_thread, NULL);
 }

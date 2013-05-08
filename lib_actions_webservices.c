@@ -29,6 +29,7 @@
 #include "lib_somafm.h"
 #include "lib_google.h"
 #include "lib_wiki.h"
+#include "lib_whatcd.h"
 #include "lib_settings.h"
 #include "lib_actions_webservices.h"
 
@@ -193,4 +194,11 @@ void action_calc(ircmessage_t *message, char *args) {
 		free(answer);
 		
 	} else irc_privmsg(message->chan, "No result from Google Calculator");
+}
+
+void action_whatcd(ircmessage_t *message, char *args) {
+	if(!*args)
+		return;
+		
+	settings_set(message->nick, "whatsession", args, PRIVATE);
 }

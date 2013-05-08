@@ -78,6 +78,7 @@ void action_get(ircmessage_t *message, char *args) {
 	else zsnprintf(answer, "%s.%s is not set", message->nickhl, args);
 	
 	irc_privmsg(message->chan, answer);
+	free(value);
 	free(key);
 }
 

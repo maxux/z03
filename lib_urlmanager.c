@@ -282,11 +282,11 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		}
 		
 		/* Checking Host for specific Cookies */
-		if((cookie = curl_cookie(url)))
-			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
-			
-		else if(data->cookie)
+		if(data->cookie)
 			curl_easy_setopt(curl, CURLOPT_COOKIE, data->cookie);
+			
+		else if((cookie = curl_cookie(url)))
+			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
 		
 		data->curlcode = curl_easy_perform(curl);
 		

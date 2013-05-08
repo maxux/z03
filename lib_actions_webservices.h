@@ -6,4 +6,7 @@
 	void action_wiki(ircmessage_t *message, char *args);
 	void action_google(ircmessage_t *message, char *args);
 	void action_calc(ircmessage_t *message, char *args);
+	
+	// exception from notice
+	void action_whatcd(ircmessage_t *message, char *args);
 #endif
