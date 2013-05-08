@@ -132,6 +132,10 @@ settings_view settings_getview(char *nick, char *key) {
 	return view;
 }
 
+void settings_by_key_free(void *data) {
+	free(data);
+}
+
 list_t *settings_by_key(char *key, settings_view view) {
 	sqlite3_stmt *stmt;
 	char *row_nick = NULL, *row_value = NULL;
@@ -152,7 +156,7 @@ list_t *settings_by_key(char *key, settings_view view) {
 		key
 	);
 	
-	if(!(list = list_init(NULL)))
+	if(!(list = list_init(settings_by_key_free)))
 		return NULL;
 	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
@@ -160,7 +164,7 @@ list_t *settings_by_key(char *key, settings_view view) {
 			row_nick  = (char *) sqlite3_column_text(stmt, 0);
 			row_value = (char *) sqlite3_column_text(stmt, 1);
 			
-			list_append(list, row_nick, row_value);
+			list_append(list, row_nick, strdup(row_value));
 		}
 	
 	} else fprintf(stderr, "[-] settings/bykey: cannot select data\n");

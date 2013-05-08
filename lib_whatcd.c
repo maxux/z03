@@ -38,6 +38,8 @@ whatcd_t *whatcd_new(char *session) {
 	
 	whatcd->session = strdup(session);
 	
+	printf("[+] whatcd: new instance, session: %s\n", whatcd->session);
+	
 	return whatcd;
 }
 

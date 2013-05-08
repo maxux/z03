@@ -278,14 +278,15 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		if(post) {
 			curl_easy_setopt(curl, CURLOPT_POST, 1);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
-			printf("[+] CURL/Post: <%s>\n", post);
+			printf("[+] CURL/post: <%s>\n", post);
 		}
 		
 		/* Checking Host for specific Cookies */
-		if(data->cookie)
+		if(data->cookie) {
+			printf("[ ] CURL/cookie: %s\n", data->cookie);
 			curl_easy_setopt(curl, CURLOPT_COOKIE, data->cookie);
 			
-		else if((cookie = curl_cookie(url)))
+		} else if((cookie = curl_cookie(url)))
 			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
 		
 		data->curlcode = curl_easy_perform(curl);
