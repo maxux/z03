@@ -687,8 +687,6 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 		);
 		
 		raw_socket(temp);
-		
-		free(curl->http_type);
 	}
 	
 	curl_data_free(curl);

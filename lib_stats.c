@@ -94,6 +94,7 @@ list_t *stats_nick_read(char *chan) {
 			nickname       = (char *) sqlite3_column_text(stmt, 0);
 			nick->lines    = (size_t) sqlite3_column_int(stmt, 1);
 			nick->lasttime = 0;
+			nick->online   = 0; // FIXME: check real status
 			
 			if((nick2 = list_search(nicks2, nickname)))
 				nick->words = nick2->words;

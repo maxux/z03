@@ -11,6 +11,7 @@
 		size_t lines;
 		size_t words;
 		time_t lasttime;
+		int online;
 		
 	} nick_t;
 	

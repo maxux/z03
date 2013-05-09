@@ -189,16 +189,18 @@ void handle_nick(char *data) {
 
 void handle_join(char *data) {
 	char *nick = NULL, *username, *host = NULL, *chan;
+	nick_t *nickdata;
+	channel_t *channel;
 	
 	chan = skip_header(data);
 	
 	/* Extracting data */
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
-		printf("[-] lib/Join: Extract data info failed\n");
+		printf("[-] lib/join: extract data info failed\n");
 		return;
 	}
 	
-	printf("[+] lib/Join: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
+	printf("[+] lib/join: nick: <%s>, username: <%s>, host: <%s>\n", nick, username, host);
 	
 	/* Check Nick Length */
 	if(!nick_length_check(nick, chan)) {
@@ -208,6 +210,13 @@ void handle_join(char *data) {
 		
 		// check if there is pending notes
 		__action_notes_checknew(chan, nick);
+		
+		if((channel = list_search(global_lib.channels, chan))) {
+			printf("[+] lib/join: setting %s online\n", nick);
+			
+			if((nickdata = list_search(channel->nicks, nick)))
+				nickdata->online = 1;
+		}
 	}
 	
 	// check if the user is known
@@ -239,26 +248,57 @@ void handle_kick(char *data) {
 
 void handle_part(char *data) {
 	char *nick = NULL, *username, *host = NULL, *chan;
+	channel_t *channel;
+	nick_t *nickdata;
 	
-	if(!(chan = strstr(data, "PART #"))) {
-		printf("[-] lib/Part: cannot get channel\n");
-		return;
-	}
-	
-	chan += 5;
+	chan = string_index(data, 2);
 	
 	/* Extracting data */
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
-		printf("[-] lib/Part: Extract data info failed\n");
+		printf("[-] lib/Part: extract data info failed\n");
+		free(chan);
 		return;
 	}
 	
-	printf("[+] lib/Part: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
+	printf("[+] lib/part: channel: %s, nick: %s\n", chan, nick);
 	
 	/* Checking if it's the bot itself */
 	if(!strcmp(nick, IRC_NICK)) {
-		printf("[+] lib/Part: cleaning <%s> environment...\n", chan);
+		printf("[+] lib/part: cleaning %s environment...\n", chan);
 		list_remove(global_lib.channels, chan);
+		
+	} else if((channel = list_search(global_lib.channels, chan))) {
+		printf("[+] lib/part: setting %s from %s: offline\n", nick, chan);
+		if((nickdata = list_search(channel->nicks, nick)))
+			nickdata->online = 0;
+	}
+	
+	free(chan);
+	free(username);
+	free(host);
+	free(nick);
+}
+
+void handle_quit(char *data) {
+	char *nick = NULL, *username, *host = NULL;
+	nick_t *nickdata;
+	list_node_t *node;
+	
+	/* Extracting data */
+	if(!irc_extract_userdata(data, &nick, &username, &host)) {
+		printf("[-] lib/Part: extract data info failed\n");
+		return;
+	}
+	
+	printf("[+] lib/quit: Nick: <%s>, Username: <%s>, Host: <%s>\n", nick, username, host);
+	
+	node = global_lib.channels->nodes;
+	while(node) {
+		printf("[+] lib/quit: removing %s from %s\n", nick, node->name);
+		if((nickdata = list_search(((channel_t *) node->data)->nicks, nick)))
+			nickdata->online = 0;
+		
+		node = node->next;
 	}
 	
 	free(username);
@@ -528,6 +568,11 @@ void main_core(char *data, char *request) {
 	
 	if(!strncmp(request, "PART", 4)) {
 		handle_part(data + 1);
+		return;
+	}
+	
+	if(!strncmp(request, "QUIT", 4)) {
+		handle_quit(data + 1);
 		return;
 	}
 	
