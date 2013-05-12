@@ -387,7 +387,7 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 				if(!strstr(host, __title_host_exceptions[i])) {
 					printf("[-] urlmanager/repost: title match disabled for host <%s>\n", host);
 					free(host);
-					break;
+					return;
 				}
 			}
 			
@@ -727,7 +727,9 @@ char * url_extract_title(char *body, char *title) {
 		while(*read != '>')
 			read++;
 			
-		end = strcasestr(++read, "</title>");
+		if(!(end = strcasestr(++read, "</")))
+			return NULL;
+			
 		*end = '\0';
 		
 		title = rtrim(ltrim(crlftrim(read)));

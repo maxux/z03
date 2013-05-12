@@ -89,7 +89,7 @@ void periodic_whatcd() {
 
 void *periodic_each_minutes(void *dummy) {
 	while(1) {
-		sleep(60);
+		sleep(360);
 		
 		printf("[+] periodic/minute: starting cycle\n");
 		global_core->extraclient++;
