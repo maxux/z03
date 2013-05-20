@@ -9,6 +9,7 @@
 	typedef struct whatcd_release_t {		
 		double torrentid;
 		double groupid;
+		char *artist;
 		char *groupname;
 		char *format;
 		char *media;
@@ -16,6 +17,12 @@
 		int unread;
 		
 	} whatcd_release_t;
+	
+	typedef struct whatcd_torrent_t {
+		unsigned int id;
+		char *artist;
+		
+	} whatcd_torrent_t;
 	
 	typedef struct whatcd_request_t {
 		char *error;

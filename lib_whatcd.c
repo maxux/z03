@@ -30,6 +30,9 @@
 #include "lib_whatcd.h"
 #include "lib_entities.h"
 
+/*
+ * whatcd main structure
+ */
 whatcd_t *whatcd_new(char *session) {
 	whatcd_t *whatcd;
 	
@@ -51,6 +54,9 @@ void whatcd_free(whatcd_t *whatcd) {
 	free(whatcd);
 }
 
+/*
+ * whatcd release (torrent)
+ */
 whatcd_release_t *whatcd_release_new() {
 	return calloc(1, sizeof(whatcd_release_t));
 }
@@ -58,13 +64,17 @@ whatcd_release_t *whatcd_release_new() {
 void whatcd_release_free(whatcd_release_t *release) {
 	if(!release)
 		return;
-		
+	
+	free(release->artist);	
 	free(release->groupname);
 	free(release->format);
 	free(release->media);
 	free(release);
 }
 
+/*
+ * general request structure
+ */
 whatcd_request_t *whatcd_request_new() {
 	return calloc(1, sizeof(whatcd_request_t));
 }
@@ -80,6 +90,24 @@ void whatcd_request_free(whatcd_request_t *request) {
 	free(request);
 }
 
+/*
+ * whatcd torrent detail
+ */
+whatcd_torrent_t *whatcd_torrent_new() {
+	return calloc(1, sizeof(whatcd_torrent_t));
+}
+
+void whatcd_torrent_free(whatcd_torrent_t *torrent) {
+	if(!torrent)
+		return;
+	
+	free(torrent->artist);
+	free(torrent);
+}
+
+/*
+ * json global error setter and cleaner
+ */
 static json_t *whatcd_json_error(json_t *root, char *error, whatcd_request_t *request) {
 	request->error = strdup(error);
 	json_decref(root);
@@ -91,6 +119,10 @@ static whatcd_request_t *whatcd_json_parse_error(char *error, whatcd_request_t *
 	return request;
 }
 
+/*
+ * read a whatcd json data and check if it's a valid json
+ * parse status and return a json_t on response
+ */
 static json_t *whatcd_json_load(char *json, size_t length, whatcd_request_t *request) {
 	json_t *root, *status;
 	json_error_t error;
@@ -119,6 +151,101 @@ static json_t *whatcd_json_load(char *json, size_t length, whatcd_request_t *req
 		return whatcd_json_error(root, "response is not an object", request);
 	
 	return root;
+}
+
+
+static whatcd_torrent_t *whatcd_torrent_json(json_t *item, whatcd_torrent_t *torrent) {
+	json_t *data, *artist;
+	
+	data = json_object_get(item, "id");
+	if(json_is_number(data))
+		torrent->id = json_number_value(data);
+	
+	data = json_object_get(item, "musicInfo");
+	if(!json_is_object(data)) {
+		fprintf(stderr, "[-] whatcd/torrent: musicInfo not found\n");
+		return torrent;
+	}
+	
+	data = json_object_get(data, "artists");
+	if(!json_is_array(data)) {
+		fprintf(stderr, "[-] whatcd/torrent: artists is not a array\n");
+		return torrent;
+	}
+	
+	artist = json_array_get(data, 0);
+	if(!json_is_object(artist)) {
+		fprintf(stderr, "[-] whatcd/torrent: artist not found\n");
+		return torrent;
+	}
+
+	data = json_object_get(artist, "name");
+	if(!json_is_string(data)) {
+		fprintf(stderr, "[-] whatcd/torrent: artist name is not a string\n");
+		return torrent;
+	}
+	
+	torrent->artist = strdup(json_string_value(data));
+	decode_html_entities_utf8(torrent->artist, torrent->artist);
+	
+	printf("<%s>\n", torrent->artist);
+
+	return torrent;
+}
+
+static whatcd_request_t *whatcd_torrent_parse(json_t *response, whatcd_t *whatcd, whatcd_request_t *request) {
+	json_t *group;
+	whatcd_torrent_t *torrent;
+	(void) whatcd;
+	
+	/* building list */
+	if(!(request->response = list_init((void (*)(void *)) whatcd_torrent_free)))
+		return NULL;
+	
+	if(!json_is_object((group = json_object_get(response, "group"))))
+		return whatcd_json_parse_error("group is not an object", request);
+		
+	torrent = whatcd_torrent_new();
+	torrent = whatcd_torrent_json(group, torrent);
+	
+	list_append(request->response, "group", torrent);
+	
+	return request;
+}
+
+whatcd_request_t *whatcd_torrent(whatcd_t *whatcd, int tid) {
+	whatcd_request_t *request;
+	curl_data_t *curl;
+	char cookie[2048], url[256];
+	json_t *root, *response;
+	
+	if(!(request = whatcd_request_new()))
+		return NULL;
+	
+	/* downloading json */
+	if(!(curl = curl_data_new()))
+		return NULL;
+	
+	zsnprintf(url, WHATCD_API_BASE "torrent&id=%d", tid);
+	
+	zsnprintf(cookie, "session=%s", whatcd->session);
+	curl->cookie = cookie;
+	
+	if(curl_download_text(url, curl)) {
+		fprintf(stderr, "[-] whatcd/torrent: curl data seems empty\n");
+		return NULL;
+	}
+	
+	if((root = whatcd_json_load(curl->data, curl->length, request))) {
+		response = json_object_get(root, "response");
+		request = whatcd_torrent_parse(response, whatcd, request);
+		json_decref(root);
+		
+	} else fprintf(stderr, "[-] whatcd/torrent: error: %s\n", request->error);
+	
+	curl_data_free(curl);
+	
+	return request;
 }
 
 static whatcd_release_t *whatcd_release_json(json_t *item, whatcd_release_t *release) {
@@ -157,24 +284,17 @@ static whatcd_release_t *whatcd_release_json(json_t *item, whatcd_release_t *rel
 	return release;
 }
 
-static whatcd_request_t *whatcd_notification_parse(json_t *response, whatcd_request_t *request) {
+static whatcd_request_t *whatcd_notification_parse(json_t *response, whatcd_t *whatcd, whatcd_request_t *request) {
 	json_t *check, *notif;
 	whatcd_release_t *release;
+	whatcd_torrent_t *torrent;
+	whatcd_request_t *torrentreq;
 	unsigned int remain;
 	char id[32];
 	
 	/* building list */
 	if(!(request->response = list_init((void (*)(void *)) whatcd_release_free)))
 		return NULL;
-	
-	/* checking is there is new notifications */
-	/* check = json_object_get(response, "numNew");
-	if(json_is_integer(check)) {
-		if(!(newnotif = json_integer_value(check))) {
-			printf("[+] whatcd/notification: no new notifications\n");
-			// return request;
-		}
-	} */
 	
 	if(!json_is_array((check = json_object_get(response, "results"))))
 		return whatcd_json_parse_error("results is not an array", request);
@@ -188,10 +308,18 @@ static whatcd_request_t *whatcd_notification_parse(json_t *response, whatcd_requ
 		release = whatcd_release_new();
 		release = whatcd_release_json(notif, release);
 		
+		/* request artist name if new notification */
+		if(release->unread) {
+			torrentreq = whatcd_torrent(whatcd, release->torrentid);
+			torrent = (whatcd_torrent_t *) list_search(torrentreq->response, "group");
+			release->artist = strdup(torrent->artist);
+			whatcd_request_free(torrentreq);
+		}
+		
 		sprintf(id, "%d", remain);		
 		list_append(request->response, id, release);
 		
-		printf("[+] whatcd/notification: [%d] %s\n", release->unread, release->groupname);
+		printf("[+] whatcd/notification: [%d] %s - %s\n", release->unread, release->artist, release->groupname);
 	}
 	
 	return request;
@@ -215,12 +343,14 @@ whatcd_request_t *whatcd_notification(whatcd_t *whatcd) {
 	zsnprintf(cookie, "session=%s", whatcd->session);
 	curl->cookie = cookie;
 	
-	if(curl_download_text(url, curl))
+	if(curl_download_text(url, curl)) {
+		fprintf(stderr, "[-] whatcd/notifications: curl data seems empty\n");
 		return NULL;
+	}
 	
 	if((root = whatcd_json_load(curl->data, curl->length, request))) {
 		response = json_object_get(root, "response");
-		request = whatcd_notification_parse(response, request);
+		request = whatcd_notification_parse(response, whatcd, request);
 		json_decref(root);
 		
 	} else fprintf(stderr, "[-] whatcd/notifications: error: %s\n", request->error);

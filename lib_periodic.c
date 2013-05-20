@@ -49,8 +49,10 @@ void periodic_whatcd() {
 			output = node->name;
 		
 		/* notification failed */
-		if(!(request = whatcd_notification(whatcd)))
+		if(!(request = whatcd_notification(whatcd))) {
+			irc_notice(node->name, "cannot grab your notifications, please check your whatcd session");
 			goto next_node;
+		}
 		
 		if(request->error) {
 			printf("[-] periodic/whatcd: error: %s\n", request->error);
@@ -67,9 +69,9 @@ void periodic_whatcd() {
 				continue;
 				
 			zsnprintf(buffer,
-				  "%s: [%s/%s] %s (%.2f Mo): " WHATCD_TORRENT "%.0f&torrentid=%.0f",
+				  "%s: [%s/%s] %s - %s (%.2f Mo): " WHATCD_TORRENT "%.0f&torrentid=%.0f",
 				  node->name,
-				  release->format, release->media, release->groupname, 
+				  release->format, release->media, release->artist, release->groupname, 
 				  release->size / 1024 / 1024, release->groupid,
 				  release->torrentid
 			);

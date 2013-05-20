@@ -277,6 +277,7 @@ void action_url(ircmessage_t *message, char *args) {
 	struct tm * timeinfo;
 	char date[128], *url_nick;
 	int row, len;
+	char *titlehl;
 	
 	if(!action_parse_args(message, args))
 		return;
@@ -304,13 +305,17 @@ void action_url(ircmessage_t *message, char *args) {
 			
 			url_nick = (char *) malloc(sizeof(char) * strlen((char *) nick) + 4);
 			strcpy(url_nick, nick);
+			
+			if(!(titlehl = anti_hl_each_words(title, strlen(title), UTF_8)))
+				continue;
 				
 			len = strlen(url) + strlen(title) + strlen(nick) + 128;
 			output = (char *) malloc(sizeof(char) * len);
-				
-			snprintf(output, len, "PRIVMSG %s :[%s] <%s> %s | %s", message->chan, date, anti_hl(url_nick), url, title);
-			raw_socket(output);
 			
+			snprintf(output, len, "[%s] <%s> %s | %s", date, anti_hl(url_nick), url, titlehl);
+			irc_privmsg(message->chan, output);
+			
+			free(titlehl);
 			free(output);
 			free(url_nick);
 		}

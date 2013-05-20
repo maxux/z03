@@ -384,7 +384,7 @@ void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t
 				break;
 			
 			for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++) {
-				if(!strstr(host, __title_host_exceptions[i])) {
+				if(strstr(host, __title_host_exceptions[i])) {
 					printf("[-] urlmanager/repost: title match disabled for host <%s>\n", host);
 					free(host);
 					return;

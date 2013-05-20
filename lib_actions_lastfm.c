@@ -33,11 +33,21 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	lastfm_request_t *request;
 	lastfm_t *lastfm;
 	char date[128], *userlist;
+	char *temp = NULL, *user2 = NULL;
 	struct tm *timeinfo;
 	list_t *backlog;
 	
 	if(strlen((args = action_check_args(args)))) {
 		user = args;
+	
+	// check if it's a settings to grab
+	if(!strncmp(user, "$(", 2) && (temp = strchr(user, ')'))) {
+		temp = strndup(user + 2, temp - user - 2);
+		if((user2 = settings_get(temp, "lastfm", PUBLIC)))
+			user = user2;
+		
+		free(temp);
+	}
 		
 	} else if(!(user = settings_get(message->nick, "lastfm", PUBLIC))) {
 		irc_privmsg(message->chan, "Lastfm username not set. Please set it with: .set lastfm <username>");
@@ -84,6 +94,7 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	
 	lastfm_request_free(request);
 	lastfm_free(lastfm);
+	free(user2);
 }
 
 void action_lastfmlove(ircmessage_t *message, char *args) {

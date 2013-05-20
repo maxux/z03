@@ -79,15 +79,19 @@ void *lib_run_fork(void *_data) {
 				
 			lib_run_privmsg(data->message, print);
 			
-			if(length++ > 4) {
+			if(!strcmp(data->message->chan, "#test") && length > 8) {
 				lib_run_privmsg(data->message, "Output truncated. Too verbose.");
 				goto eot;
 			}
+			
+			if(strcmp(data->message->chan, "#test") && length > 1)
+				goto eot;
 			
 			if(match)
 				print = match + 1;
 			
 			rlen = 0;
+			length++;
 		}
 	}
 	
