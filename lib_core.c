@@ -387,6 +387,11 @@ int handle_message(char *data, ircmessage_t *message) {
 		return 0;
 	}
 	
+	if(strstr(data, "une kernel") || strstr(data, "la kernel") || strstr(data, "kernelle")) {
+		irc_kick(message->chan, message->nick, "On dit *un* *kernel*, espèce d'yllaytray");
+		return 0;
+	}
+	
 	/* Updating channel lines count */
 	if(progression_match(++message->channel->lines)) {
 		snprintf(buffer, sizeof(buffer), "Well done, we just reached %u lines !\n", message->channel->lines);
