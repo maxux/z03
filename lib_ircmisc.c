@@ -55,7 +55,7 @@ inline short utf8_charlen(unsigned char c) {
 	if((c & 0xf8) == 0xf0 && (c <= 0xf4))
 		return 4;         /* 11110xxx */
 		
-	return 0; /* invalid UTF8 */
+	return 0; /* invalid utf-8 */
 }
 
 inline size_t chrcpy_utf8(char *dst, char *src) {
@@ -163,7 +163,7 @@ char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	
 	/* \u200b is 3 bytes length, str is normally not long, just allocating 3x */
 	allocation = ((len * 3) + 8);
-	printf("[.] AntiHL: Allocating: %u bytes (original: %u)\n", allocation, len);
+	printf("[.] hl-protect/eachwords: allocating: %u bytes (original: %u)\n", allocation, len);
 	
 	stripped = (char *) malloc(sizeof(char) * allocation);
 	bzero(stripped, allocation);
@@ -197,20 +197,25 @@ char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	
 	write = stripped;
 	
-	// debug(read, strlen(read));
+	/* debug(read, strlen(read)); */
 	
-	// Escape first word
+	/* escape first word */
 	if(*read && *read != '&')
 		anti_hl_append(&write, &read);
 	
 	while(*read) {
-		s = chrcpy_utf8(write, read);
+		// avoid infinite loop, skip wrong char
+		if(!(s = chrcpy_utf8(write, read))) {
+			read++;
+			continue;
+		}
+			
 		write += s;
 		
-		// If space, and next is valid, and next is not space (avoid ' - ')
-		// Skip if contains & (html entities)
+		// if space, and next is valid, and next is not space (avoid ' - ')
+		// skip if contains & (html entities)
 		if(*read == ' ' && *(read + 1) && *(read + 1) != '&' && *(read + 2) && *(read + 2) != ' ') {
-			// Copy Space
+			// copy space
 			*write = *read++;
 			anti_hl_append(&write, &read);
 			
@@ -221,7 +226,7 @@ char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	
 	// debug(stripped, allocation);
 	
-	printf("[.] AntiHL: <%s>\n", stripped);
+	printf("[.] hl-protect/eachwords: <%s>\n", stripped);
 	
 	/* Freeing "convert", should be NULL if not converted */
 	free(convert);

@@ -30,13 +30,14 @@
 #include "lib_settings.h"
 #include "lib_whatcd.h"
 
-void periodic_whatcd() {
+void periodic_whatcd(list_t *tracking) {
 	whatcd_t *whatcd;
 	whatcd_request_t *request;
 	list_node_t *node, *node2;
 	whatcd_release_t *release;
 	char buffer[2048], *output;
 	list_t *users;
+	int *trackval; /* store value for check how many errors/users waz */
 	
 	if(!(users = settings_by_key("whatsession", PRIVATE)))
 		return;
@@ -45,12 +46,25 @@ void periodic_whatcd() {
 	while(node) {
 		whatcd = whatcd_new((char *) node->data);
 		
+		/* load error count */
+		if(!(trackval = (int *) list_search(tracking, node->name))) {
+			trackval = (int *) calloc(1, sizeof(int));
+			list_append(tracking, node->name, trackval);
+		}
+		
 		if(!(output = settings_get(node->name, "whatchan", PUBLIC)))
 			output = node->name;
 		
 		/* notification failed */
 		if(!(request = whatcd_notification(whatcd))) {
-			irc_notice(node->name, "cannot grab your notifications, please check your whatcd session");
+			printf("[-] periodic/whatcd: trackval error count for %s: %d\n", node->name, ++*trackval);
+			
+			if(*trackval == 4)
+				irc_notice(node->name, "cannot grab your notifications, please check your whatcd session");
+			
+			if(*trackval == 50)
+				irc_notice(node->name, "whatcd session seems really down, please check your whatcd session or unset it with: .unset whatsession");
+				
 			goto next_node;
 		}
 		
@@ -77,6 +91,7 @@ void periodic_whatcd() {
 			);
 			
 			irc_privmsg(output, buffer);
+			*trackval = 0;
 		}
 		
 		next_node:
@@ -90,13 +105,21 @@ void periodic_whatcd() {
 }
 
 void *periodic_each_minutes(void *dummy) {
+	list_t *tracking;
+	
+	// FIXME: add destructor
+	if(!(tracking = list_init(NULL))) {
+		fprintf(stderr, "[-] periodic: cannot init list\n");
+		return dummy;
+	}
+	
 	while(1) {
 		sleep(360);
 		
 		printf("[+] periodic/minute: starting cycle\n");
 		global_core->extraclient++;
 		
-		periodic_whatcd();
+		periodic_whatcd(tracking);
 		
 		global_core->extraclient--;
 		printf("[+] periodic/minute: end of cycle\n");

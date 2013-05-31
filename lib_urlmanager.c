@@ -61,7 +61,11 @@ char *__user_agent_hosts[] = {
 };
 
 char *__title_host_exceptions[] = {
-	"facebook.com", "imgur.com", "soundcloud.com", "ecolevirtuelle.provincedeliege.be"
+	"facebook.com",
+	"imgur.com",
+	"soundcloud.com",
+	"ecolevirtuelle.provincedeliege.be",
+	"gifsound.com",
 };
 
 char *extract_url(char *url) {
@@ -115,7 +119,7 @@ char *curl_useragent(char *url) {
 	
 	/* Checking host */
 	if((host = curl_gethost(url))) {
-		printf("[+] CURL/Init: host is <%s>\n", host);
+		printf("[+] urlmanager/host: <%s>\n", host);
 		
 		for(i = 0; i < sizeof(__user_agent_hosts) / sizeof(char *); i++) {
 			if(!strcmp(host, __user_agent_hosts[i]))
@@ -125,7 +129,7 @@ char *curl_useragent(char *url) {
 		free(host);
 	}
 	
-	printf("[+] CURL/UserAgent: <%s>\n", useragent);
+	printf("[+] urlmanager/useragent: <%s>\n", useragent);
 	
 	return useragent;
 }
@@ -139,7 +143,7 @@ char *curl_cookie(char *url) {
 	
 	for(i = 0; __host_cookies[i].host; i++) {
 		if(strstr(host, __host_cookies[i].host)) {
-			printf("[ ] URL/Cookie: cookie %s (%s) found\n", __host_cookies[i].host, host);
+			printf("[ ] urlmanager/cookie: cookie %s (%s) found\n", __host_cookies[i].host, host);
 			cookie = __host_cookies[i].cookie;
 			break;
 		}
@@ -157,27 +161,27 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	if(!(size * nmemb))
 		return 0;
 	
-	printf("[ ] CURL/Header: %s", ptr);
+	printf("[ ] urlmanager/header: %s", ptr);
 	
 	if(!strncasecmp(ptr, "Content-Type: ", 14)) {
 		free(curl->http_type);
 		curl->http_type = NULL;
 			
 		if(!strncmp(ptr + 14, "image/", 6)) {
-			printf("[+] CURL/Header: <image> mime type detected\n");
+			printf("[+] urlmanager/header: <image> mime type detected\n");
 			curl->type = IMAGE_ALL;
 			
 			return size * nmemb;
 		}
 		
 		if(!strncmp(ptr + 14, "text/html", 9)) {
-			printf("[+] CURL/Header: <text/html> mime type detected\n");
+			printf("[+] urlmanager/header: <text/html> mime type detected\n");
 			curl->type = TEXT_HTML;
 			
 			return size * nmemb;
 		}
 		
-		printf("[ ] CURL/Header: match: %s", ptr);
+		printf("[ ] urlmanager/header: match: %s", ptr);
 		
 		/* ignoring anything else */
 		curl->type = UNKNOWN_TYPE;
@@ -188,12 +192,12 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 		strcpy(curl->http_type, ptr + 14);
 		curl->http_type[len - 2] = '\0';
 		
-		printf("[-] CURL/Header: unhandled mime type: <%s>\n", curl->http_type);
+		printf("[-] urlmanager/header: unhandled mime type: <%s>\n", curl->http_type);
 	}
 	
 	if(!strncasecmp(ptr, "Content-Length: ", 16)) {
 		curl->http_length = atoll(ptr + 16);
-		printf("[+] CURL/Header: length %d bytes\n", curl->http_length);
+		printf("[+] urlmanager/header: length %d bytes\n", curl->http_length);
 	}
 
 	/* Return required by libcurl */
@@ -252,7 +256,7 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 	// FIXME: set it in other way
 	data->forcedl = forcedl;
 	
-	printf("[+] CURL: %s, force dl: %d\n", url, data->forcedl);
+	printf("[+] urlmanager/curl: %s, force dl: %d\n", url, data->forcedl);
 	
 	useragent = curl_useragent(url);
 	
@@ -278,12 +282,12 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		if(post) {
 			curl_easy_setopt(curl, CURLOPT_POST, 1);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
-			printf("[+] CURL/post: <%s>\n", post);
+			printf("[+] urlmanager/post: <%s>\n", post);
 		}
 		
 		/* Checking Host for specific Cookies */
 		if(data->cookie) {
-			printf("[ ] CURL/cookie: %s\n", data->cookie);
+			printf("[ ] urlmanager/cookie: %s\n", data->cookie);
 			curl_easy_setopt(curl, CURLOPT_COOKIE, data->cookie);
 			
 		} else if((cookie = curl_cookie(url)))
@@ -292,18 +296,18 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		data->curlcode = curl_easy_perform(curl);
 		
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
-		printf("[ ] CURL: code: %ld\n", data->code);
+		printf("[ ] urlmanager/curl: code: %ld\n", data->code);
 		
 		curl_easy_cleanup(curl);
 		
 		if(!data->data && !data->http_length) {
-			fprintf(stderr, "[-] CURL: data is empty.\n");
+			fprintf(stderr, "[-] urlmanager/curl: data is empty.\n");
 			return 1;
 		}
 		
 		if(data->type == TEXT_HTML) {
 			data->charset = url_extract_charset(data->data);
-			printf("[ ] CURL: charset: %d\n", data->charset);
+			printf("[ ] urlmanager/curl: charset: %d\n", data->charset);
 		}
 		
 	} else return 1;
@@ -410,15 +414,15 @@ void check_round_count(ircmessage_t *message) {
 	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
 	
 	if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+		fprintf(stderr, "[-] url parser: cannot select url\n");
 		
 	if((sqlite3_step(stmt)) == SQLITE_ROW) {
 		urls = sqlite3_column_int(stmt, 0);
 		
-		printf("[ ] URL: %d\n", urls);
+		printf("[ ] urlmanager/count: %d\n", urls);
 		if(urls % 500 == 0) {
-			sprintf(msg, "PRIVMSG %s :We just reached %d urls !", message->chan, urls);
-			raw_socket(msg);
+			zsnprintf(msg, "We just reached %d urls !", urls);
+			irc_privmsg(message->chan, msg);
 		}
 	}
 	
@@ -436,7 +440,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	printf("[+] URL Parser: %s\n", url);
 		
 	if(strlen(url) > 256) {
-		printf("[-] URL Parser: URL too long...\n");
+		printf("[-] urlmanager/parser: url too long...\n");
 		return 2;
 	}
 	
@@ -446,7 +450,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	);
 	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL) {
-		fprintf(stderr, "[-] URL Parser: cannot select url\n");
+		fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
 		return 1;
 	}
 	
@@ -464,7 +468,7 @@ int handle_url(ircmessage_t *message, char *url) {
 			
 		match = 1;
 		
-		printf("[+] URL Parser: URL already on database, updating...\n");
+		printf("[+] urlmanager/parser: url already on database, updating...\n");
 		sqlquery = sqlite3_mprintf("UPDATE url SET hit = hit + 1 WHERE id = %d", id);
 		
 	} else {
@@ -477,7 +481,7 @@ int handle_url(ircmessage_t *message, char *url) {
 	}
 	
 	if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-		printf("[-] URL Parser: cannot update db\n");
+		printf("[-] urlmanager/parser: cannot update db\n");
 	
 	/* Clearing */
 	sqlite3_free(sqlquery);
@@ -506,7 +510,7 @@ char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
 int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	curl_data_t *curl;
 	char *title = NULL, *stripped = NULL;
-	char *strcode, temp[256];
+	char temp[256];
 	unsigned int len;
 	char *sqlquery, *request;
 	sqlite3_stmt *stmt;
@@ -523,8 +527,8 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	if(curl_download(url, curl, 0))
 		printf("[-] Warning: special download\n");
 		
-	printf("[+] Downloaded Length: %d\n", curl->length);
-	printf("[+] Downloaded Type  : %d\n", curl->type);
+	printf("[+] urlmanager/downloaded length: %d\n", curl->length);
+	printf("[+] urlmanager/downloaded type: %d\n", curl->type);
 	// printf("%s\n", curl->data);
 	
 	// Write error occure on data file
@@ -537,7 +541,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 	}
 	
 	if(!curl->data && !curl->http_length) {
-		fprintf(stderr, "[-] URL/Dispatch: data is empty, this should not happen\n");
+		fprintf(stderr, "[-] urlmanager/dispatch: data is empty, this should not happen\n");
 		curl_data_free(curl);
 		return 2;
 	}
@@ -562,17 +566,16 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			len = strlen(title) + 256;
 			request = (char *) malloc(sizeof(char) * len);
 			
-			if(curl->code == 404)
-				strcode = " (Error 404)";
-				
-			else strcode = "";
-			
 			/* Notify Title */
 			stripped = anti_hl_each_words(title, strlen(title), curl->charset);
 			decode_html_entities_utf8(stripped, NULL);
 			
-			snprintf(request, len, "PRIVMSG %s :URL%s: %s", message->chan, strcode, stripped);
-			raw_socket(request);
+			if(curl->code != 200)
+				snprintf(request, len, "URL (Error: %ld): %s", curl->code, stripped);
+				
+			else snprintf(request, len, "URL: %s\n", stripped);
+			
+			irc_privmsg(message->chan, request);
 			
 			/* Check Title Repost */
 			// redecoding entities for clear title update
@@ -588,7 +591,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			);
 			
 			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
-				fprintf(stderr, "[-] URL Parser: cannot select url\n");
+				fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
 			
 			if(sqlite3_step(stmt) == SQLITE_ROW) {
 				// Skip repost from same nick
@@ -607,7 +610,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			
 			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
 			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-				printf("[-] URL Parser: cannot update db\n");
+				printf("[-] urlmanager/parser: cannot update db\n");
 			
 			/* Clearing */
 			sqlite3_free(sqlquery);
@@ -615,17 +618,16 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			free(stripped);
 			free(request);
 			
-		} else printf("[-] URL: Cannot extract title\n");
+		} else printf("[-] urlmanager/parser: cannot extract title\n");
 		
 	} else if(curl->type == IMAGE_ALL) {
 		if(curl->http_length > CURL_MAX_SIZE) {
 			zsnprintf(temp,
-				"PRIVMSG %s :(Warning: image size: %u Mo)",
-				message->chan,
+				"(Warning: image size: %u Mo)",
 				curl->http_length / 1024 / 1024
 			);
 			
-			raw_socket(temp);
+			irc_privmsg(message->chan, temp);
 			
 			return 1;
 		}
@@ -640,7 +642,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			);
 			
 			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-				printf("[-] URL Parser: cannot update db\n");
+				printf("[-] urlmanager/parser: cannot update db\n");
 				
 			/* Clearing */
 			sqlite3_free(sqlquery);
@@ -656,7 +658,7 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 			);
 			
 			if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
-				fprintf(stderr, "[-] URL Parser: cannot select url\n");
+				fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
 				
 			while(sqlite3_step(stmt) == SQLITE_ROW) {
 				/* Skip repost from same nick */
@@ -680,13 +682,11 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 		
 	} else if(curl->type == UNKNOWN_TYPE) {
 		zsnprintf(temp,
-			"PRIVMSG %s :Content: %s (%.2f Mo)",
-			message->chan, 
-			curl->http_type, 
+			"Content: %s (%.2f Mo)", curl->http_type,
 			(double) curl->http_length / 1024 / 1024
 		);
 		
-		raw_socket(temp);
+		irc_privmsg(message->chan, temp);
 	}
 	
 	curl_data_free(curl);
@@ -715,7 +715,7 @@ int handle_url_image(char *url, curl_data_t *curl) {
 	
 	fclose(fp);
 	
-	printf("[+] Image/CURL: File saved (%d / %s)\n", curl->length, temp);
+	printf("[+] urlmanager/image: file saved (%d / %s)\n", curl->length, temp);
 	
 	return 0;
 }
@@ -740,7 +740,7 @@ char * url_extract_title(char *body, char *title) {
 		if(!strlen(title))
 			return NULL;
 			
-		printf("[+] Title: <%s>\n", title);
+		printf("[+] urlmanager/title: <%s>\n", title);
 		
 	} else return NULL;
 	
@@ -767,7 +767,7 @@ charset_t url_extract_charset(char *body) {
 			if(!strncasecmp(charset, "windows-1252", 5) || !strncasecmp(charset + 1, "windows-1252", 5))
 				return WIN_1252;
 			
-			printf("[ ] Charset: Unknown: <%s>\n", charset);
+			printf("[ ] urlmanager/charset: unknown: <%s>\n", charset);
 		}
 	}
 	
@@ -799,7 +799,7 @@ char * shurl(char *url) {
 	
 	curl_data_free(curl);
 	
-	printf("[+] Shurl: <%s>\n", request);
+	printf("[+] urlmanager/shurl: <%s>\n", request);
 	
 	return request;
 }

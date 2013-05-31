@@ -286,7 +286,7 @@ void handle_quit(char *data) {
 	
 	/* Extracting data */
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
-		printf("[-] lib/Part: extract data info failed\n");
+		printf("[-] lib/quit: extract data info failed\n");
 		return;
 	}
 	
@@ -384,12 +384,17 @@ int handle_message(char *data, ircmessage_t *message) {
 	/* Temp FIXME: for T4g1 */
 	if(strstr(data, "mére")) {
 		irc_kick(message->chan, message->nick, "ta mére ouais");
-		return 0;
+		// return 0;
 	}
 	
 	if(strstr(data, "une kernel") || strstr(data, "la kernel") || strstr(data, "kernelle")) {
 		irc_kick(message->chan, message->nick, "On dit *un* *kernel*, espèce d'yllaytray");
-		return 0;
+		// return 0;
+	}
+	
+	if(strstr(data, "boiler")) {
+		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
+		// return 0;
 	}
 	
 	/* Updating channel lines count */

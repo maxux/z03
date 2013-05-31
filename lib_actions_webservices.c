@@ -201,4 +201,5 @@ void action_whatcd(ircmessage_t *message, char *args) {
 		return;
 		
 	settings_set(message->nick, "whatsession", args, PRIVATE);
+	irc_notice(message->nick, "what.cd session set");
 }
