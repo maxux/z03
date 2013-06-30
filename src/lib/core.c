@@ -392,7 +392,14 @@ int handle_message(char *data, ircmessage_t *message) {
 		// return 0;
 	}
 	
-	if(strstr(data, "boiler")) {
+	if(!strncasecmp(message->nick, "malabar", 7) && (
+		strstr(data, "boiler") ||
+		strstr(data, "b0iler") ||
+		strstr(data, "bo!ler") ||
+		strstr(data, "Boiler") ||
+		strstr(data, "B0iler") ||
+		strstr(data, "Bo!l3r")
+	)) {
 		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
 		// return 0;
 	}

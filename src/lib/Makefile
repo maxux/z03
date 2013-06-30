@@ -12,7 +12,7 @@ options: config.mk
 	@echo "EXTRA   = $(EXTRA_CFLAGS)"
 
 $(EXEC): $(OBJ)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $(BINPATH)$@ $^ $(LDFLAGS)
 	
 $(OBJ): $(SRC)
 	$(CC) -c $(CFLAGS) $(EXTRA_CFLAGS) $*.c

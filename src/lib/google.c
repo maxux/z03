@@ -102,7 +102,7 @@ char *google_calc(char *keywords) {
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
-	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//h2[@class='r']", ctx);
+	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_ans vk_bk']", ctx);
 	
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		for(i = 0; i < xpathObj->nodesetval->nodeNr; i++) {

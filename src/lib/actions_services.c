@@ -119,13 +119,3 @@ void action_notes(ircmessage_t *message, char *args) {
 	
 	sqlite3_free(sqlquery);
 }
-
-void action_ghost(ircmessage_t *message, char *args) {
-	char request[1024];
-	
-	if(!action_parse_args(message, args))
-		return;
-	
-	zsnprintf(request, "ghost %s %s", message->nick, args);
-	irc_privmsg("nickserv", request);
-}

@@ -26,7 +26,6 @@
 #include "actions.h"
 #include "ircmisc.h"
 #include "weather.h"
-#include "somafm.h"
 #include "google.h"
 #include "wiki.h"
 #include "whatcd.h"
@@ -65,41 +64,6 @@ void action_weather(ircmessage_t *message, char *args) {
 	
 	weather_handle(message->chan, (weather_stations + id));
 }
-
-void action_somafm(ircmessage_t *message, char *args) {
-	char cmdline[256], *list;
-	unsigned int i;
-	int id = 0;	// default
-	
-	/* Checking arguments */
-	if(*args) {
-		/* Building List */
-		if(!strcmp(args, "list")) {
-			list = somafm_station_list();
-			if(!list)
-				return;
-				
-			zsnprintf(cmdline, "Stations list: %s (Default: %s)",
-			                   list, somafm_stations[id].ref);
-			irc_privmsg(message->chan, cmdline);
-			
-			free(list);
-			
-			return;
-		}
-		
-		/* Searching station */
-		for(i = 0; i < somafm_stations_count; i++) {
-			if(!strncmp(args, somafm_stations[i].ref, strlen(somafm_stations[i].ref))) {
-				id = i;
-				break;
-			}
-		}
-	}
-	
-	somafm_handle(message->chan, (somafm_stations + id));
-}
-
 
 void action_wiki(ircmessage_t *message, char *args) {
 	google_search_t *google;

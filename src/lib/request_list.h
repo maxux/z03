@@ -48,12 +48,6 @@ request_t __request[] = {
 		.hidden   = 0,
 	},
 	{
-		.match    = ".somafm",
-		.callback = action_somafm,
-		.man      = "print the current track on SomaFM radio: .somafm list, .somafm station",
-		.hidden   = 0,
-	},
-	{
 		.match    = ".dns",
 		.callback = action_dns,
 		.man      = "resolve a dns name address: .dns domain-name",
@@ -189,12 +183,6 @@ request_t __request[] = {
 		.match    = ".calc",
 		.callback = action_calc,
 		.man      = "google calculator query",
-		.hidden   = 0,
-	},
-	{
-		.match    = ".ghost",
-		.callback = action_ghost,
-		.man      = "ghost nickserv helper: .ghost nick-to-ghost",
 		.hidden   = 0,
 	},
 	{

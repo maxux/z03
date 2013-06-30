@@ -563,6 +563,10 @@ int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
 		
 		/* Extract title */
 		if((title = url_extract_title(curl->data, title)) != NULL) {
+			if(!strncasecmp(message->nick, "malabar", 7) && 
+			   (strstr(title, "Boiler Room") || strstr(title, "BOILER ROOM")))
+				irc_kick(message->chan, message->nick, "ON S'EN *BRANLE* DE TA PUTAIN DE BOILER ROOM");
+			
 			len = strlen(title) + 256;
 			request = (char *) malloc(sizeof(char) * len);
 			

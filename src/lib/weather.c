@@ -33,6 +33,7 @@
 #include "ircmisc.h"
 
 weather_station_t weather_stations[] = {
+	{.id = 29,  .ref = "liege",        .type = STATION_STATION, .name = "Thier-à-Liège"},
 	{.id = 96,  .ref = "slins",        .type = STATION_STATION, .name = "Slins"},
 	{.id = 125, .ref = "oupeye",       .type = STATION_STATION, .name = "Oupeye"},
 	{.id = 14,  .ref = "lille",        .type = STATION_METAR,   .name = "Lille (France)"},
@@ -47,7 +48,7 @@ weather_station_t weather_stations[] = {
 };
 
 unsigned int weather_stations_count = sizeof(weather_stations) / sizeof(weather_station_t);
-int weather_default_station = 1;
+int weather_default_station = 0;
 
 char *__weather_internal_station_url[] = {
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datametar.php&Itemid=69&id=%d",

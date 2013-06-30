@@ -350,6 +350,7 @@ int main(void) {
 	/* signals */
 	signal_intercept(SIGSEGV, sighandler);
 	signal_intercept(SIGCHLD, sighandler);
+	signal_intercept(SIGPIPE, sighandler);
 	
 	/* Loading dynamic code */
 	loadlib(&codemap);
