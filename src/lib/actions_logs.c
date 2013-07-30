@@ -186,7 +186,9 @@ void action_count(ircmessage_t *message, char *args) {
 	char *sqlquery, *nick;
 	char output[256];
 	int words, lines, twords, tlines;
-	char found = 0;
+	time_t since;
+	struct tm * timeinfo;
+	char found = 0, date[128];
 	
 	if(!strlen((args = action_check_args(args))))
 		nick = message->nick;
@@ -194,13 +196,16 @@ void action_count(ircmessage_t *message, char *args) {
 	else nick = args;
 	
 	sqlquery = sqlite3_mprintf(
-		"SELECT words, lines, ("
-		"   SELECT SUM(words) FROM stats "
-		"    WHERE chan = '%q') as twords, "
-		"    (SELECT COUNT(*) FROM logs "
-		"    WHERE chan = '%q') as tlines "
+		"SELECT words, lines,                        "
+		"    (SELECT SUM(words) FROM stats           "
+		"    WHERE chan = '%q') as twords,           "
+		"    (SELECT COUNT(*) FROM logs              "
+		"    WHERE chan = '%q') as tlines,           "
+		"    (SELECT timestamp FROM logs             "
+		"    WHERE chan = '%q' AND nick = '%q'       "
+		"    ORDER BY timestamp ASC LIMIT 1) as si   "
 		"FROM stats WHERE nick = '%q' AND chan = '%q'",
-		message->chan, message->chan, nick, message->chan
+		message->chan, message->chan, message->chan, nick, nick, message->chan
 	);
 	                           
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
@@ -213,8 +218,12 @@ void action_count(ircmessage_t *message, char *args) {
 		lines  = sqlite3_column_int(stmt, 1);
 		twords = sqlite3_column_int(stmt, 2);
 		tlines = sqlite3_column_int(stmt, 3);
+		since  = (time_t) sqlite3_column_int(stmt, 4);
 		
-		printf("[ ] action/count: %d / %d / %d / %d\n", words, lines, twords, tlines);
+		timeinfo = localtime(&since);
+		strftime(date, sizeof(date), "%d/%m/%Y", timeinfo);
+		
+		printf("[ ] action/count: %d / %d / %d / %d / %lu\n", words, lines, twords, tlines, since);
 		
 		// avoid divide by zero
 		if(tlines && twords) {
@@ -223,11 +232,14 @@ void action_count(ircmessage_t *message, char *args) {
 				
 			else nick = anti_hl(args);
 		
-			zsnprintf(output, "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per lines)",
-			                  nick,
-			                  lines, ((float) lines / tlines) * 100, tlines,
-			                  words, ((float) words / twords) * 100, twords,
-			                  ((float) words / lines));
+			zsnprintf(output,
+			          "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per lines) since %s",
+				  nick,
+				  lines, ((float) lines / tlines) * 100, tlines,
+				  words, ((float) words / twords) * 100, twords,
+				  ((float) words / lines),
+				  date
+			);
 			                  
 			irc_privmsg(message->chan, output);
 		}

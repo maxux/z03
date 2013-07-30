@@ -66,6 +66,7 @@ char *__title_host_exceptions[] = {
 	"soundcloud.com",
 	"ecolevirtuelle.provincedeliege.be",
 	"gifsound.com",
+	"instagr.am",
 };
 
 char *extract_url(char *url) {
