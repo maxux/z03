@@ -3,7 +3,8 @@
 	
 	typedef enum weather_station_type_t {
 		STATION_METAR,
-		STATION_STATION
+		STATION_STATION,
+		STATION_MAXUX
 		
 	} weather_station_type_t;
 	

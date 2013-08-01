@@ -45,6 +45,7 @@ weather_station_t weather_stations[] = {
 	{.id = 13,  .ref = "beauvechain",  .type = STATION_METAR,   .name = "Beauvechain"},
 	{.id = 36,  .ref = "vaux",         .type = STATION_STATION, .name = "Vaux-sous-Chèvremont"},
 	{.id = 59,  .ref = "herve",        .type = STATION_STATION, .name = "Herve (Outre-Cour)"},
+	{.id = 42,  .ref = "maxux",        .type = STATION_MAXUX,   .name = "M​axux (local)"},
 };
 
 unsigned int weather_stations_count = sizeof(weather_stations) / sizeof(weather_station_t);
@@ -52,7 +53,8 @@ int weather_default_station = 0;
 
 char *__weather_internal_station_url[] = {
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datametar.php&Itemid=69&id=%d",
-	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datastation.php&Itemid=69&id=%d&lg=2"
+	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datastation.php&Itemid=69&id=%d&lg=2",
+	"https://www.maxux.net/devs/rasp/z03.php?%d",
 };
 
 int weather_get_station(char *name) {
@@ -159,10 +161,8 @@ int weather_handle(char *chan, weather_station_t *station) {
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//ul[@class='arrow']/li", ctx);
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		snprintf(temp, sizeof(temp), "PRIVMSG %s :Station information is currently unavailable.", chan);
-		raw_socket(temp);
-		
-		printf("[-] XPath: No values\n");
+		printf("[-] weather: xpath 1: no values\n");
+		irc_privmsg(chan, "Station information is currently unavailable.");
 		goto freeme;
 	}
 	
@@ -179,7 +179,7 @@ int weather_handle(char *chan, weather_station_t *station) {
 	xpathObj = xmlXPathEvalExpression((unsigned const char *) "//h3[@class='MBlegend-title']", ctx);
 	
 	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		printf("[-] XPath: No values\n");
+		printf("[-] weather: xpath 2: no values\n");
 		goto freeme;
 	}
 	
@@ -192,8 +192,8 @@ int weather_handle(char *chan, weather_station_t *station) {
 	}
 	
 	// building response	
-	sprintf(temp, "PRIVMSG %s :%s: température: %.1f°C, humidité: %d%% [%s]", chan, station->name, weather.temp, weather.humidity, weather.date);
-	raw_socket(temp);
+	sprintf(temp, "%s: température: %.1f°C, humidité: %d%% [%s]", station->name, weather.temp, weather.humidity, weather.date);
+	irc_privmsg(chan, temp);
 	
 	// freeing all stuff
 	freeme:
@@ -204,4 +204,3 @@ int weather_handle(char *chan, weather_station_t *station) {
 	
 	return 0;
 }
-
