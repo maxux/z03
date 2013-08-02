@@ -382,6 +382,38 @@ char *space_encode(char *str) {
 	return str;
 }
 
+char *url_encode(char *url) {
+	char *temp, *swap;
+	
+	if(!(temp = (char *) calloc(strlen(url) * 4, sizeof(char))))
+		return NULL;
+	
+	swap = temp;
+	
+	while(*url) {
+		if(*url == ' ') {
+			*swap++ = '+';
+		
+		} else if(*url == '+') {
+			strncpy(swap, "%2B", 3);
+			swap += 3;
+		
+		} else if(*url == '=') {
+			strncpy(swap, "%3D", 3);
+			swap += 3;
+			
+		} else if(*url == '?') {
+			strncpy(swap, "%3F", 3);
+			swap += 3;
+		
+		} else *swap++ = *url;
+		
+		url++;
+	}
+	
+	return temp;
+}
+
 int progression_match(size_t value) {
 	size_t match = 250;
 	

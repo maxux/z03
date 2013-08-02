@@ -10,6 +10,8 @@
 	char *crlftrim(char *str);
 	
 	char *space_encode(char *str);
+	char *url_encode(char *url);
+	
 	char *string_index(char *str, unsigned int index);
 	void intswap(int *a, int *b);
 	

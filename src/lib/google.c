@@ -31,8 +31,8 @@
 #include "actions.h"
 #include "ircmisc.h"
 
-char *baseurlen = "https://www.google.com/search?hl=en&q=";
-char *baseurlfr = "https://www.google.com/search?hl=fr&q=";
+static char *baseurlen = "https://www.google.com/search?hl=en&q=";
+static char *baseurl   = "https://www.google.com/search?q=";
 
 google_search_t * google_search(char *keywords) {
 	curl_data_t *curl;
@@ -88,12 +88,16 @@ char *google_calc(char *keywords) {
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
 	xmlNode *node = NULL;
-	char url[2048], *value = NULL;
+	char url[2048], *value = NULL, *request;
 	int i;
 	
 	curl = curl_data_new();
 	
-	snprintf(url, sizeof(url), "%s%s", baseurlfr, space_encode(keywords));
+	if(!(request = url_encode(keywords)))
+		return NULL;
+		
+	snprintf(url, sizeof(url), "%s%s", baseurl, request);
+	free(request);
 	
 	if(curl_download_text(url, curl))
 		return NULL;
@@ -102,7 +106,18 @@ char *google_calc(char *keywords) {
 	
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
+	
+	/* trying some method to catch response */
 	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_ans vk_bk']", ctx);
+	
+	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_bk vk_ans']", ctx);
+	
+	else if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_ans vk_bk curtgt']", ctx);
+	
+	else if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//span[@id='cwos']", ctx);
 	
 	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
 		for(i = 0; i < xpathObj->nodesetval->nodeNr; i++) {
@@ -112,6 +127,15 @@ char *google_calc(char *keywords) {
 				value = strdup((char *) xmlNodeGetContent(node));
 				printf("[+] google/calc: value: %s\n", value);
 			}
+		}
+	
+	/* maybe a <input> answer */
+	} else {
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//input[@id='ucw_rhs_d']", ctx);
+		if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
+			node = xpathObj->nodesetval->nodeTab[0];
+			value = strdup((char *) xmlGetProp(node, (const xmlChar *) "value"));
+			printf("[+] google/calc: value: %s\n", value);
 		}
 	}
 
