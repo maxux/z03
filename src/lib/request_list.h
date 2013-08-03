@@ -2,7 +2,13 @@ request_t __request[] = {
 	{
 		.match    = ".weather",
 		.callback = action_weather,
-		.man      = "print weather information: .weather list, .weather [station]",
+		.man      = "print weather information from meteobelgique: .weather list, .weather [station]",
+		.hidden   = 0,
+	},
+	{
+		.match    = ".wunder",
+		.callback = action_wunder,
+		.man      = "print weather information from wunderground: .wunder country/city (eg: fr/rennes)",
 		.hidden   = 0,
 	},
 	{

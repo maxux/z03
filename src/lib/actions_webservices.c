@@ -26,6 +26,8 @@
 #include "actions.h"
 #include "ircmisc.h"
 #include "weather.h"
+#include "weather_meteobe.h"
+#include "weather_wunder.h"
 #include "google.h"
 #include "wiki.h"
 #include "whatcd.h"
@@ -44,8 +46,13 @@ void action_weather(ircmessage_t *message, char *args) {
 			if(!list)
 				return;
 				
-			zsnprintf(cmdline, "Stations list: %s (Default: %s)",
-			                   list, weather_stations[weather_default_station].ref);
+			zsnprintf(
+				cmdline,
+				"Stations list: %s (Default: %s)",
+				list,
+				weather_stations[weather_default_station].ref
+			);
+			
 			irc_privmsg(message->chan, cmdline);
 			
 			free(list);
@@ -63,6 +70,24 @@ void action_weather(ircmessage_t *message, char *args) {
 	} else id = weather_default_station;
 	
 	weather_handle(message->chan, (weather_stations + id));
+}
+
+void action_wunder(ircmessage_t *message, char *args) {
+	char *value;
+	curl_data_t *curl;
+	
+	if(!(value = settings_get(message->nick, "wunder", PUBLIC))) {
+		if(!action_parse_args(message, args)) {
+			return;
+			
+		} else value = strdup(args);
+	}
+	
+	curl = curl_data_new();
+	wunder_handle(message->chan, value, curl);
+	curl_data_free(curl);	
+	
+	free(value);
 }
 
 void action_wiki(ircmessage_t *message, char *args) {

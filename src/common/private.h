@@ -10,4 +10,6 @@
 	
 	#define LASTFM_APIKEY		""
 	#define LASTFM_APISECRET	""
+	
+	#define WUNDERGROUND_KEY	""
 #endif
