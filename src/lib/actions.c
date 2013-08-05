@@ -72,7 +72,7 @@ void action_man(ircmessage_t *message, char *args) {
 		return;
 	
 	for(i = 0; i < __request_count; i++) {
-		if(match_prefix(args, __request[i].match + 1) && !__request[i].hidden) {
+		if(!strcmp(args, __request[i].match + 1) && !__request[i].hidden) {
 			zsnprintf(buffer, "%s: %s", args, __request[i].man);
 			irc_privmsg(message->chan, buffer);
 			return;

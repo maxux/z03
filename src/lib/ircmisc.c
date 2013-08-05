@@ -244,6 +244,9 @@ char *ltrim(char *str) {
 char *rtrim(char *str) {
 	char *back = str + strlen(str);
 	
+	if(!*str)
+		return str;
+		
 	while(isspace(*--back));
 		*(back + 1) = '\0';
 		

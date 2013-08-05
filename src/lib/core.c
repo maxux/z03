@@ -306,25 +306,6 @@ void handle_quit(char *data) {
 	free(nick);
 }
 
-char * match_prefix(char *data, char *match) {
-	size_t size;
-	
-	size = strlen(match);
-	if(!strncmp(data, match, size)) {
-		/* Arguments */
-		if(*(data + size) == ' ')
-			return data + size + 1;
-		
-		/* No arguments */
-		else if(*(data + size) == '\0')
-			return data + size;
-		
-		/* Not exact match */
-		else return NULL;
-		
-	} else return NULL;
-}
-
 void irc_kick(char *chan, char *nick, char *reason) {
 	char *request;
 	
@@ -365,9 +346,51 @@ int handle_query(char *data) {
 	return 0;
 }
 
+int handle_commands(char *content, ircmessage_t *message) {
+	unsigned int i;
+	unsigned int callback_index = 0, callback_count = 0;
+	char *callback_temp = NULL;
+	char *command, *match;
+	
+	if((match = strchr(content, ' '))) {
+		command = strndup(content, match - content);
+		match++;
+		
+	} else {
+		command = strdup(content);
+		match = "";
+	}
+	
+	for(i = 0; i < __request_count; i++) {
+		if(!strncmp(command, __request[i].match, strlen(command))) {
+			printf("[+] commands: match for: <%s>\n", __request[i].match);
+			callback_count++;
+			callback_index = i;
+			callback_temp = match;
+			
+			/* check for exact matching */
+			if(!strcmp(command, __request[i].match))
+				break;
+		}
+	}
+	
+	free(command);
+	
+	if(callback_count == 0)
+		return 0;
+	
+	if(callback_count == 1) {
+		message->command = content;
+		__request[callback_index].callback(message, callback_temp);
+		return 1;
+		
+	} else irc_privmsg(message->chan, "Ambiguous command name, be more precise.");
+	
+	return 0;
+}
+
 int handle_message(char *data, ircmessage_t *message) {
 	char *content, *temp;
-	unsigned int i;
 	char *url, *trueurl;
 	nick_t *nick;
 	char buffer[256];
@@ -470,16 +493,12 @@ int handle_message(char *data, ircmessage_t *message) {
 		}
 	}
 	
-	/* Saving log */
+	/* saving log */
 	log_privmsg(message->chan, message->nick, content);
 	
-	for(i = 0; i < __request_count; i++) {
-		if((temp = match_prefix(content, __request[i].match))) {
-			message->command = content;
-			__request[i].callback(message, temp);
-			return 0;
-		}
-	}
+	/* checking bot commands */
+	if(handle_commands(content, message))
+		return 0;
 	
 	if((url = strstr(data, "http://")) || (url = strstr(data, "https://"))) {
 		if((trueurl = extract_url(url))) {

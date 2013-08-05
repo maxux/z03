@@ -78,7 +78,13 @@ void action_notes(ircmessage_t *message, char *args) {
 	char *sqlquery, *msg;
 	int row, count = 0;
 	
-	if(!*args || !(msg = strchr(args, ' '))) {
+	/* read our own notes */
+	if(!*args) {
+		__action_notes_checknew(message->chan, message->nick);
+		return;
+	}
+	
+	if(!(msg = strchr(args, ' '))) {
 		irc_privmsg(message->chan, "Missing arguments");
 		return;
 	}

@@ -68,9 +68,6 @@
 	/* Global Data */
 	extern global_lib_t global_lib;
 	
-	
-	char *match_prefix(char *data, char *match);
-	
 	void main_construct(void);
 	void main_core(char *data, char *request);
 	void main_destruct(void);

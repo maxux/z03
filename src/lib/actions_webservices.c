@@ -76,12 +76,11 @@ void action_wunder(ircmessage_t *message, char *args) {
 	char *value;
 	curl_data_t *curl;
 	
-	if(!(value = settings_get(message->nick, "wunder", PUBLIC))) {
-		if(!action_parse_args(message, args)) {
+	if(!*args) {
+		if(!(value = settings_get(message->nick, "wunder", PUBLIC)))
 			return;
 			
-		} else value = strdup(args);
-	}
+	} else value = strdup(args);
 	
 	curl = curl_data_new();
 	wunder_handle(message->chan, value, curl);
