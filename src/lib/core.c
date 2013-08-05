@@ -352,6 +352,9 @@ int handle_commands(char *content, ircmessage_t *message) {
 	char *callback_temp = NULL;
 	char *command, *match;
 	
+	if(*content == ' ')
+		return 1;
+	
 	if((match = strchr(content, ' '))) {
 		command = strndup(content, match - content);
 		match++;
@@ -369,8 +372,10 @@ int handle_commands(char *content, ircmessage_t *message) {
 			callback_temp = match;
 			
 			/* check for exact matching */
-			if(!strcmp(command, __request[i].match))
+			if(!strcmp(command, __request[i].match)) {
+				callback_count = 1;
 				break;
+			}
 		}
 	}
 	
