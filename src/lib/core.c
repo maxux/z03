@@ -394,6 +394,41 @@ int handle_commands(char *content, ircmessage_t *message) {
 	return 0;
 }
 
+int handle_precommands(char *content, ircmessage_t *message) {
+	/* Special Check for BELL */
+	if(strchr(content, '\x07')) {
+		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
+		return 1;
+	}
+	
+	
+	if(strstr(content, "mére")) {
+		irc_kick(message->chan, message->nick, "ta mére ouais");
+		return 0;
+	}
+	
+	if(strstr(content, "une kernel") || strstr(content, "la kernel") || strstr(content, "kernelle")) {
+		irc_kick(message->chan, message->nick, "On dit *un* *kernel*, espèce d'yllaytray");
+		return 0;
+	}
+	
+	if(!strncasecmp(message->nick, "malabar", 7) && (
+		strstr(content, "boiler")  ||
+		strstr(content, "b0iler")  ||
+		strstr(content, "bo!ler")  ||
+		strstr(content, "Boiler")  ||
+		strstr(content, "B0iler")  ||
+		strstr(content, "Bo!l3r")  ||
+		strstr(content, " BR")     || 
+		!strncmp(content, "BR", 2)
+	)) {
+		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
+		return 0;
+	}
+	
+	return 0;
+}
+
 int handle_message(char *data, ircmessage_t *message) {
 	char *content, *temp;
 	char *url, *trueurl;
@@ -403,34 +438,9 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	content = skip_server(data) + 1;
 	
-	/* Special Check for BELL */
-	if(strchr(data, '\x07')) {
-		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
+	/* security check and easteregg/useless commands */
+	if(handle_precommands(content, message))
 		return 0;
-	}
-	
-	/* Temp FIXME: for T4g1 */
-	if(strstr(data, "mére")) {
-		irc_kick(message->chan, message->nick, "ta mére ouais");
-		// return 0;
-	}
-	
-	if(strstr(data, "une kernel") || strstr(data, "la kernel") || strstr(data, "kernelle")) {
-		irc_kick(message->chan, message->nick, "On dit *un* *kernel*, espèce d'yllaytray");
-		// return 0;
-	}
-	
-	if(!strncasecmp(message->nick, "malabar", 7) && (
-		strstr(data, "boiler") ||
-		strstr(data, "b0iler") ||
-		strstr(data, "bo!ler") ||
-		strstr(data, "Boiler") ||
-		strstr(data, "B0iler") ||
-		strstr(data, "Bo!l3r")
-	)) {
-		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
-		// return 0;
-	}
 	
 	/* Updating channel lines count */
 	if(progression_match(++message->channel->lines)) {
