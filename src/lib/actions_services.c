@@ -145,6 +145,11 @@ void action_delay(ircmessage_t *message, char *args) {
 		return;
 	}
 	
+	if(timevalue > 2880) {
+		irc_privmsg(message->chan, "Delay out of range");
+		return;
+	}
+	
 	/* time checking and settings */
 	timestamp = time(NULL) + (timevalue * 60);
 	timeinfo = localtime(&timestamp);

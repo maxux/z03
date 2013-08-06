@@ -228,7 +228,7 @@ request_t __request[] = {
 		.callback = action_delay,
 		.man      = "alarm timed notification",
 		.hidden   = 0,
-		.syntaxe  = ".delay <minutes> <message>",
+		.syntaxe  = ".delay <1-2880 minutes> <message>",
 	},
 	{
 		.match    = "sudo",

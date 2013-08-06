@@ -429,7 +429,7 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
-	if((rand() % 42) == 21) {
+	if(!strncasecmp(message->nick, "malabar", 7) && ((rand() % 42) == 21)) {
 		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM, MEME SI T'EN PARLAIS PAS.");
 		return 0;
 	}

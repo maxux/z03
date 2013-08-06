@@ -85,6 +85,12 @@ void action_man(ircmessage_t *message, char *args) {
 		if(!strcmp(args, __request[i].match + 1) && !__request[i].hidden) {
 			zsnprintf(buffer, "%s: %s", args, __request[i].man);
 			irc_privmsg(message->chan, buffer);
+			
+			if(*(__request[i].syntaxe)) {
+				zsnprintf(buffer, "Syntaxe: %s", __request[i].syntaxe);
+				irc_privmsg(message->chan, buffer);
+			}
+			
 			return;
 		}
 	}
