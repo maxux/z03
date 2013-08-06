@@ -104,6 +104,43 @@ void periodic_whatcd(list_t *tracking) {
 	list_free(users);
 }
 
+void periodic_delay() {
+	sqlite3_stmt *stmt;
+	char output[1024];
+	char *sqlquery, *nick, *chan, *message;
+	int id = 0;
+	
+	/* Checking notes */
+	sqlquery = sqlite3_mprintf(
+		"SELECT id, nick, chan, message FROM delay "
+		"WHERE timestamp < %ld AND finished = 0",
+		time(NULL)
+	);
+	
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+		while(sqlite3_step(stmt) == SQLITE_ROW) {
+			id      = sqlite3_column_int(stmt, 0);
+			nick    = (char *) sqlite3_column_text(stmt, 1);
+			chan    = (char *) sqlite3_column_text(stmt, 2);
+			message = (char *) sqlite3_column_text(stmt, 3);
+			
+			zsnprintf(output, "[alarm] %s: %s", nick, message);
+			irc_privmsg(chan, output);
+		}
+		
+		sqlite3_free(sqlquery);
+		sqlite3_finalize(stmt);
+		
+		sqlquery = sqlite3_mprintf("UPDATE delay SET finished = 1 WHERE id = %d", id);
+		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
+			printf("[-] lib/notes: cannot mark as read\n");
+	
+	} else fprintf(stderr, "[-] lib/delay: sql error\n");
+	
+	/* Clearing */
+	sqlite3_free(sqlquery);
+}
+
 void *periodic_each_minutes(void *dummy) {
 	list_t *tracking;
 	
@@ -114,12 +151,13 @@ void *periodic_each_minutes(void *dummy) {
 	}
 	
 	while(1) {
-		sleep(360);
+		sleep(60);
 		
 		printf("[+] periodic/minute: starting cycle\n");
 		global_core->extraclient++;
 		
 		periodic_whatcd(tracking);
+		periodic_delay();
 		
 		global_core->extraclient--;
 		printf("[+] periodic/minute: end of cycle\n");

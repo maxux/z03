@@ -36,7 +36,12 @@ void __action_notes_checknew(char *chan, char *nick) {
 	time_t ts;
 	
 	/* Checking notes */
-	sqlquery = sqlite3_mprintf("SELECT fnick, message, ts, host FROM notes WHERE tnick = '%q' AND chan = '%q' AND seen = 0", nick, chan);
+	sqlquery = sqlite3_mprintf(
+		"SELECT fnick, message, ts, host FROM notes     "
+		"WHERE tnick = '%q' AND chan = '%q' AND seen = 0",
+		nick, chan
+	);
+	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			fnick   = strdup((char *) sqlite3_column_text(stmt, 0));
@@ -85,7 +90,7 @@ void action_notes(ircmessage_t *message, char *args) {
 	}
 	
 	if(!(msg = strchr(args, ' '))) {
-		irc_privmsg(message->chan, "Missing arguments");
+		action_missing_args(message);
 		return;
 	}
 	
@@ -122,6 +127,40 @@ void action_notes(ircmessage_t *message, char *args) {
 		irc_privmsg(message->chan, "Message saved");
 		
 	} else irc_privmsg(message->chan, "Cannot sent your message. Try again later.");
+	
+	sqlite3_free(sqlquery);
+}
+
+void action_delay(ircmessage_t *message, char *args) {
+	char *msg, *sqlquery, date[128];
+	time_t timestamp;
+	int timevalue;
+	struct tm *timeinfo;
+	
+	if(!action_parse_args(message, args))
+		return;
+	
+	if(!(msg = strchr(args, ' ')) || (timevalue = atoi(args)) <= 0) {
+		action_missing_args(message);
+		return;
+	}
+	
+	/* time checking and settings */
+	timestamp = time(NULL) + (timevalue * 60);
+	timeinfo = localtime(&timestamp);
+	strftime(date, sizeof(date), "Alarm set to: " TIME_FORMAT, timeinfo);
+	
+	/* building sql query */
+	sqlquery = sqlite3_mprintf(
+		"INSERT INTO delay (timestamp, nick, chan, message, finished) "
+		"VALUES ('%ld', '%q', '%q', '%q', 0)",
+		timestamp, message->nick, message->chan, msg + 1
+	);
+	
+	if(db_sqlite_simple_query(sqlite_db, sqlquery)) {
+		irc_privmsg(message->chan, date);
+		
+	} else irc_privmsg(message->chan, "Cannot program your alarm. Try again later.");
 	
 	sqlite3_free(sqlquery);
 }

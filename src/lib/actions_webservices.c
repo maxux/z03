@@ -77,8 +77,10 @@ void action_wunder(ircmessage_t *message, char *args) {
 	curl_data_t *curl;
 	
 	if(!*args) {
-		if(!(value = settings_get(message->nick, "wunder", PUBLIC)))
+		if(!(value = settings_get(message->nick, "wunder", PUBLIC))) {
+			action_missing_args(message);
 			return;
+		}
 			
 	} else value = strdup(args);
 	

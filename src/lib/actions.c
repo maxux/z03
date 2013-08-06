@@ -29,9 +29,16 @@ char *action_check_args(char *args) {
 	return ltrim(rtrim(args));
 }
 
+void action_missing_args(ircmessage_t *message) {
+	char info[2048];
+	
+	zsnprintf(info, "Missing arguments. Command syntaxe: %s", message->request->syntaxe);
+	irc_privmsg(message->chan, info);
+}
+
 char *action_parse_args(ircmessage_t *message, char *args) {
 	if(!strlen(action_check_args(args))) {
-		irc_privmsg(message->chan, "Missing arguments");
+		action_missing_args(message);
 		return NULL;
 	}
 	
@@ -40,19 +47,21 @@ char *action_parse_args(ircmessage_t *message, char *args) {
 
 void action_help(ircmessage_t *message, char *args) {
 	char list[512], buffer[768];
-	unsigned int i;
+	unsigned int i, length;
 	(void) args;
 	
 	// clearing list
 	list[0] = '\0';
+	length  = 0;
 	
 	for(i = 0; i < __request_count; i++) {
 		if(!__request[i].hidden) {
 			strcat(list, __request[i].match);
 			strcat(list, " ");
+			length += strlen(__request[i].match);
 		}
 		
-		if((!(i % 15) && i > 0) || i == __request_count - 1) {
+		if(length >= 60 || i == __request_count - 1) {
 			if(*list) {
 				zsnprintf(buffer, "Commands: %s", list);
 				irc_privmsg(message->chan, buffer);
@@ -60,6 +69,7 @@ void action_help(ircmessage_t *message, char *args) {
 			
 			// reset list
 			list[0] = '\0';
+			length  = 0;
 		}
 	}
 }

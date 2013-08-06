@@ -52,7 +52,7 @@ void action_time(ircmessage_t *message, char *args) {
 	time(&rawtime);
 	timeinfo = localtime(&rawtime);
 
-	strftime(date, sizeof(date), "%A %d %B %X %Y", timeinfo);	
+	strftime(date, sizeof(date), TIME_FORMAT, timeinfo);	
 	irc_privmsg(message->chan, date);
 }
 

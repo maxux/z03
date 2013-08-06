@@ -351,6 +351,7 @@ int handle_commands(char *content, ircmessage_t *message) {
 	unsigned int callback_index = 0, callback_count = 0;
 	char *callback_temp = NULL;
 	char *command, *match;
+	request_t *callback_request = NULL;
 	
 	if(*content == ' ')
 		return 1;
@@ -368,8 +369,9 @@ int handle_commands(char *content, ircmessage_t *message) {
 		if(!strncmp(command, __request[i].match, strlen(command))) {
 			printf("[+] commands: match for: <%s>\n", __request[i].match);
 			callback_count++;
-			callback_index = i;
-			callback_temp = match;
+			callback_index   = i;
+			callback_temp    = match;
+			callback_request = &__request[i];
 			
 			/* check for exact matching */
 			if(!strcmp(command, __request[i].match)) {
@@ -386,6 +388,7 @@ int handle_commands(char *content, ircmessage_t *message) {
 	
 	if(callback_count == 1) {
 		message->command = content;
+		message->request = callback_request;
 		__request[callback_index].callback(message, callback_temp);
 		return 1;
 		
@@ -395,13 +398,13 @@ int handle_commands(char *content, ircmessage_t *message) {
 }
 
 int handle_precommands(char *content, ircmessage_t *message) {
-	/* Special Check for BELL */
+	/* special check for BELL */
 	if(strchr(content, '\x07')) {
 		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
 		return 1;
 	}
 	
-	
+	/* useless or easteregg */
 	if(strstr(content, "mére")) {
 		irc_kick(message->chan, message->nick, "ta mére ouais");
 		return 0;
@@ -413,16 +416,21 @@ int handle_precommands(char *content, ircmessage_t *message) {
 	}
 	
 	if(!strncasecmp(message->nick, "malabar", 7) && (
-		strstr(content, "boiler")  ||
-		strstr(content, "b0iler")  ||
-		strstr(content, "bo!ler")  ||
-		strstr(content, "Boiler")  ||
-		strstr(content, "B0iler")  ||
-		strstr(content, "Bo!l3r")  ||
-		strstr(content, " BR")     || 
-		!strncmp(content, "BR", 2)
+		strcasestr(content, "boiler") ||
+		strcasestr(content, "b0iler") ||
+		strcasestr(content, "bo!ler") ||
+		strcasestr(content, " BR")    || 
+		strcasestr(content, " 8R")    ||
+		strcasestr(content, " B5")    || 
+		strcasestr(content, " 85")    ||
+		strcasestr(content, "chaufferie")
 	)) {
 		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
+		return 0;
+	}
+	
+	if((rand() % 42) == 21) {
+		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM, MEME SI T'EN PARLAIS PAS.");
 		return 0;
 	}
 	

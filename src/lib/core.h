@@ -5,7 +5,8 @@
 	#include <string.h>
 	#include "list.h"
 	
-	#define OUTPUT_PATH		"/var/www/perso/imagespawn/data/"
+	#define OUTPUT_PATH             "/var/www/perso/imagespawn/data/"
+	#define TIME_FORMAT             "%A %d %B %X %Y UTC%z (%Z)"
 	
 	typedef struct nick_t {
 		size_t lines;
@@ -44,6 +45,8 @@
 		char *command;
 		char *args;
 		
+		struct request_t *request;
+		
 	} ircmessage_t;
 	
 	typedef struct request_t {
@@ -51,6 +54,7 @@
 		void (*callback)(ircmessage_t *, char *);
 		char *man;
 		char hidden;
+		char *syntaxe;
 		
 	} request_t;
 	
