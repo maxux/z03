@@ -231,10 +231,10 @@ request_t __request[] = {
 		.syntaxe  = ".delay <1-2880 minutes> <message>",
 	},
 	{
-		.match    = "sudo",
-		.callback = action_sudo,
+		.match    = ".ovh",
+		.callback = action_ovh,
 		.man      = "",
-		.hidden   = 1,
+		.hidden   = 0,
 		.syntaxe  = "",
 	},
 	{

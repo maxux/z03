@@ -230,7 +230,7 @@ repost_t *url_repost_advanced(curl_data_t *curl, ircmessage_t *message, repost_t
 	if(newrepost->sha1 && curl->type == IMAGE_ALL) {
 		zsnprintf(buffer,
 			"[checksum match, OP is %s (%s), hit %d times. URL waz: %s]",
-			anti_hl(ophl), timing, newrepost->hit + 1, newrepost->op
+			anti_hl(ophl), timing, newrepost->hit + 1, newrepost->url
 		);
 
 		irc_privmsg(message->chan, buffer);

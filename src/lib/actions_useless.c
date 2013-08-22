@@ -16,17 +16,53 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
  */
- 
+
+#include <stdio.h> 
+#include <stdlib.h>
 #include "core.h"
 #include "run.h"
 #include "actions_useless.h"
+#include "settings.h"
+#include "downloader.h"
 
+/*
 void action_sudo(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_privmsg(message->chan, "sudo: you are not sudoers");
 }
+*/
 
 void action_blowjob(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_kick(message->chan, message->nick, "Tu vois, ça marche, connard !");
+}
+
+void action_ovh(ircmessage_t *message, char *args) {
+	char *id = NULL, *pass = NULL, url[1024];
+	curl_data_t *curl = NULL;
+	(void) args;
+	
+	curl = curl_data_new();
+	
+	if(!(id = settings_get(message->nick, "ovh_orderid", PUBLIC))) {
+		irc_privmsg(message->chan, "ovh_orderid not found");
+		goto freeall;
+	}
+	
+	if(!(pass = settings_get(message->nick, "ovh_orderpass", PUBLIC))) {
+		irc_privmsg(message->chan, "ovh_orderpass not found");
+		goto freeall;
+	}
+	
+	zsnprintf(url, "http://www.maxux.net/perso/ovh/status.php?id=%s&pass=%s", id, pass);
+		
+	if(curl_download_text(url, curl))
+		return;
+	
+	irc_privmsg(message->chan, curl->data);
+	
+	freeall:
+		free(id);
+		free(pass);
+		curl_data_free(curl);
 }
