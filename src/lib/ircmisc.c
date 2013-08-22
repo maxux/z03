@@ -164,7 +164,7 @@ char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 	
 	/* \u200b is 3 bytes length, str is normally not long, just allocating 3x */
 	allocation = ((len * 3) + 8);
-	printf("[.] hl-protect/eachwords: allocating: %u bytes (original: %u)\n", allocation, len);
+	printf("[ ] hl-protect/eachwords: allocating: %zu bytes (original: %zu)\n", allocation, len);
 	
 	stripped = (char *) malloc(sizeof(char) * allocation);
 	bzero(stripped, allocation);

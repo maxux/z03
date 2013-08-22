@@ -185,7 +185,7 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 	
 	if(!strncasecmp(ptr, "Content-Length: ", 16)) {
 		curl->http_length = atoll(ptr + 16);
-		printf("[+] urlmanager/header: length %d bytes\n", curl->http_length);
+		printf("[+] urlmanager/header: length %zu bytes\n", curl->http_length);
 	}
 
 	/* Return required by libcurl */

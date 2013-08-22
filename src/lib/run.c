@@ -53,7 +53,7 @@ void *lib_run_fork(void *_data) {
 	struct timeval tv = {tv.tv_sec = 0, tv.tv_usec = 0};
 	char buffer[1024], length = 0;
 	char *match = NULL, *print;
-	size_t rlen;
+	size_t rlen = 0;
 	
 	printf("[+] lib/run: thread %u: starting...\n", (unsigned int) pthread_self());
 	

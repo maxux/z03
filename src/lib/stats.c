@@ -175,7 +175,7 @@ size_t stats_get_words(char *nick, char *chan) {
 		while(sqlite3_step(stmt) == SQLITE_ROW)	
 			words = (size_t) sqlite3_column_int(stmt, 0);
 	
-	printf("[+] lib/stats: %u words for <%s/%s>\n", words, chan, nick);
+	printf("[+] lib/stats: %zu words for <%s/%s>\n", words, chan, nick);
 	
 	sqlite3_finalize(stmt);
 	sqlite3_free(sqlquery);
@@ -194,7 +194,7 @@ channel_t *stats_channel_load(char *chan) {
 	/* zsnprintf(buffer, "[table rehashed: got %u total lines for %u nicks on database]",
 	                  channel->lines, channel->nicks->length);
 	irc_privmsg(chan, buffer); */
-	printf("[+] lib/stats: %s: table rehashed: got %u total lines for %u nicks\n",
+	printf("[+] lib/stats: %s: table rehashed: got %u total lines for %zu nicks\n",
 	       chan, channel->lines, channel->nicks->length);
 	
 	return channel;
@@ -299,8 +299,8 @@ void stats_rebuild_all(list_t *channels) {
 			
 			// counting words
 			nick->words = stats_words_count(node_nick->name, node_channel->name);
-			printf("[+] lib/stats: rebuild: %s/%s: %u\n", node_channel->name, node_nick->name,
-			                                              nick->words);
+			printf("[+] lib/stats: rebuild: %s/%s: %zu\n",
+			       node_channel->name, node_nick->name, nick->words);
 
 			// saving on database
 			stats_set_words(node_nick->name, node_channel->name, nick->words);

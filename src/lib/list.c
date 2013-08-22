@@ -137,7 +137,7 @@ char *list_implode(list_t *list, size_t limit) {
 		strcat(implode, buffer);
 		
 		if(now > limit) {
-			zsnprintf(buffer, " and %u others hidden", list->length - now);
+			zsnprintf(buffer, " and %zu others hidden", list->length - now);
 			implode = (char *) realloc(implode, alloc + 64);
 			strcat(implode, buffer);
 			

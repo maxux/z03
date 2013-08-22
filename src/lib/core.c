@@ -496,7 +496,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	// updating channel lines count
 	if(progression_match(++message->channel->lines)) {
-		snprintf(buffer, sizeof(buffer), "Well done, we just reached %u lines !\n", message->channel->lines);
+		zsnprintf(buffer, "Well done, we just reached %zu lines !\n", message->channel->lines);
 		irc_privmsg(message->chan, buffer);
 	}
 	
@@ -512,8 +512,12 @@ int handle_message(char *data, ircmessage_t *message) {
 		
 		// update nick lines
 		if(progression_match(++nick->lines)) {
-			snprintf(buffer, sizeof(buffer), "Hey, %s just reached %u lines (%.2f%% of %s) !\n", 
-					message->nickhl, nick->lines, ((double) nick->lines / message->channel->lines) * 100, message->chan);
+			zsnprintf(buffer,
+			          "Hey, %s just reached %zu lines (%.2f%% of %s) !\n", 
+				  message->nickhl, nick->lines,
+				  ((double) nick->lines / message->channel->lines) * 100,
+				  message->chan
+			);
 				
 			irc_privmsg(message->chan, buffer);
 		}
@@ -533,7 +537,7 @@ int handle_message(char *data, ircmessage_t *message) {
 			nick->lasttime = stats_get_lasttime(message->nick, message->chan);
 		}
 			
-		printf("[ ] lib/message: %s/%s, lines: %u/%u, words: %u, lasttime: %ld\n",
+		printf("[ ] lib/message: %s/%s, lines: %zu/%zu, words: %zu, lasttime: %ld\n",
 		       message->chan, message->nickhl, nick->lines, message->channel->lines,
 		       nick->words, nick->lasttime);
 		
@@ -561,7 +565,9 @@ int handle_message(char *data, ircmessage_t *message) {
 		stats_update(message, nick, 1);
 		
 		if(!(message->channel->nicks->length % 100)) {
-			snprintf(buffer, sizeof(buffer), "%s is the %uth nick on this channel", message->nickhl, message->channel->nicks->length);
+			zsnprintf(buffer, "%s is the %zuth nick on this channel",
+			                  message->nickhl, message->channel->nicks->length);
+			
 			irc_privmsg(message->chan, buffer);
 		}
 	}

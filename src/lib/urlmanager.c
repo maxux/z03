@@ -296,7 +296,7 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 	if(curl_download_nobody(url, curl, 0))
 		printf("[-] Warning: special download\n");
 		
-	printf("[+] urlmanager/url httplength: %d\n", curl->http_length);
+	printf("[+] urlmanager/url httplength: %zu\n", curl->http_length);
 	printf("[+] urlmanager/url type: %d\n", curl->type);
 	
 	// curl/http error (404, 401, ...), nothing interresting is downloaded
