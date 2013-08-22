@@ -194,7 +194,7 @@ channel_t *stats_channel_load(char *chan) {
 	/* zsnprintf(buffer, "[table rehashed: got %u total lines for %u nicks on database]",
 	                  channel->lines, channel->nicks->length);
 	irc_privmsg(chan, buffer); */
-	printf("[+] lib/stats: %s: table rehashed: got %u total lines for %zu nicks\n",
+	printf("[+] lib/stats: %s: table rehashed: got %zu total lines for %u nicks\n",
 	       chan, channel->lines, channel->nicks->length);
 	
 	return channel;

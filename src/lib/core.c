@@ -565,7 +565,7 @@ int handle_message(char *data, ircmessage_t *message) {
 		stats_update(message, nick, 1);
 		
 		if(!(message->channel->nicks->length % 100)) {
-			zsnprintf(buffer, "%s is the %zuth nick on this channel",
+			zsnprintf(buffer, "%s is the %uth nick on this channel",
 			                  message->nickhl, message->channel->nicks->length);
 			
 			irc_privmsg(message->chan, buffer);
