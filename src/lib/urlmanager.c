@@ -31,33 +31,27 @@
 #include <curl/curl.h>
 #include <ctype.h>
 #include <sqlite3.h>
-#include <openssl/sha.h>
+#include <magic.h>
+#include <pthread.h>
 #include "../common/bot.h"
 #include "../core/init.h"
 #include "database.h"
 #include "list.h"
 #include "core.h"
 #include "entities.h"
+#include "downloader.h"
 #include "urlmanager.h"
+#include "urlrepost.h"
 #include "ircmisc.h"
+#include "stats.h"
+#include "magic.h"
 
-#define _GNU_SOURCE
-
-char *__host_ignore[] = {NULL
-	/* "www.maxux.net/",
-	"paste.maxux.net/",
-	"git.maxux.net/" */
-};
-
-host_cookies_t __host_cookies[] = {
-	{.host = "facebook.com",    .cookie = PRIVATE_FBCOOK},
-	{.host = "what.cd",         .cookie = PRIVATE_WHATCD},
-	{.host = "gks.gs",          .cookie = PRIVATE_GKS},
-	{.host = NULL,              .cookie = NULL},
-};
-
-char *__user_agent_hosts[] = {
-	"t.co", "gks.gs", "google.com"
+request_t __url_request = {
+	.match    = "",
+	.callback = url_manager,
+	.man      = "",
+	.hidden   = 1,
+	.syntaxe  = "",
 };
 
 char *__title_host_exceptions[] = {
@@ -69,6 +63,10 @@ char *__title_host_exceptions[] = {
 	"instagr.am",
 };
 
+//
+// return a malloc'ed url from a string
+// the string must begin by "http(s)://" 
+//
 char *extract_url(char *url) {
 	int i = 0, braks = 0;
 	char *out;
@@ -93,639 +91,11 @@ char *extract_url(char *url) {
 	return out;
 }
 
-char *curl_gethost(char *url) {
-	char *buffer, *match, *left;
-	
-	/* Extracting Host */
-	if((match = strstr(url, "//"))) {
-		/* Skipping // */
-		match += 2;
-		
-		if(!(left = strchr(match, '/')))
-			return NULL;
-		
-		buffer = (char *) malloc(sizeof(char) * (left - match) + 1);
-		snprintf(buffer, left - match + 1, "%s", match);
-		
-		return buffer;
-		
-	} else return NULL;
-}
-
-char *curl_useragent(char *url) {
-	char *host, *useragent;
-	unsigned int i;
-	
-	useragent = CURL_USERAGENT;
-	
-	/* Checking host */
-	if((host = curl_gethost(url))) {
-		printf("[+] urlmanager/host: <%s>\n", host);
-		
-		for(i = 0; i < sizeof(__user_agent_hosts) / sizeof(char *); i++) {
-			if(!strcmp(host, __user_agent_hosts[i]))
-				useragent = CURL_USERAGENT_LEGACY;
-		}
-			
-		free(host);
-	}
-	
-	printf("[+] urlmanager/useragent: <%s>\n", useragent);
-	
-	return useragent;
-}
-
-char *curl_cookie(char *url) {
-	char *host, *cookie = NULL;
-	int i;
-	
-	if(!(host = curl_gethost(url)))
-		return NULL;
-	
-	for(i = 0; __host_cookies[i].host; i++) {
-		if(strstr(host, __host_cookies[i].host)) {
-			printf("[ ] urlmanager/cookie: cookie %s (%s) found\n", __host_cookies[i].host, host);
-			cookie = __host_cookies[i].cookie;
-			break;
-		}
-	}
-		
-	free(host);
-	
-	return cookie;
-}
-
-size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata) {
-	curl_data_t *curl = (curl_data_t*) userdata;
-	size_t len;
-	
-	if(!(size * nmemb))
-		return 0;
-	
-	printf("[ ] urlmanager/header: %s", ptr);
-	
-	if(!strncasecmp(ptr, "Content-Type: ", 14)) {
-		free(curl->http_type);
-		curl->http_type = NULL;
-			
-		if(!strncmp(ptr + 14, "image/", 6)) {
-			printf("[+] urlmanager/header: <image> mime type detected\n");
-			curl->type = IMAGE_ALL;
-			
-			return size * nmemb;
-		}
-		
-		if(!strncmp(ptr + 14, "text/html", 9)) {
-			printf("[+] urlmanager/header: <text/html> mime type detected\n");
-			curl->type = TEXT_HTML;
-			
-			return size * nmemb;
-		}
-		
-		printf("[ ] urlmanager/header: match: %s", ptr);
-		
-		/* ignoring anything else */
-		curl->type = UNKNOWN_TYPE;
-		
-		len = strlen(ptr + 14);
-		curl->http_type = (char *) malloc(sizeof(char) * len + 1);
-		
-		strcpy(curl->http_type, ptr + 14);
-		curl->http_type[len - 2] = '\0';
-		
-		printf("[-] urlmanager/header: unhandled mime type: <%s>\n", curl->http_type);
-	}
-	
-	if(!strncasecmp(ptr, "Content-Length: ", 16)) {
-		curl->http_length = atoll(ptr + 16);
-		printf("[+] urlmanager/header: length %d bytes\n", curl->http_length);
-	}
-
-	/* Return required by libcurl */
-	return size * nmemb;
-}
-
-size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
-	curl_data_t *curl = (curl_data_t*) userdata;
-	size_t prev;
-	
-	if(!curl->forcedl && curl->http_length > CURL_MAX_SIZE)
-		return 0;
-	
-	prev = curl->length;
-	curl->length += (size * nmemb);
-	
-	// Do not download if too large or a unhandled mime
-	if(!curl->forcedl && (curl->length > CURL_MAX_SIZE || curl->http_type))
-		return 0;
-	
-	/* Resize data */
-	curl->data  = (char *) realloc(curl->data, (curl->length + 1));
-	
-	/* Appending data */
-	memcpy(curl->data + prev, ptr, size * nmemb);
-	
-	/* Return required by libcurl */
-	return size * nmemb;
-}
-
-curl_data_t *curl_data_new() {
-	curl_data_t *data;
-	
-	if(!(data = (curl_data_t *) calloc(1, sizeof(curl_data_t))))
-		return NULL;
-	
-	data->type        = UNKNOWN_TYPE;
-	data->charset     = UNKNOWN_CHARSET;
-	
-	return data;
-}
-
-void curl_data_free(curl_data_t *data) {
-	free(data->data);
-	free(data->http_type);
-	free(data);
-}
-
-static int curl_download_process(char *url, curl_data_t *data, char forcedl, char *post) {
-	CURL *curl;
-	char *useragent = CURL_USERAGENT;
-	char *cookie;
-	
-	curl = curl_easy_init();
-
-	// FIXME: set it in other way
-	data->forcedl = forcedl;
-	
-	printf("[+] urlmanager/curl: %s, force dl: %d\n", url, data->forcedl);
-	
-	useragent = curl_useragent(url);
-	
-	if(curl) {
-		curl_easy_setopt(curl, CURLOPT_URL, url);
-		
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, data);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_body);
-
-		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
-		curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10);
-		
-		curl_easy_setopt(curl, CURLOPT_HEADERDATA, data);
-		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_header_validate);
-		
-		curl_easy_setopt(curl, CURLOPT_HEADER, 0);
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
-		
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15);
-		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
-		
-		if(post) {
-			curl_easy_setopt(curl, CURLOPT_POST, 1);
-			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
-			printf("[+] urlmanager/post: <%s>\n", post);
-		}
-		
-		/* Checking Host for specific Cookies */
-		if(data->cookie) {
-			printf("[ ] urlmanager/cookie: %s\n", data->cookie);
-			curl_easy_setopt(curl, CURLOPT_COOKIE, data->cookie);
-			
-		} else if((cookie = curl_cookie(url)))
-			curl_easy_setopt(curl, CURLOPT_COOKIE, cookie);
-		
-		data->curlcode = curl_easy_perform(curl);
-		
-		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &(data->code));
-		printf("[ ] urlmanager/curl: code: %ld\n", data->code);
-		
-		curl_easy_cleanup(curl);
-		
-		if(!data->data && !data->http_length) {
-			fprintf(stderr, "[-] urlmanager/curl: data is empty.\n");
-			return 1;
-		}
-		
-		if(data->type == TEXT_HTML) {
-			data->charset = url_extract_charset(data->data);
-			printf("[ ] urlmanager/curl: charset: %d\n", data->charset);
-		}
-		
-	} else return 1;
-	
-	return 0;
-}
-
-/* wrapper */
-int curl_download(char *url, curl_data_t *data, char forcedl) {
-	return curl_download_process(url, data, forcedl, NULL);
-}
-
-int curl_download_post(char *url, curl_data_t *data, char *post) {
-	return curl_download_process(url, data, 1, post);
-}
-
-int curl_download_text(char *url, curl_data_t *data) {
-	if(curl_download(url, data, 1) || !data->length)
-		return 1;
-	
-	data->data[data->length] = '\0';	
-	return 0;
-}
-
-int curl_download_text_post(char *url, curl_data_t *data, char *post) {
-	if(curl_download_post(url, data, post) || !data->length)
-		return 1;
-	
-	data->data[data->length] = '\0';	
-	return 0;
-}
-
-
-void handle_repost(repost_type_t type, char *url, char *chan, char *nick, time_t ts, int hit) {
-	char timestring[64];
-	struct tm * timeinfo;
-	char op[48], msg[512];
-	char *host = NULL;
-	unsigned int i;
-	
-	strcpy(op, nick);
-	
-	if(ts != 0) {
-		timeinfo = localtime(&ts);
-		sprintf(timestring,
-		        "%02d/%02d/%02d %02d:%02d:%02d",
-		        timeinfo->tm_mday,
-		        timeinfo->tm_mon + 1,
-		        (timeinfo->tm_year + 1900 - 2000),
-		        timeinfo->tm_hour,
-		        timeinfo->tm_min,
-		        timeinfo->tm_sec
-		);
-		
-	} else strcpy(timestring, "unknown");
-
-	switch(type) {
-		case URL_MATCH:
-			zsnprintf(msg,
-				"(url match, OP is %s (%s), hit %d times)",
-				anti_hl(op), timestring, hit + 1
-			);
-			
-			irc_privmsg(chan, msg);
-		break;
-		
-		case CHECKSUM_MATCH:
-			zsnprintf(msg,
-				"(checksum match, OP is %s (%s), hit %d times. URL waz: %s)",
-				anti_hl(op), timestring, hit + 1, url
-			);
-			
-			irc_privmsg(chan, msg);
-		break;
-		
-		case TITLE_MATCH:
-			if(!(host = curl_gethost(url)))
-				break;
-			
-			for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++) {
-				if(strstr(host, __title_host_exceptions[i])) {
-					printf("[-] urlmanager/repost: title match disabled for host <%s>\n", host);
-					free(host);
-					return;
-				}
-			}
-			
-			zsnprintf(msg, 
-				"(title match on database, OP is %s, at %s. URL waz: %s)",
-				anti_hl(op), timestring, url
-			);
-			
-			irc_privmsg(chan, msg);				
-			free(host);
-		break;
-	}
-}
-
-void check_round_count(ircmessage_t *message) {
-	sqlite3_stmt *stmt;
-	char *sqlquery, msg[128];
-	int urls = -1;
-
-	sqlquery = sqlite3_mprintf("SELECT count(id) FROM url WHERE chan = '%q'", message->chan);
-	
-	if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
-		fprintf(stderr, "[-] url parser: cannot select url\n");
-		
-	if((sqlite3_step(stmt)) == SQLITE_ROW) {
-		urls = sqlite3_column_int(stmt, 0);
-		
-		printf("[ ] urlmanager/count: %d\n", urls);
-		if(urls % 500 == 0) {
-			zsnprintf(msg, "We just reached %d urls !", urls);
-			irc_privmsg(message->chan, msg);
-		}
-	}
-	
-	sqlite3_finalize(stmt);
-	sqlite3_free(sqlquery);
-}
-
-int handle_url(ircmessage_t *message, char *url) {
-	sqlite3_stmt *stmt;
-	char *sqlquery, *op;
-	int id = -1, hit = 0;
-	char match = 0;
-	time_t ts = 0;
-	
-	printf("[+] URL Parser: %s\n", url);
-		
-	if(strlen(url) > 256) {
-		printf("[-] urlmanager/parser: url too long...\n");
-		return 2;
-	}
-	
-	sqlquery = sqlite3_mprintf(
-		"SELECT id, nick, hit, time FROM url WHERE url = '%q' AND chan = '%q'",
-		url, message->chan
-	);
-	
-	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL) {
-		fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
-		return 1;
-	}
-	
-	if(sqlite3_step(stmt) == SQLITE_ROW) {
-		id  = sqlite3_column_int(stmt, 0);
-		op  = (char *) sqlite3_column_text(stmt, 1);
-		hit = sqlite3_column_int(stmt, 2);
-		ts  = sqlite3_column_int(stmt, 3);
-	}
-	
-	/* Updating Database */
-	if(id > -1) {
-		if(strcmp(op, message->nick))
-			handle_repost(URL_MATCH, NULL, message->chan, op, ts, hit);
-			
-		match = 1;
-		
-		printf("[+] urlmanager/parser: url already on database, updating...\n");
-		sqlquery = sqlite3_mprintf("UPDATE url SET hit = hit + 1 WHERE id = %d", id);
-		
-	} else {
-		printf("[+] URL Parser: New url, inserting...\n");
-		sqlquery = sqlite3_mprintf(
-			"INSERT INTO url (nick, url, hit, time, chan) "
-			"VALUES ('%q', '%q', 1, %d, '%q')", 
-			message->nick, url, time(NULL), message->chan
-		);
-	}
-	
-	if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-		printf("[-] urlmanager/parser: cannot update db\n");
-	
-	/* Clearing */
-	sqlite3_free(sqlquery);
-	sqlite3_finalize(stmt);
-	
-	check_round_count(message);
-	
-	/*
-	 *   Dispatching url handling if not a repost
-	 */
-	return handle_url_dispatch(url, message, match);
-}
-
-char * sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
-	char sha1_hex[3] = {0};
-	unsigned int i;
-	
-	for(i = 0; i < SHA_DIGEST_LENGTH; i++) {
-		sprintf(sha1_hex, "%02x", sha1_hexa[i]);
-		strcat(sha1_char, sha1_hex);
-	}
-	
-	return sha1_char;
-}
-
-int handle_url_dispatch(char *url, ircmessage_t *message, char already_match) {
-	curl_data_t *curl;
-	char *title = NULL, *stripped = NULL;
-	char temp[256];
-	unsigned int len;
-	char *sqlquery, *request;
-	sqlite3_stmt *stmt;
-	
-	curl = curl_data_new();
-	
-	unsigned char sha1_hexa[SHA_DIGEST_LENGTH];
-	char sha1_char[(SHA_DIGEST_LENGTH * 2) + 1];
-	
-	char *sqlurl = NULL, *nick = NULL;
-	time_t ts = 0;
-	int hit = -1;
-	
-	if(curl_download(url, curl, 0))
-		printf("[-] Warning: special download\n");
-		
-	printf("[+] urlmanager/downloaded length: %d\n", curl->length);
-	printf("[+] urlmanager/downloaded type: %d\n", curl->type);
-	// printf("%s\n", curl->data);
-	
-	// Write error occure on data file
-	if(curl->curlcode != CURLE_OK && curl->curlcode != CURLE_WRITE_ERROR) {
-		zsnprintf(temp, "URL (Error %d): %s", curl->curlcode, curl_easy_strerror(curl->curlcode));
-		irc_privmsg(message->chan, temp);
-		
-		curl_data_free(curl);
-		return 2;
-	}
-	
-	if(!curl->data && !curl->http_length) {
-		fprintf(stderr, "[-] urlmanager/dispatch: data is empty, this should not happen\n");
-		curl_data_free(curl);
-		return 2;
-	}
-	
-	if(!curl->length && curl->type != UNKNOWN_TYPE) {
-		/* realloc should not be occured, but not sure... */
-		curl_data_free(curl);
-		return 2;
-	}
-
-	if(curl->type == TEXT_HTML) {
-		/* Checking ignored hosts */
-		/* for(i = 0; i < sizeof(__host_ignore) / sizeof(char *); i++) {
-			if(strstr(url, __host_ignore[i])) {
-				free(curl->data);
-				return 3;
-			}
-		} */
-		
-		/* Extract title */
-		if((title = url_extract_title(curl->data, title)) != NULL) {
-			if(!strncasecmp(message->nick, "malabar", 7) && 
-			   (strstr(title, "Boiler Room") || strstr(title, "BOILER ROOM")))
-				irc_kick(message->chan, message->nick, "ON S'EN *BRANLE* DE TA PUTAIN DE BOILER ROOM");
-			
-			len = strlen(title) + 256;
-			request = (char *) malloc(sizeof(char) * len);
-			
-			/* Notify Title */
-			stripped = anti_hl_each_words(title, strlen(title), curl->charset);
-			decode_html_entities_utf8(stripped, NULL);
-			
-			if(curl->code != 200)
-				snprintf(request, len, "URL (Error: %ld): %s", curl->code, stripped);
-				
-			else snprintf(request, len, "URL: %s\n", stripped);
-			
-			irc_privmsg(message->chan, request);
-			
-			/* Check Title Repost */
-			// redecoding entities for clear title update
-			decode_html_entities_utf8(title, NULL);
-			sqlquery = sqlite3_mprintf(
-				"SELECT url, nick, time, hit "
-				"FROM url           "
-				"WHERE title = '%q' "
-				"  AND nick != '%q' "
-				"  AND chan = '%q'  "
-				"LIMIT 1            ",
-				title, message->nick, message->chan
-			);
-			
-			if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
-				fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
-			
-			if(sqlite3_step(stmt) == SQLITE_ROW) {
-				// Skip repost from same nick
-				nick   = (char *) sqlite3_column_text(stmt, 1);					
-				sqlurl = (char *) sqlite3_column_text(stmt, 0);
-				ts     = sqlite3_column_int(stmt, 2);
-				hit    = sqlite3_column_int(stmt, 3);
-				
-				if(curl->code == 200 && !already_match)
-					handle_repost(TITLE_MATCH, sqlurl, message->chan, nick, ts, hit);
-			}
-			
-			// Clearing
-			sqlite3_free(sqlquery);
-			sqlite3_finalize(stmt);
-			
-			sqlquery = sqlite3_mprintf("UPDATE url SET title = '%q' WHERE url = '%q'", title, url);
-			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-				printf("[-] urlmanager/parser: cannot update db\n");
-			
-			/* Clearing */
-			sqlite3_free(sqlquery);
-			
-			free(stripped);
-			free(request);
-			
-		} else printf("[-] urlmanager/parser: cannot extract title\n");
-		
-	} else if(curl->type == IMAGE_ALL) {
-		if(curl->http_length > CURL_MAX_SIZE) {
-			zsnprintf(temp,
-				"(Warning: image size: %u Mo)",
-				curl->http_length / 1024 / 1024
-			);
-			
-			irc_privmsg(message->chan, temp);
-			
-			return 1;
-		}
-			
-		if(!handle_url_image(url, curl)) {
-			/* Calculing data checksum */
-			SHA1((unsigned char *) curl->data, curl->length, sha1_hexa);
-			
-			sqlquery = sqlite3_mprintf(
-				"UPDATE url SET sha1 = '%s' WHERE url = '%q'",
-				sha1_string(sha1_hexa, sha1_char), url
-			);
-			
-			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-				printf("[-] urlmanager/parser: cannot update db\n");
-				
-			/* Clearing */
-			sqlite3_free(sqlquery);
-			
-			/* Checking checksum repost */
-			sqlquery = sqlite3_mprintf(
-				"SELECT url, nick, time, hit "
-				"FROM url          "
-				"WHERE sha1 = '%s' "
-				"  AND url != '%q' "
-				"  AND chan = '%q' ",
-				sha1_char, url, message->chan
-			);
-			
-			if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
-				fprintf(stderr, "[-] urlmanager/parser: cannot select url\n");
-				
-			while(sqlite3_step(stmt) == SQLITE_ROW) {
-				/* Skip repost from same nick */
-				nick   = (char *) sqlite3_column_text(stmt, 1);
-				
-				if(!strcmp((char *) nick, message->nick))
-					continue;
-					
-				sqlurl = (char *) sqlite3_column_text(stmt, 0);
-				ts     = sqlite3_column_int(stmt, 2);
-				hit    = sqlite3_column_int(stmt, 3);
-				
-				if(!already_match)
-					handle_repost(CHECKSUM_MATCH, sqlurl, message->chan, nick, ts, hit);
-			}
-			
-			/* Clearing */
-			sqlite3_free(sqlquery);
-			sqlite3_finalize(stmt);
-		}
-		
-	} else if(curl->type == UNKNOWN_TYPE) {
-		zsnprintf(temp,
-			"Content: %s (%.2f Mo)", curl->http_type,
-			(double) curl->http_length / 1024 / 1024
-		);
-		
-		irc_privmsg(message->chan, temp);
-	}
-	
-	curl_data_free(curl);
-	
-	return 0;
-}
-
-int handle_url_image(char *url, curl_data_t *curl) {
-	FILE *fp;	
-	char filename[512], temp[256];
-	 
-	/* Keep going on Image Support */	
-	strcpy(temp, url + 7);
-	clean_filename(temp);
-	
-	/* Open File */
-	sprintf(filename, "%s/%s", OUTPUT_PATH, temp);
-		
-	if(!(fp = fopen(filename, "w"))) {
-		perror(filename);
-		return 1;
-	}
-	
-	if(fwrite(curl->data, 1, curl->length, fp) != curl->length)
-		perror("fwrite");
-	
-	fclose(fp);
-	
-	printf("[+] urlmanager/image: file saved (%d / %s)\n", curl->length, temp);
-	
-	return 0;
-}
-
-char * url_extract_title(char *body, char *title) {
+//
+// grab <title></title> from a html page
+// don't use libxml to works with crappy invalid html page
+// 
+static char *url_extract_title(char *body, char *title) {
 	char *read, *end;
 	
 	if((read = strcasestr(body, "<title"))) {
@@ -752,59 +122,249 @@ char * url_extract_title(char *body, char *title) {
 	return title;
 }
 
-charset_t url_extract_charset(char *body) {
-	char *charset, *limit;
+//
+// build a magic file string from libmagic, see magic.
+//
+int url_magic(curl_data_t *curl, ircmessage_t *message) {
+	char *magicstr = NULL;
+	char buffer[1024];
 	
-	if((limit = strcasestr(body, "</head>"))) {
-		if((charset = strcasestr(body, "charset="))) {
-			if(charset > limit || strlen(charset) < 12)
-				return UNKNOWN_CHARSET;
-			
-			/* Skipping beginning */
-			charset += 8;
-			
-			if(!strncasecmp(charset, "iso-8859-1", 10) || !strncasecmp(charset + 1, "iso-8859-1", 10))
-				return ISO_8859;
-			
-			if(!strncasecmp(charset, "utf-8", 5) || !strncasecmp(charset + 1, "utf-8", 5))
-				return UTF_8;
-			
-			if(!strncasecmp(charset, "windows-1252", 5) || !strncasecmp(charset + 1, "windows-1252", 5))
-				return WIN_1252;
-			
-			printf("[ ] urlmanager/charset: unknown: <%s>\n", charset);
-		}
-	}
+	// magic file
+	magicstr = magic(curl->data, curl->length);
+		
+	zsnprintf(buffer, "File: [%.2f Mo, %s]", curl->http_length / 1024 / 1024.0, magicstr);
+	irc_privmsg(message->chan, buffer);
 	
-	return UNKNOWN_CHARSET;
+	free(magicstr);
+	
+	return 1;
 }
 
-char * shurl(char *url) {
-	char *baseurl = "http://x.maxux.net/index.php?url=", *request;
+//
+// download image in memory, process a checksum in ram
+// magic file and saving on disk for mirroring
+//
+static int url_process_image(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_t *curl;
-	size_t len;
+	char filename[512], temp[512];
+	int length;
 	
 	curl = curl_data_new();
 	
-	len = (strlen(baseurl) + strlen(url)) + 8;
-	request = (char *) malloc(sizeof(char) * len);
+	if(curl_download(url, curl, 0)) // force dl is useless with custom wrapper
+		fprintf(stderr, "[-] urlmanager/image: something wrong with download\n");
 	
-	sprintf(request, "%s%s", baseurl, url);
+	if(curl->data && curl->length) {	 
+		strcpy(temp, url + 7);
+		clean_filename(temp);
+		
+		// building filename
+		sprintf(filename, "%s/%s", OUTPUT_PATH, temp);
+		printf("[+] urlmanager/image: %s\n", filename);		
 	
-	if(curl_download_text(request, curl)) {
-		free(request);
-		return NULL;
+		length = file_write(filename, curl->data, curl->length);		
+		printf("[+] urlmanager/image: file saved: %d bytes", length);
+		
+		url_magic(curl, message);
+		url_repost_advanced(curl, message, repost);
 	}
 	
-	if(curl->length > len)
-		curl->length = len - 1;
+	// free stuff
+	curl_data_free(curl);
 	
-	strncpy(request, curl->data, curl->length);
-	request[curl->length] = '\0';
+	return 0;
+}
+
+static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) {
+	curl_data_t *curl;
+	char *title = NULL;
+	char *request = NULL;
+	unsigned int length;
+	char *sqlquery;
+	
+	curl = curl_data_new();
+	
+	if(curl_download(url, curl, 0)) // force dl is useless with custom wrapper
+		fprintf(stderr, "[-] urlmanager/html: something wrong with download\n");
+	
+	if(curl->data && curl->length && (title = url_extract_title(curl->data, title))) {
+		// useless/easteregg check
+		if(!strncasecmp(message->nick, "malabar", 7) && 
+		   (strstr(title, "Boiler Room") || strstr(title, "BOILER ROOM")))
+			irc_kick(message->chan, message->nick, "ON S'EN *BRANLE* DE TA PUTAIN DE BOILER ROOM");
+		
+		// FIXME: wtf -_-
+		length = strlen(title) + 256;
+		request = (char *) malloc(sizeof(char) * length);
+		
+		// highlight preventing on title
+		repost->title = anti_hl_each_words(title, strlen(title), curl->charset);
+		decode_html_entities_utf8(repost->title, NULL);
+		
+		// print title with error code if any
+		if(curl->code != 200) {
+			snprintf(request, length, "URL (Error: %ld): %s", curl->code, repost->title);
+			
+		} else snprintf(request, length, "URL: %s", repost->title);
+		
+		irc_privmsg(message->chan, request);
+		free(request);
+		
+		// updating title on database
+		sqlquery = sqlite3_mprintf(
+			"UPDATE url SET title = '%q' WHERE url = '%q'",
+			repost->title, url
+		);
+		
+		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
+			printf("[-] urlmanager/title: cannot update title on db\n");
+		
+		sqlite3_free(sqlquery);
+		
+		url_repost_advanced(curl, message, repost);
+		
+	} else fprintf(stderr, "[-] urlmanager/title: cannot extract title\n");
+	
+	// free stuff
+	curl_data_free(curl);
+	
+	return 0;
+}
+
+//
+// handler for unknown process, wrapper for libcurl
+// downloading 256 ko of data, then magic it
+//
+static size_t url_process_unknown_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+	curl_data_t *curl = (curl_data_t*) userdata;
+	size_t prev;
+	
+	prev = curl->length;
+	curl->length += (size * nmemb);
+	
+	/* Resize data */
+	curl->data  = (char *) realloc(curl->data, (curl->length + 1));
+	memcpy(curl->data + prev, ptr, size * nmemb);
+	
+	if(curl->length >= 256 * 1024)
+		return 0;
+	
+	return size * nmemb;
+}
+
+//
+// process download of UNKNOWN type (not image or html)
+//
+static int url_process_unknown(char *url, ircmessage_t *message, repost_t *repost) {
+	curl_data_t *curl;
+	(void) repost;
+	
+	curl = curl_data_new();
+	curl->body_callback = url_process_unknown_callback;
+	
+	if(curl_download(url, curl, 42)) // force dl is useless with custom wrapper
+		fprintf(stderr, "[-] urlmanager/unknown: something wrong with download\n");
+	
+	if(curl->data && curl->length)
+		url_magic(curl, message);
+	
+	// free stuff
+	curl_data_free(curl);
+	
+	return 0;
+}
+
+//
+// just wrap error avoiding lot of line
+//
+int url_error(int errcode, curl_data_t *curl) {
+	curl_data_free(curl);
+	return errcode;
+}
+
+//
+// make a first HTTP HEAD request, to read header information
+// on base on header, dispatch code to image/html/unknown (binary)
+//
+static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
+	curl_data_t *curl;
+	char buffer[1024];
+	
+	curl = curl_data_new();
+	
+	// reading request header
+	if(curl_download_nobody(url, curl, 0))
+		printf("[-] Warning: special download\n");
+		
+	printf("[+] urlmanager/url httplength: %d\n", curl->http_length);
+	printf("[+] urlmanager/url type: %d\n", curl->type);
+	
+	// curl/http error (404, 401, ...), nothing interresting is downloaded
+	if(curl->curlcode != CURLE_OK && curl->curlcode != CURLE_WRITE_ERROR) {
+		zsnprintf(buffer, "URL (Error %d): %s", curl->curlcode, curl_easy_strerror(curl->curlcode));
+		irc_privmsg(message->chan, buffer);
+		return url_error(1, curl);
+	}
+	
+	if(curl->http_length) {	
+		// warning on big image
+		if(curl->type == IMAGE_ALL && curl->http_length > CURL_WARN_SIZE) {
+			zsnprintf(buffer, "Warning: image size: %.2f Mo, downloading...",
+			                  curl->http_length / 1024 / 1024.0);
+			                
+			irc_privmsg(message->chan, buffer);
+		}
+		
+	} else fprintf(stderr, "[-] urlmanager/url httplength is not set, deal with it.\n");
 	
 	curl_data_free(curl);
 	
-	printf("[+] urlmanager/shurl: <%s>\n", request);
+	/* dispatching process */
+	if(curl->type == IMAGE_ALL)
+		return url_process_image(url, message, repost);
+		
+	if(curl->type == TEXT_HTML)
+		return url_process_html(url, message, repost);
+		
+	if(curl->type == UNKNOWN_TYPE)
+		return url_process_unknown(url, message, repost);
 	
-	return request;
+	return 0;
+}
+
+//
+// main point of url handler, check the url, load initial repost information
+// make stats counting then process the request to curl parsing
+//
+void url_manager(ircmessage_t *message, char *args) {
+	char buffer[1024], *url;
+	int urlcount;
+	repost_t *repost;
+	(void) args;
+	
+	url = message->args;
+	
+	printf("[+] urlmanager/parser: %s\n", url);
+		
+	if(strlen(url) > 256) {
+		printf("[-] urlmanager/parser: url too long...\n");
+		return;
+	}
+	
+	// creating repost node
+	repost = repost_new();
+	repost->url = strdup(url);
+	url_repost_hit(url, message, repost);
+	
+	// check for round url count
+	if(!((urlcount = stats_url_count(message->chan)) % 500)) {
+		zsnprintf(buffer, "We just reached %d urls !", urlcount);
+		irc_privmsg(message->chan, buffer);
+	}
+	
+	// dispatching url
+	url_process(url, message, repost);
+	
+	// freeing stuff
+	repost_free(repost);
 }

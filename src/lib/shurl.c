@@ -18,25 +18,40 @@
  */
 
 #include <stdio.h>
-#include "weather.h"
-#include "core.h"
+#include <string.h>
+#include <stdlib.h>
 #include "downloader.h"
-#include "actions.h"
-#include "ircmisc.h"
+#include "shurl.h"
 
-void weather_error(char *chan, char *message) {
-	irc_privmsg(chan, message);
-}
+static char *baseurl = "http://x.maxux.net/index.php?url=";
 
-void weather_print(char *chan, weather_data_t *weather) {
-	char temp[1024];
+char *shurl(char *url) {
+	char *request;
+	curl_data_t *curl;
+	size_t len;
 	
-	// building response	
-	zsnprintf(
-		temp,
-		"%s: temperature: %.1f°C, humidity: %.1f%% [%s]",
-		weather->location, weather->temp, weather->humidity, weather->date
-	);
+	curl = curl_data_new();
 	
-	irc_privmsg(chan, temp);
+	len = (strlen(baseurl) + strlen(url)) + 8;
+	if(!(request = (char *) malloc(sizeof(char) * len)))
+		return NULL;
+	
+	sprintf(request, "%s%s", baseurl, url);
+	
+	if(curl_download_text(request, curl)) {
+		free(request);
+		return NULL;
+	}
+	
+	if(curl->length > len)
+		curl->length = len - 1;
+	
+	strncpy(request, curl->data, curl->length);
+	request[curl->length] = '\0';
+	
+	curl_data_free(curl);
+	
+	printf("[+] urlmanager/shurl: <%s>\n", request);
+	
+	return request;
 }

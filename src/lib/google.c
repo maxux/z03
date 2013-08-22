@@ -27,7 +27,7 @@
 #include "../core/init.h"
 #include "list.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "actions.h"
 #include "ircmisc.h"
 

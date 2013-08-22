@@ -28,7 +28,7 @@
 #include "ircmisc.h"
 #include "actions_binutils.h"
 
-void action_ping(ircmessage_t *message, char *args) {
+void action_just_ping(ircmessage_t *message, char *args) {
 	time_t t;
 	struct tm *timeinfo;
 	char buffer[128];
@@ -41,6 +41,35 @@ void action_ping(ircmessage_t *message, char *args) {
 	                  timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 	
 	irc_privmsg(message->chan, buffer);
+}
+
+void action_ping(ircmessage_t *message, char *args) {
+	struct hostent *he;
+	char cmdline[1024], buffer[512];
+	FILE *fp;
+	
+	if(!strlen((args = action_check_args(args)))) {
+		action_just_ping(message, args);
+		return;
+	}		
+	
+	if((he = gethostbyname(args)) == NULL) {
+		zsnprintf(buffer, "Cannot resolve host %s", args);
+		irc_privmsg(message->chan, buffer);
+		return;
+	}
+	
+	// 
+	zsnprintf(cmdline, "ping -W1 -c 3 -i 0.2 %s | tail -2", args);
+	if(!(fp = popen(cmdline, "r"))) {
+		perror("[-] popen");
+		return;
+	}
+	
+	while(fgets(buffer, sizeof(buffer), fp))
+		irc_privmsg(message->chan, buffer);
+	
+	fclose(fp);
 }
 
 void action_time(ircmessage_t *message, char *args) {
@@ -89,7 +118,6 @@ void action_dns(ircmessage_t *message, char *args) {
 		irc_privmsg(message->chan, buffer);
 		return;
 	}
-	
 	
 	ipbuf = inet_ntoa(*((struct in_addr *) he->h_addr_list[0]));
 	

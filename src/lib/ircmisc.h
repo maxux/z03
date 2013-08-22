@@ -1,7 +1,7 @@
 #ifndef __IRCMISC_H
 	#define __IRCMISC_H
 	
-	#include "urlmanager.h"
+	#include "downloader.h"
 
 	char *clean_filename(char *file);
 	
@@ -28,10 +28,14 @@
 	
 	int progression_match(size_t value);
 	
-	char *md5ascii(char *source);
 	size_t words_count(char *str);
 	
 	time_t today();
 	
 	char *list_nick_implode(list_t *list);
+	
+	char *md5_ascii(char *source);
+	char *sha1_string(unsigned char *sha1_hexa, char *sha1_char);
+	
+	int file_write(const char *filename, char *buffer, size_t length);
 #endif

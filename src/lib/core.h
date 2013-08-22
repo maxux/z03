@@ -3,6 +3,7 @@
 	
 	#include <time.h>
 	#include <string.h>
+	#include <pthread.h>
 	#include "list.h"
 	
 	#define OUTPUT_PATH             "/var/www/perso/imagespawn/data/"
@@ -58,10 +59,18 @@
 		
 	} request_t;
 	
+	typedef struct thread_cmd_t {
+		ircmessage_t *message;
+		char *args;
+		pthread_t thread;
+		char myid[16];
+		
+	} thread_cmd_t;
 	
 	
 	typedef struct global_lib_t {
 		struct list_t *channels;
+		struct list_t *threads;
 		
 	} global_lib_t;
 	
@@ -92,4 +101,7 @@
 	
 	void irc_privmsg(char *dest, char *message);
 	void irc_notice(char *user, char *message);
+	
+	/* gnu fix */
+	extern char *strcasestr(const char *, const char *);
 #endif

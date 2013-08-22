@@ -86,9 +86,9 @@ request_t __request[] = {
 	{
 		.match    = ".known",
 		.callback = action_known,
-		.man      = "check if a given nick is already known, by hostname",
+		.man      = "parse regexp and show which known nick match",
 		.hidden   = 0,
-		.syntaxe  = ".known <nick>",
+		.syntaxe  = ".known <regexp>",
 	},
 	{
 		.match    = ".url",

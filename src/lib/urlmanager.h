@@ -1,82 +1,19 @@
-#ifndef __IMAGESPAWN_URL
-	#define __IMAGESPAWN_URL
+#ifndef __ZO3_LIB_URL
+	#define __ZO3_LIB_URL
 	
 	#include <curl/curl.h>
 	#define CURL_USERAGENT		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.22 Safari/537.36"
 	#define CURL_USERAGENT_LEGACY	"curl/7.25.0 (i686-pc-linux-gnu) libcurl/7.25.0"
-	#define CURL_MAX_SIZE		20 * 1024 * 1024	/* 20 Mo */
+	#define CURL_WARN_SIZE          15 * 1024 * 1024        /* in bytes */
 	
 	/* Title Host ignore */
 	extern char *__host_ignore[];
 	
-	typedef enum repost_type_t {
-		URL_MATCH,
-		CHECKSUM_MATCH,
-		TITLE_MATCH,
-		
-	} repost_type_t;
+	extern request_t __url_request;
 	
+	char *extract_url(char *url);	
+	void url_manager(ircmessage_t *message, char *args);
+	int url_error(int errcode, curl_data_t *curl);
 	
-	typedef enum document_type_t {
-		UNKNOWN_TYPE,
-		TEXT_HTML,
-		IMAGE_ALL
-		
-	} document_type_t;
-	
-	typedef enum charset_t {
-		UNKNOWN_CHARSET,
-		UTF_8,
-		ISO_8859,
-		WIN_1252
-		
-	} charset_t;
-	
-	typedef struct curl_data_t {
-		char *data;
-		size_t http_length;
-		size_t length;
-		long code;
-		char *http_type;
-		enum document_type_t type;
-		enum charset_t charset;
-		CURLcode curlcode;
-		char forcedl;
-		char *cookie;
-		
-	} curl_data_t;
-	
-	typedef struct host_cookies_t {
-		char *host;
-		char *cookie;
-		
-	} host_cookies_t;
-	
-	char *extract_url(char *url);
-	
-	curl_data_t *curl_data_new();
-	void curl_data_free(curl_data_t *data);
-	
-	size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata);
-	size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata);
-	char * curl_cookie(char *url);
-	int curl_download(char *url, curl_data_t *data, char forcedl);
-	int curl_download_post(char *url, curl_data_t *data, char *post);
-	int curl_download_text(char *url, curl_data_t *data);
-	int curl_download_text_post(char *url, curl_data_t *data, char *post);
-	
-	char * repost();
-	
-	int handle_url(ircmessage_t *message, char *url);
-	int handle_url_dispatch(char *url, ircmessage_t *message, char already_match);
-	int handle_url_image(char *url, curl_data_t *curl);
-	
-	char * url_extract_title(char *body, char *title);
-	enum charset_t url_extract_charset(char *body);
-	
-	void handle_url_title(char *url);
-	char * shurl(char *url);
-	
-	// GNU Fix
-	extern char * strcasestr(const char *, const char *);
+	int url_magic(curl_data_t *curl, ircmessage_t *message);
 #endif

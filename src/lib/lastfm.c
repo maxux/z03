@@ -26,7 +26,7 @@
 #include "list.h"
 #include "database.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "ircmisc.h"
 #include "lastfm.h"
 
@@ -265,7 +265,7 @@ lastfm_request_t *lastfm_getplaying(lastfm_t *lastfm, lastfm_request_t *request,
 	if(lastfm_curl_download_text(url, curl, request))
 		return request;
 	
-	printf("[ ] lastfm: json dump: <%s>\n", curl->data);
+	// printf("[ ] lastfm: json dump: <%s>\n", curl->data);
 	
 	/* loading json */
 	if(!(root = lastfm_json_load(curl->data, curl->length, request)))
@@ -325,7 +325,7 @@ lastfm_request_t *lastfm_api_gettoken(lastfm_t *lastfm, lastfm_request_t *reques
 	if(curl_download_text(url, curl))
 		return request;
 	
-	printf("[ ] lastfm: json dump: <%s>\n", curl->data);
+	// printf("[ ] lastfm: json dump: <%s>\n", curl->data);
 	
 	if(!(root = lastfm_json_load(curl->data, curl->length, request)))
 		return lastfm_abort_request(root, curl, request);
@@ -355,7 +355,7 @@ static char *lastfm_sig_getsession(lastfm_t *lastfm) {
 	char str[MALLOC_DEFAULT], *md5;
 	
 	snprintf(str, MALLOC_DEFAULT, "api_key%smethodauth.getSessiontoken%s%s", lastfm->apikey, lastfm->token, lastfm->apisecret);
-	md5 = md5ascii(str);
+	md5 = md5_ascii(str);
 	
 	return md5;
 }
@@ -375,7 +375,7 @@ lastfm_request_t *lastfm_api_getsession(lastfm_t *lastfm, lastfm_request_t *requ
 	if(curl_download_text(url, curl))
 		return request;
 	
-	printf("[ ] lastfm: json dump: <%s>\n", curl->data);
+	// printf("[ ] lastfm: json dump: <%s>\n", curl->data);
 	
 	if(!(root = lastfm_json_load(curl->data, curl->length, request)))
 		return lastfm_abort_request(root, curl, request);
@@ -408,7 +408,7 @@ static char *lastfm_sig_love(lastfm_t *lastfm) {
 	
 	printf("[ ] lasfm/sig: <%s>\n", str);
 	
-	return md5ascii(str);
+	return md5_ascii(str);
 }
 
 // request love track
@@ -437,7 +437,7 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 	if(curl_download_text_post(LASTFM_API_BASE, curl, space_encode(post)))
 		return request;
 	
-	printf("[ ] lastfm: json dump: <%s>\n", curl->data);
+	// printf("[ ] lastfm: json dump: <%s>\n", curl->data);
 	
 	if(!(root = lastfm_json_load(curl->data, curl->length, request)))
 		return lastfm_abort_request(root, curl, request);

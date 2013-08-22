@@ -370,3 +370,27 @@ void stats_daily_update() {
 	
 	sqlite3_finalize(stmt);
 }
+
+int stats_url_count(char *chan) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	int urls = -1;
+
+	sqlquery = sqlite3_mprintf(
+		"SELECT count(id) FROM url WHERE chan = '%q'",
+		chan
+	);
+	
+	if(!(stmt = db_sqlite_select_query(sqlite_db, sqlquery)))
+		fprintf(stderr, "[-] url parser: cannot select url\n");
+		
+	if((sqlite3_step(stmt)) == SQLITE_ROW) {
+		urls = sqlite3_column_int(stmt, 0);
+		printf("[ ] urlmanager/count: %d\n", urls);
+	}
+	
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	return urls;
+}

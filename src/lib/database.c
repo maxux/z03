@@ -36,6 +36,8 @@ sqlite3 *db_sqlite_init() {
 	
 	printf("[+] sqlite: loading <%s>\n", SQL_DATABASE_FILE);
 	
+	sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+	
 	if(sqlite3_open(SQL_DATABASE_FILE, &db) != SQLITE_OK) {
 		fprintf(stderr, "[-] sqlite: cannot open sqlite databse: <%s>\n", sqlite3_errmsg(db));
 		return NULL;

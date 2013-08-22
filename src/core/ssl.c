@@ -22,11 +22,55 @@
 #include <string.h>
 #include "init.h"
 
+#include <pthread.h>
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
 #include "ssl.h"
+
+static pthread_mutex_t *lockarray;
+
+/* openssl callback for thread safe libcurl */
+static void lock_callback(int mode, int type, char *file, int line) {
+	(void) file;
+	(void) line;
+	
+	if(mode & CRYPTO_LOCK)
+		pthread_mutex_lock(&(lockarray[type]));
+		
+	else  pthread_mutex_unlock(&(lockarray[type]));
+}
+
+static unsigned long thread_id(void) {
+	unsigned long ret;
+
+	ret = (unsigned long) pthread_self();
+	return ret;
+}
+
+static void init_locks(void) {
+	int i;
+
+	lockarray = (pthread_mutex_t *) OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
+	
+	for(i = 0; i < CRYPTO_num_locks(); i++)
+		pthread_mutex_init(&(lockarray[i]), NULL);
+
+	CRYPTO_set_id_callback((unsigned long (*)()) thread_id);
+	CRYPTO_set_locking_callback((void (*)()) lock_callback);
+}
+
+static void kill_locks(void) {
+	int i;
+
+	CRYPTO_set_locking_callback(NULL);
+	
+	for(i = 0; i < CRYPTO_num_locks(); i++)
+		pthread_mutex_destroy(&(lockarray[i]));
+
+	OPENSSL_free(lockarray);
+}
 
 ssl_socket_t *init_socket_ssl(int sockfd, ssl_socket_t *ssl) {
 	ssl->socket     = NULL;
@@ -38,6 +82,8 @@ ssl_socket_t *init_socket_ssl(int sockfd, ssl_socket_t *ssl) {
 	
 	// Register the available ciphers and digests
 	SSL_library_init();
+	
+	init_locks();
 
 	// New context saying we are a client, and using SSL 2 or 3
 	ssl->sslContext = SSL_CTX_new(SSLv23_client_method());
@@ -84,6 +130,8 @@ void ssl_close(ssl_socket_t *ssl) {
 		SSL_CTX_free(ssl->sslContext);
 
 	free(ssl);
+	
+	kill_locks();
 }
 
 void ssl_error() {

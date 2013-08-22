@@ -89,6 +89,8 @@ void sighandler(int signal) {
 			
 			fprintf(stderr, "[-] ---    Rolling back    ---\n");
 			
+			sleep(5);
+			
 			siglongjmp(segfault_env, 1);
 		break;
 	}
@@ -223,9 +225,6 @@ int init_socket(char *server, int port) {
 		return -1;
 	}
 	
-	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
-		diep("[-] setsockopt: SO_RCVTIMEO");
-	
 	return fd;
 }
 
@@ -237,12 +236,8 @@ void raw_socket(char *message) {
 	strcpy(sending, message);
 	strcat(sending, "\r\n");
 	
-	pthread_mutex_lock(&global_core->mutex_ssl);
-	
 	if(ssl_write(ssl, sending) == -1)
 		perror("[-] IRC: send");
-	
-	pthread_mutex_unlock(&global_core->mutex_ssl);
 	
 	free(sending);
 }
@@ -286,28 +281,18 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 			}
 		}
 		
-		do {
-			pthread_mutex_lock(&global_core->mutex_ssl);
-			
-			if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
-				if(rlen == 0) {
-					ssl_error();
-					printf("[ ] Core: Warning: nothing read from socket\n");
-					diep("recv");
-				}
-					
-				buff[rlen] = '\0';
+		if((rlen = ssl_read(ssl, buff, MAXBUFF)) >= 0) {
+			if(rlen == 0)
+				continue;
+			/* // ssl_error();
+				printf("[ ] Core: Warning: nothing read from socket\n");
+				diep("[-] core: recv");
+			} */
 				
-			} else if(errno != EAGAIN)
-				ssl_error();
+			buff[rlen] = '\0';
 			
-			pthread_mutex_unlock(&global_core->mutex_ssl);
-			
-			// if threads, waiting for mutex match
-			if(remain_client())
-				usleep(420000);
-			
-		} while(errno == EAGAIN);
+		} else if(errno != EAGAIN)
+			ssl_error();
 	}
 	
 	return 0;

@@ -25,7 +25,7 @@
 #include "list.h"
 #include "database.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "ircmisc.h"
 #include "whatcd.h"
 #include "entities.h"

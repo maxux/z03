@@ -25,7 +25,7 @@
 #include "list.h"
 #include "database.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "ircmisc.h"
 #include "settings.h"
 #include "whatcd.h"
@@ -131,14 +131,16 @@ void periodic_delay() {
 		sqlite3_free(sqlquery);
 		sqlite3_finalize(stmt);
 		
-		sqlquery = sqlite3_mprintf("UPDATE delay SET finished = 1 WHERE id = %d", id);
-		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
-			printf("[-] lib/notes: cannot mark as read\n");
+		if(id > 0) {		
+			sqlquery = sqlite3_mprintf("UPDATE delay SET finished = 1 WHERE id = %d", id);
+			
+			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
+				printf("[-] lib/notes: cannot mark as read\n");
+			
+			sqlite3_free(sqlquery);
+		}
 	
 	} else fprintf(stderr, "[-] lib/delay: sql error\n");
-	
-	/* Clearing */
-	sqlite3_free(sqlquery);
 }
 
 void *periodic_each_minutes(void *dummy) {

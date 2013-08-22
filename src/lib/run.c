@@ -31,7 +31,6 @@
 #include "../core/init.h"
 #include "list.h"
 #include "core.h"
-#include "urlmanager.h"
 #include "run.h"
 #include "ircmisc.h"
 
@@ -116,7 +115,6 @@ void *lib_run_fork(void *_data) {
 }
 
 void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
-	struct timeval tv = {tv.tv_sec = 0, tv.tv_usec = 0};
 	char buffer[2048];
 	char *prefix[] = {"C ", "PY ", "HS ", "PHP "};
 	lib_run_data_t *data;
@@ -126,10 +124,6 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 		irc_privmsg(msg->chan, "Build machine seems te be down");
 		return;
 	}
-	
-	/* removing timeout */
-	if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
-		diep("[-] setsockopt: SO_RCVTIMEO");
 	
 	/* creating environment */
 	if(!(data = malloc(sizeof(lib_run_data_t))))
@@ -152,11 +146,6 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	
 	data->codefd = fd;
 	global_core->extraclient++;
-	
-	/* reducing main socket timeout */
-	tv.tv_sec = 1;
-	if(setsockopt(ssl->sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv)))
-		diep("[-] setsockopt: SO_RCVTIMEO");
 	
 	/* threading operation */
 	printf("[+] lib/run: starting thread\n");

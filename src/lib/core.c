@@ -42,6 +42,7 @@
 #include "list.h"
 #include "core.h"
 #include "entities.h"
+#include "downloader.h"
 #include "urlmanager.h"
 #include "logs.h"
 #include "ircmisc.h"
@@ -60,15 +61,17 @@
 #include "actions_run.h"
 #include "actions_useless.h"
 
-// request_t __request= include
 #include "request_list.h"
 unsigned int __request_count = sizeof(__request) / sizeof(request_t);
 
-#define LASTTIME_CHECK     5 * 24 * 60 * 60 // 5 days
+#define NICK_LASTTIME_CHECK     5 * 24 * 60 * 60 // 5 days
 
 global_lib_t global_lib = {
 	.channels = NULL,
+	.threads  = NULL,
 };
+
+
 
 pthread_t __periodic_thread;
 
@@ -346,9 +349,51 @@ int handle_query(char *data) {
 	return 0;
 }
 
+void * command_thread(void *_thread) {
+	thread_cmd_t *thread = (thread_cmd_t *) _thread;
+	
+	thread->message->request->callback(thread->message, thread->args);
+	
+	// freeing process
+	free(thread->message->message);
+	free(thread->message->command);
+	free(thread->message->args);
+	free(thread->message);
+	free(thread->args);
+	
+	list_remove(global_lib.threads, thread->myid);
+	free(thread);
+	
+	return _thread;
+}
+
+void command_prepare_thread(ircmessage_t *message, char *args) {
+	thread_cmd_t *thread;
+	
+	// copy ircmessage_t element
+	thread = (thread_cmd_t *) malloc(sizeof(thread_cmd_t));
+	thread->message = (ircmessage_t *) malloc(sizeof(ircmessage_t));
+	memcpy(thread->message, message, sizeof(ircmessage_t));
+	
+	// reallocating dynamic contents
+	thread->message->message = strdup(message->message);
+	thread->message->command = strdup(message->command);
+	thread->message->args    = strdup(message->args);
+	
+	thread->args = strdup(args);
+	
+	zsnprintf(thread->myid, "%p", (void *) &thread->thread);
+	
+	if(!pthread_create(&thread->thread, NULL, command_thread, thread)) {
+		printf("[+] core/thread: created\n");
+		list_append(global_lib.threads, strdup(thread->myid), thread);
+		
+	} else perror("[-] core/thread");
+}
+
 int handle_commands(char *content, ircmessage_t *message) {
 	unsigned int i;
-	unsigned int callback_index = 0, callback_count = 0;
+	unsigned int callback_count = 0;
 	char *callback_temp = NULL;
 	char *command, *match;
 	request_t *callback_request = NULL;
@@ -369,7 +414,6 @@ int handle_commands(char *content, ircmessage_t *message) {
 		if(!strncmp(command, __request[i].match, strlen(command))) {
 			printf("[+] commands: match for: <%s>\n", __request[i].match);
 			callback_count++;
-			callback_index   = i;
 			callback_temp    = match;
 			callback_request = &__request[i];
 			
@@ -389,7 +433,7 @@ int handle_commands(char *content, ircmessage_t *message) {
 	if(callback_count == 1) {
 		message->command = content;
 		message->request = callback_request;
-		__request[callback_index].callback(message, callback_temp);
+		command_prepare_thread(message, callback_temp);
 		return 1;
 		
 	} else irc_privmsg(message->chan, "Ambiguous command name, be more precise.");
@@ -419,10 +463,10 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		strcasestr(content, "boiler") ||
 		strcasestr(content, "b0iler") ||
 		strcasestr(content, "bo!ler") ||
-		strcasestr(content, " BR")    || 
-		strcasestr(content, " 8R")    ||
-		strcasestr(content, " B5")    || 
-		strcasestr(content, " 85")    ||
+		!strcasecmp(content, "BR")   ||
+		!strcasecmp(content, "8R")   ||
+		strcasestr(content, "BR ")   || 
+		strcasestr(content, "8R ")   ||
 		strcasestr(content, "chaufferie")
 	)) {
 		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
@@ -446,15 +490,21 @@ int handle_message(char *data, ircmessage_t *message) {
 	
 	content = skip_server(data) + 1;
 	
-	/* security check and easteregg/useless commands */
+	// security check and easteregg/useless commands
 	if(handle_precommands(content, message))
 		return 0;
 	
-	/* Updating channel lines count */
+	// updating channel lines count
 	if(progression_match(++message->channel->lines)) {
 		snprintf(buffer, sizeof(buffer), "Well done, we just reached %u lines !\n", message->channel->lines);
 		irc_privmsg(message->chan, buffer);
 	}
+	
+	// checking bot commands, before stats management
+	// this cause a better response time
+	handle_commands(content, message);
+	
+	db_sqlite_simple_query(sqlite_db, "BEGIN TRANSACTION");
 	
 	/* Updating nick lines count */
 	if((nick = list_search(message->channel->nicks, message->nick))) {
@@ -487,7 +537,7 @@ int handle_message(char *data, ircmessage_t *message) {
 		       message->chan, message->nickhl, nick->lines, message->channel->lines,
 		       nick->words, nick->lasttime);
 		
-		if(nick->lasttime < now - LASTTIME_CHECK) {
+		if(nick->lasttime < now - NICK_LASTTIME_CHECK) {
 			temp = time_elapsed(now - nick->lasttime);
 			zsnprintf(buffer, "%s had not been seen on this channel for %s", message->nickhl, temp);
 			irc_privmsg(message->chan, buffer);
@@ -519,16 +569,17 @@ int handle_message(char *data, ircmessage_t *message) {
 	/* saving log */
 	log_privmsg(message->chan, message->nick, content);
 	
-	/* checking bot commands */
-	if(handle_commands(content, message))
-		return 0;
+	// commit sql
+	db_sqlite_simple_query(sqlite_db, "END TRANSACTION");
 	
 	if((url = strstr(data, "http://")) || (url = strstr(data, "https://"))) {
 		if((trueurl = extract_url(url))) {
-			handle_url(message, trueurl);
+			message->request = &__url_request;
+			message->args    = trueurl;
+			command_prepare_thread(message, trueurl);
 			free(trueurl);
 			
-		} else fprintf(stderr, "[-] URL: Cannot extact url\n");		
+		} else fprintf(stderr, "[-] URL: Cannot extact url\n");
 	}
 	
 	return 1;
@@ -660,6 +711,10 @@ void main_core(char *data, char *request) {
 
 void main_construct(void) {
 	global_lib.channels = list_init(NULL);
+	global_lib.threads  = list_init(NULL);
+	
+	// init libcurl
+	curl_global_init(CURL_GLOBAL_ALL);
 	
 	// opening sqlite
 	sqlite_db = db_sqlite_init();
@@ -678,6 +733,8 @@ void main_construct(void) {
 }
 
 void main_destruct(void) {
+	list_node_t *node;
+	
 	// closing sqitite
 	db_sqlite_close(sqlite_db);
 	
@@ -686,4 +743,13 @@ void main_destruct(void) {
 	
 	printf("[+] lib: waiting theads...\n");
 	pthread_join(__periodic_thread, NULL);
+	
+	// FIXME: iterate node
+	while((node = global_lib.threads->nodes)) {	
+		// pthread_cancel(((thread_cmd_t *) node)->thread);
+		pthread_join(((thread_cmd_t *) node)->thread, NULL);
+	}
+	
+	list_free(global_lib.channels);
+	list_free(global_lib.threads);
 }

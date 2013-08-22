@@ -32,6 +32,7 @@
 #include "wiki.h"
 #include "whatcd.h"
 #include "settings.h"
+#include "shurl.h"
 #include "actions_webservices.h"
 
 void action_weather(ircmessage_t *message, char *args) {

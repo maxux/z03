@@ -23,10 +23,11 @@
 #include <ctype.h>
 #include <iconv.h>
 #include <openssl/md5.h>
+#include <openssl/sha.h>
 #include "../core/init.h"
 #include "database.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "ircmisc.h"
 
 typedef struct iconv_data_t {
@@ -429,28 +430,6 @@ int progression_match(size_t value) {
 	return !(value % 20000);
 }
 
-char *md5ascii(char *source) {
-	unsigned char result[MD5_DIGEST_LENGTH];
-	const unsigned char *str;
-	char *output, tmp[3];
-	int i;
-	
-	printf("[+] ircmisc/md5: hashing <%s>\n", source);
-	
-	str = (unsigned char *) source;
-	
-	MD5(str, strlen(source), result);
-	
-	output = (char *) calloc(sizeof(char), (MD5_DIGEST_LENGTH * 2) + 1);
-	
-	for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
-		sprintf(tmp, "%02x", result[i]);
-		strcat(output, tmp);
-	}
-	
-	return output;
-}
-
 size_t words_count(char *str) {
 	size_t words = 0;
 	
@@ -517,4 +496,57 @@ char *list_nick_implode(list_t *list) {
 	*(implode + length - 2) = '\0';
 	
 	return implode;
+}
+
+char *md5_ascii(char *source) {
+	unsigned char result[MD5_DIGEST_LENGTH];
+	const unsigned char *str;
+	char *output, tmp[3];
+	int i;
+	
+	printf("[+] ircmisc/md5: hashing <%s>\n", source);
+	
+	str = (unsigned char *) source;
+	
+	MD5(str, strlen(source), result);
+	
+	output = (char *) calloc(sizeof(char), (MD5_DIGEST_LENGTH * 2) + 1);
+	
+	for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
+		sprintf(tmp, "%02x", result[i]);
+		strcat(output, tmp);
+	}
+	
+	return output;
+}
+
+char *sha1_string(unsigned char *sha1_hexa, char *sha1_char) {
+	char sha1_hex[3] = {0};
+	unsigned int i;
+	
+	*sha1_char = '\0';
+	
+	for(i = 0; i < SHA_DIGEST_LENGTH; i++) {
+		sprintf(sha1_hex, "%02x", sha1_hexa[i]);
+		strcat(sha1_char, sha1_hex);
+	}
+	
+	return sha1_char;
+}
+
+int file_write(const char *filename, char *buffer, size_t length) {
+	FILE *fp;
+	size_t written;
+	
+	if(!(fp = fopen(filename, "w"))) {
+		perror(filename);
+		return 0;
+	}
+	
+	if((written = fwrite(buffer, 1, length, fp)) != length)
+		perror("[-] fwrite");
+	
+	fclose(fp);
+	
+	return written;
 }

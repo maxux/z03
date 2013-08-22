@@ -196,25 +196,30 @@ void action_count(ircmessage_t *message, char *args) {
 	else nick = args;
 	
 	sqlquery = sqlite3_mprintf(
-		"SELECT words, lines,                        "
-		"    (SELECT SUM(words) FROM stats           "
-		"    WHERE chan = '%q') as twords,           "
-		"    (SELECT COUNT(*) FROM logs              "
-		"    WHERE chan = '%q') as tlines,           "
-		"    (SELECT timestamp FROM logs             "
-		"    WHERE chan = '%q' AND nick = '%q'       "
-		"    ORDER BY timestamp ASC LIMIT 1) as si   "
-		"FROM stats WHERE nick = '%q' AND chan = '%q'",
+		"SELECT SUM(words), SUM(lines),             "
+		"    (SELECT SUM(words) FROM stats          "
+		"    WHERE chan = '%q') as twords,          "
+		"    (SELECT COUNT(*) FROM logs             "
+		"    WHERE chan = '%q') as tlines,          "
+		"    (SELECT timestamp FROM logs            "
+		"    WHERE chan = '%q' AND nick REGEXP '%q' "
+		"    ORDER BY timestamp ASC LIMIT 1) as si  "
+		"FROM stats                                 "
+		"WHERE nick REGEXP '%q' AND chan = '%q'      ",
 		message->chan, message->chan, message->chan, nick, nick, message->chan
 	);
 	                           
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] action/count: sql error\n");
 	
-	while(sqlite3_step(stmt) == SQLITE_ROW) {
-		found = 1;
-		
+	while(sqlite3_step(stmt) == SQLITE_ROW) {		
 		words  = sqlite3_column_int(stmt, 0);
+		
+		if(words) {
+			found = 1;
+			
+		} else break;
+			
 		lines  = sqlite3_column_int(stmt, 1);
 		twords = sqlite3_column_int(stmt, 2);
 		tlines = sqlite3_column_int(stmt, 3);
@@ -256,29 +261,37 @@ void action_count(ircmessage_t *message, char *args) {
 }
 
 void action_known(ircmessage_t *message, char *args) {
-	char *list, *listhl;
-	char output[256];
-	whois_t *whois;
-		
+	sqlite3_stmt *stmt;
+	char *sqlquery, *parsed, *implode;
+	const unsigned char *nick;
+	list_t *nicklist;
+	
 	if(!action_parse_args(message, args))
 		return;
 	
-	if((whois = irc_whois(args))) {
-		if((list = irc_knownuser(args, whois->host))) {
-			listhl = anti_hl_each_words(list, strlen(list), UTF_8);
-			zsnprintf(output, "%s (host: %s) is also known as: %s",
-			                  anti_hl(args), whois->host, listhl);
-			
-			free(listhl);
-			free(list);
-			
-			whois_free(whois);
-			
-		} else zsnprintf(output, "<%s> has no previous known host", anti_hl(args));
-		
-	} else zsnprintf(output, "<%s> is not connected", args);
+	sqlquery = sqlite3_mprintf(
+		"SELECT nick FROM stats                 "
+		"WHERE nick REGEXP '%q' AND chan = '%q' ",
+		args, message->chan
+	);
 	
-	irc_privmsg(message->chan, output);
+	nicklist = list_init(NULL);
+	
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] action/count: sql error\n");
+	
+	while(sqlite3_step(stmt) == SQLITE_ROW) {
+		nick = sqlite3_column_text(stmt, 0);		
+		parsed = anti_hl_alloc((char *) nick);
+		list_append(nicklist, parsed, parsed);
+	}
+	
+	implode = list_implode(nicklist, 10);
+	irc_privmsg(message->chan, implode);
+	
+	list_free(nicklist);
+	sqlite3_free(sqlquery);
+	sqlite3_finalize(stmt);
 }
 
 void action_url(ircmessage_t *message, char *args) {

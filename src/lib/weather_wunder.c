@@ -22,7 +22,7 @@
 #include <jansson.h>
 #include "../common/private.h"
 #include "core.h"
-#include "urlmanager.h"
+#include "downloader.h"
 #include "weather.h"
 #include "weather_wunder.h"
 #include "actions.h"

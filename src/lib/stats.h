@@ -12,4 +12,6 @@
 	void stats_load_all(list_t *root);
 	
 	void stats_daily_update();
+	
+	int stats_url_count(char *chan);
 #endif

@@ -22,4 +22,6 @@
 	
 	int list_remove(list_t *list, char *name);
 	void list_free(list_t *list);
+	
+	char *list_implode(list_t *list, size_t limit);
 #endif

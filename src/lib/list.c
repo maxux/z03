@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "list.h"
+#include "core.h"
+#include "ircmisc.h"
 
 list_t * list_init(void (*destruct)(void *)) {
 	list_t *list;
@@ -108,4 +110,44 @@ int list_remove(list_t *list, char *name) {
 	free(node);
 	
 	return 0;
+}
+
+char *list_implode(list_t *list, size_t limit) {
+	size_t alloc = 0, now = 0;
+	list_node_t *node;
+	char *implode;
+	char buffer[128];
+	
+	/* compute the full list length */
+	node = list->nodes;
+		
+	while(node) {
+		alloc += strlen(node->name) + 8;
+		node = node->next;
+	}
+	
+	/* allocating string and re-iterate list */
+	implode = (char *) calloc(sizeof(char), alloc);
+	node = list->nodes;
+	
+	while(node && ++now) {
+		// appending anti-hled nick
+		zsnprintf(buffer, "%s", node->name);
+		anti_hl(buffer);
+		strcat(implode, buffer);
+		
+		if(now > limit) {
+			zsnprintf(buffer, " and %u others hidden", list->length - now);
+			implode = (char *) realloc(implode, alloc + 64);
+			strcat(implode, buffer);
+			
+			return implode;
+			
+		} else if(node->next)
+			strcat(implode, ", ");
+			
+		node = node->next;
+	}
+	
+	return implode;
 }
