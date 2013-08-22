@@ -12,6 +12,7 @@ options: config.mk
 	@echo "EXTRA   = $(EXTRA_CFLAGS)"
 
 $(EXEC): $(OBJ)
+	mkdir -p $(BINPATH)
 	$(CC) -o $(BINPATH)$@ $^ $(LDFLAGS)
 	
 $(OBJ): $(SRC)
