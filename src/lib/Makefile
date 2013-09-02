@@ -1,7 +1,8 @@
 include config.mk
 
-SRC = $(wildcard *.c)
-OBJ = $(SRC:.c=.o)
+_SRC = $(wildcard *.c)
+SRC  = registrar.c $(filter-out registrar.c, $(_SRC))
+OBJ  = $(SRC:.c=.o)
 
 all: options $(EXEC)
 

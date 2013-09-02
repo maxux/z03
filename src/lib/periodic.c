@@ -32,8 +32,8 @@
 
 void periodic_whatcd(list_t *tracking) {
 	whatcd_t *whatcd;
+	list_node_t *node2;
 	whatcd_request_t *request;
-	list_node_t *node, *node2;
 	whatcd_release_t *release;
 	char buffer[2048], *output;
 	list_t *users;
@@ -42,8 +42,7 @@ void periodic_whatcd(list_t *tracking) {
 	if(!(users = settings_by_key("whatsession", PRIVATE)))
 		return;
 	
-	node = users->nodes;
-	while(node) {
+	list_foreach(users, node) {
 		whatcd = whatcd_new((char *) node->data);
 		
 		/* load error count */
@@ -97,8 +96,6 @@ void periodic_whatcd(list_t *tracking) {
 		next_node:
 			whatcd_request_free(request);		
 			whatcd_free(whatcd);
-			
-			node = node->next;
 	}
 	
 	list_free(users);

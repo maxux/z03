@@ -21,6 +21,53 @@
 #include "run.h"
 #include "actions_run.h"
 
+//
+// registering commands
+//
+
+static request_t __action_c = {
+	.match    = ".c",
+	.callback = action_run_c,
+	.man      = "compile and run c code, from arguments",
+	.hidden   = 0,
+	.syntaxe  = ".c <c code> eg: .c printf(\"Hello world\\n\");",
+};
+
+static request_t __action_python = {
+	.match    = ".python",
+	.callback = action_run_py,
+	.man      = "compile and run inline python code, from arguments",
+	.hidden   = 0,
+	.syntaxe  = ".python <python code> eg: .py print('Hello world')",
+};
+
+static request_t __action_haskell = {
+	.match    = ".haskell",
+	.callback = action_run_hs,
+	.man      = "compile and run inline haskell code, from arguments",
+	.hidden   = 0,
+	.syntaxe  = ".haskell <haskell code> eg: .hs print \"Hello\"",
+};
+
+static request_t __action_php = {
+	.match    = ".php",
+	.callback = action_run_php,
+	.man      = "compile and run inline php code, from arguments",
+	.hidden   = 0,
+	.syntaxe  = ".php <php code> eg: .php echo \"Hello\";",
+};
+
+__registrar actions_run() {
+	request_register(&__action_c);
+	request_register(&__action_python);
+	request_register(&__action_haskell);
+	request_register(&__action_php);
+}
+
+//
+// commands implementation
+//
+
 void action_run_c(ircmessage_t *message, char *args) {
 	lib_run_init(message, args, C);
 }

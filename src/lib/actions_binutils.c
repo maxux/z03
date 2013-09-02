@@ -19,7 +19,6 @@
  
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
 #include <netdb.h>
 #include "../common/bot.h"
 #include "../core/init.h"
@@ -28,49 +27,43 @@
 #include "ircmisc.h"
 #include "actions_binutils.h"
 
-void action_just_ping(ircmessage_t *message, char *args) {
-	time_t t;
-	struct tm *timeinfo;
-	char buffer[128];
-	(void) args;
-	
-	time(&t);
-	timeinfo = localtime(&t);
-	
-	zsnprintf(buffer, "Pong. Ping request received at %02d:%02d:%02d.",
-	                  timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-	
-	irc_privmsg(message->chan, buffer);
+//
+// registering commands
+//
+
+static request_t __action_time = {
+	.match    = ".time",
+	.callback = action_time,
+	.man      = "print the time",
+	.hidden   = 0,
+	.syntaxe  = "",
+};
+
+static request_t __action_uptime = {
+	.match    = ".uptime",
+	.callback = action_uptime,
+	.man      = "print the bot's uptime",
+	.hidden   = 0,
+	.syntaxe  = "",
+};
+
+static request_t __action_rand = {
+	.match    = ".rand",
+	.callback = action_random,
+	.man      = "random number generator",
+	.hidden   = 0,
+	.syntaxe  = ".rand, .rand <max>, .rand <min> <max>",
+};
+
+__registrar actions_binutils() {
+	request_register(&__action_time);
+	request_register(&__action_uptime);
+	request_register(&__action_rand);
 }
 
-void action_ping(ircmessage_t *message, char *args) {
-	struct hostent *he;
-	char cmdline[1024], buffer[512];
-	FILE *fp;
-	
-	if(!strlen((args = action_check_args(args)))) {
-		action_just_ping(message, args);
-		return;
-	}		
-	
-	if((he = gethostbyname(args)) == NULL) {
-		zsnprintf(buffer, "Cannot resolve host %s", args);
-		irc_privmsg(message->chan, buffer);
-		return;
-	}
-	
-	// 
-	zsnprintf(cmdline, "ping -W1 -c 3 -i 0.2 %s | tail -2", args);
-	if(!(fp = popen(cmdline, "r"))) {
-		perror("[-] popen");
-		return;
-	}
-	
-	while(fgets(buffer, sizeof(buffer), fp))
-		irc_privmsg(message->chan, buffer);
-	
-	fclose(fp);
-}
+//
+// commands implementation
+//
 
 void action_time(ircmessage_t *message, char *args) {
 	time_t rawtime;
@@ -103,50 +96,6 @@ void action_uptime(ircmessage_t *message, char *args) {
 	free(rehash);
 	
 	irc_privmsg(message->chan, msg);
-}
-
-void action_dns(ircmessage_t *message, char *args) {
-	struct hostent *he;
-	char buffer[256];
-	char *ipbuf;
-	
-	if(!action_parse_args(message, args))
-		return;
-		
-	if((he = gethostbyname(args)) == NULL) {
-		zsnprintf(buffer, "Cannot resolve host %s", args);
-		irc_privmsg(message->chan, buffer);
-		return;
-	}
-	
-	ipbuf = inet_ntoa(*((struct in_addr *) he->h_addr_list[0]));
-	
-	zsnprintf(buffer, "%s -> %s", args, ipbuf);
-	irc_privmsg(message->chan, buffer);
-}
-
-void action_rdns(ircmessage_t *message, char *args) {
-	struct hostent *he;
-	char buffer[256];
-	in_addr_t ip;
-	
-	if(!action_parse_args(message, args))
-		return;
-	
-	if((ip = inet_addr(args)) == INADDR_NONE) {
-		zsnprintf(buffer, "Invalid address <%s>", args);
-		irc_privmsg(message->chan, buffer);
-		return;
-	}
-		
-	if((he = gethostbyaddr(&ip, sizeof(in_addr_t), AF_INET)) == NULL) {
-		zsnprintf(buffer, "Cannot resolve host %s", args);
-		irc_privmsg(message->chan, buffer);
-		return;
-	}
-	
-	zsnprintf(buffer, "%s -> %s", args, he->h_name);
-	irc_privmsg(message->chan, buffer);
 }
 
 void action_random(ircmessage_t *message, char *args) {

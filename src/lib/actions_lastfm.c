@@ -28,6 +28,35 @@
 #include "actions.h"
 #include "actions_lastfm.h"
 
+//
+// registering commands
+//
+
+static request_t __action_fm = {
+	.match    = ".fm",
+	.callback = action_lastfm,
+	.man      = "print now playing lastfm title",
+	.hidden   = 0,
+	.syntaxe  = ".fm, .fm <lastfm nick>, .fm $(<irc nick>), setting variable: lastfm",
+};
+
+static request_t __action_fmlove = {
+	.match    = ".fmlove",
+	.callback = action_lastfmlove,
+	.man      = "love your current track on last.fm",
+	.hidden   = 0,
+	.syntaxe  = "",
+};
+
+__registrar actions_lastfm() {
+	request_register(&__action_fm);
+	request_register(&__action_fmlove);
+}
+
+//
+// commands implementation
+//
+
 void action_lastfm(ircmessage_t *message, char *args) {
 	char *user, answer[512];
 	lastfm_request_t *request;

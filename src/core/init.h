@@ -11,8 +11,6 @@
 		char *filename;                /* library filename */
 		void *handler;                 /* library handler */
 		void (*main)(char *, char *);  /* main library function */
-		void (*construct)(void);       /* pre-load data */
-		void (*destruct)(void);        /* closing data, threads, ... */
 		
 	} codemap_t;
 	

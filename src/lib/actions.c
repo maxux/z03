@@ -24,6 +24,36 @@
 #include "core.h"
 #include "actions.h"
 #include "ircmisc.h"
+#include "list.h"
+
+//
+// registering commands
+//
+
+static request_t __action_help = {
+	.match    = ".help",
+	.callback = action_help,
+	.man      = "print the list of all the commands available",
+	.hidden   = 0,
+	.syntaxe  = "",
+};
+
+static request_t __action_man = {
+	.match    = ".man",
+	.callback = action_man,
+	.man      = "print 'man page' of a given bot command",
+	.hidden   = 0,
+	.syntaxe  = ".man <command name> (without prefix)",
+};
+
+__registrar actions_root() {
+	request_register(&__action_help);
+	request_register(&__action_man);
+}
+
+//
+// commands implementation
+//
 
 char *action_check_args(char *args) {
 	return ltrim(rtrim(args));
@@ -46,22 +76,25 @@ char *action_parse_args(ircmessage_t *message, char *args) {
 }
 
 void action_help(ircmessage_t *message, char *args) {
+	request_t *request;
 	char list[512], buffer[768];
-	unsigned int i, length;
+	unsigned int length;
 	(void) args;
 	
 	// clearing list
 	list[0] = '\0';
 	length  = 0;
 	
-	for(i = 0; i < __request_count; i++) {
-		if(!__request[i].hidden) {
-			strcat(list, __request[i].match);
+	list_foreach(global_lib.commands, node) {
+		request = (request_t *) node->data;
+	
+		if(!request->hidden) {
+			strcat(list, request->match);
 			strcat(list, " ");
-			length += strlen(__request[i].match);
+			length += strlen(request->match);
 		}
 		
-		if(length >= 60 || i == __request_count - 1) {
+		if(length >= 60 || !node->next) {
 			if(*list) {
 				zsnprintf(buffer, "Commands: %s", list);
 				irc_privmsg(message->chan, buffer);
@@ -75,19 +108,21 @@ void action_help(ircmessage_t *message, char *args) {
 }
 
 void action_man(ircmessage_t *message, char *args) {
+	request_t *request;
 	char buffer[512];
-	unsigned int i;
 	
 	if(!action_parse_args(message, args))
 		return;
 	
-	for(i = 0; i < __request_count; i++) {
-		if(!strcmp(args, __request[i].match + 1) && !__request[i].hidden) {
-			zsnprintf(buffer, "%s: %s", args, __request[i].man);
+	list_foreach(global_lib.commands, node) {
+		request = (request_t *) node->data;
+		
+		if(!strcmp(args, request->match + 1) && !request->hidden) {
+			zsnprintf(buffer, "%s: %s", args, request->man);
 			irc_privmsg(message->chan, buffer);
 			
-			if(*(__request[i].syntaxe)) {
-				zsnprintf(buffer, "Syntaxe: %s", __request[i].syntaxe);
+			if(*(request->syntaxe)) {
+				zsnprintf(buffer, "Syntaxe: %s", request->syntaxe);
 				irc_privmsg(message->chan, buffer);
 			}
 			

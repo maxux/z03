@@ -28,6 +28,35 @@
 #include "actions.h"
 #include "actions_services.h"
 
+//
+// registering commands
+//
+
+static request_t __action_note = {
+	.match    = ".note",
+	.callback = action_notes,
+	.man      = "leave a message to someone, will be sent when connecting.",
+	.hidden   = 0,
+	.syntaxe  = ".note, .note <nick> <message>",
+};
+
+static request_t __action_delay = {
+	.match    = ".delay",
+	.callback = action_delay,
+	.man      = "alarm timed notification",
+	.hidden   = 0,
+	.syntaxe  = ".delay <1-2880 minutes> <message>",
+};
+
+__registrar actions_services() {
+	request_register(&__action_note);
+	request_register(&__action_delay);
+}
+
+//
+// commands implementation
+//
+
 void __action_notes_checknew(char *chan, char *nick) {
 	sqlite3_stmt *stmt;
 	char output[1024], timestring[64];

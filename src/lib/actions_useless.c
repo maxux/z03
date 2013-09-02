@@ -24,26 +24,57 @@
 #include "actions_useless.h"
 #include "settings.h"
 #include "downloader.h"
-#include "actions_logs.h"
+#include "actions_backlog.h"
 
-/*
-void action_sudo(ircmessage_t *message, char *args) {
-	(void) args;
-	irc_privmsg(message->chan, "sudo: you are not sudoers");
+//
+// registering commands
+//
+
+static request_t __action_ba = {
+	.match    = ".ba",
+	.callback = action_useless_ba,
+	.man      = "",
+	.hidden   = 1,
+	.syntaxe  = "",
+};
+
+static request_t __action_blowjob = {
+	.match    = ".blowjob",
+	.callback = action_useless_blowjob,
+	.man      = "",
+	.hidden   = 1,
+	.syntaxe  = "",
+};
+
+static request_t __action_ovh = {
+	.match    = ".ovh",
+	.callback = action_useless_ovh,
+	.man      = "",
+	.hidden   = 0,
+	.syntaxe  = "",
+};
+
+__registrar actions_useless() {
+	request_register(&__action_ba);
+	request_register(&__action_blowjob);
+	request_register(&__action_ovh);
 }
-*/
+
+//
+// commands implementation
+//
 
 void action_useless_ba(ircmessage_t *message, char *args) {
 	irc_privmsg(message->chan, ".ba .ba .ba... .ba .ba .bibel...");	
 	action_backlog(message, args);
 }
 
-void action_blowjob(ircmessage_t *message, char *args) {
+void action_useless_blowjob(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_kick(message->chan, message->nick, "Tu vois, ça marche, connard !");
 }
 
-void action_ovh(ircmessage_t *message, char *args) {
+void action_useless_ovh(ircmessage_t *message, char *args) {
 	char *id = NULL, *pass = NULL, url[1024];
 	curl_data_t *curl = NULL;
 	(void) args;
@@ -72,3 +103,8 @@ void action_ovh(ircmessage_t *message, char *args) {
 		free(pass);
 		curl_data_free(curl);
 }
+
+/* void action_sudo(ircmessage_t *message, char *args) {
+	(void) args;
+	irc_privmsg(message->chan, "sudo: you are not sudoers");
+} */

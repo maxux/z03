@@ -71,14 +71,11 @@
 	typedef struct global_lib_t {
 		struct list_t *channels;
 		struct list_t *threads;
+		struct list_t *commands;
 		
 	} global_lib_t;
 	
-	/* Action Request */
-	extern unsigned int __request_count;
-	extern request_t __request[];
-	
-	/* Global Data */
+	// global data
 	extern global_lib_t global_lib;
 	
 	void main_construct(void);
@@ -104,4 +101,8 @@
 	
 	/* gnu fix */
 	extern char *strcasestr(const char *, const char *);
+	
+	#include "registrar.h"
+	void lib_construct();
+	void lib_destruct();
 #endif

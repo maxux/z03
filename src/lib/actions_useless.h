@@ -2,7 +2,6 @@
 	#define __Z03_BOT_ACTIONS_USELESS_H
 	
 	void action_useless_ba(ircmessage_t *message, char *args);
-	
-	void action_blowjob(ircmessage_t *message, char *args);
-	void action_ovh(ircmessage_t *message, char *args);
+	void action_useless_blowjob(ircmessage_t *message, char *args);
+	void action_useless_ovh(ircmessage_t *message, char *args);
 #endif

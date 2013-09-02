@@ -24,4 +24,7 @@
 	void list_free(list_t *list);
 	
 	char *list_implode(list_t *list, size_t limit);
+	
+	#define list_foreach(list, node) \
+	        for(list_node_t *node = list->nodes; node; node = node->next)
 #endif

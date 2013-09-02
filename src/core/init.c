@@ -101,12 +101,9 @@ void loadlib(codemap_t *codemap) {
 	
 	/* Unloading previously loaded lib */
 	if(codemap->handler) {
-		printf("[+] Core: destructing...\n");
-		codemap->destruct();
-		
-		printf("[+] Core: unlinking library...\n");
+		printf("[+] core: unlinking library...\n");
 		if(dlclose(codemap->handler)) {
-			fprintf(stderr, "[-] Core: %s\n", dlerror());
+			fprintf(stderr, "[-] core: %s\n", dlerror());
 			return;
 		}
 			
@@ -115,42 +112,25 @@ void loadlib(codemap_t *codemap) {
 	}
 	
 	/* Loading new library */
-	printf("[+] Core: linking library...\n");
+	printf("[+] core: linking library...\n");
 	
 	codemap->handler = dlopen(codemap->filename, RTLD_NOW);
 	if(!codemap->handler) {
-		fprintf(stdout, "[-] Core: dlopen: %s\n", dlerror());
+		fprintf(stdout, "[-] core: dlopen: %s\n", dlerror());
 		exit(EXIT_FAILURE);
 	}
 	
 	/* Linking main */
 	codemap->main = dlsym(codemap->handler, "main_core");
 	if((error = dlerror()) != NULL) {
-		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
-		exit(EXIT_FAILURE);
-	}
-	
-	/* Linking destruct */
-	codemap->construct = dlsym(codemap->handler, "main_construct");
-	if((error = dlerror()) != NULL) {
-		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
-		exit(EXIT_FAILURE);
-	}
-	
-	/* Linking destruct */
-	codemap->destruct = dlsym(codemap->handler, "main_destruct");
-	if((error = dlerror()) != NULL) {
-		fprintf(stderr, "[-] Core: dlsym: %s\n", error);
+		fprintf(stderr, "[-] core: dlsym: %s\n", error);
 		exit(EXIT_FAILURE);
 	}
 	
 	global_core->rehash_time = time(NULL);
 	global_core->rehash_count++;
 	
-	printf("[+] Core: calling constructor...\n");
-	codemap->construct();
-	
-	printf("[+] Core: link ready\n");
+	printf("[+] core: link ready\n");
 }
 
 void core_handle_private_message(char *data, codemap_t *codemap) {
@@ -173,7 +153,7 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 			printf("[+] Admin <%s> request: <%s>\n", remote, request);
 			
 			if(!strncmp(request, ".rehash", 7)) {
-				printf("[+] Core: rehashing code...\n");
+				printf("[+] core: rehashing code...\n");
 				loadlib(codemap);
 				
 			} else if(request[0] != '.')
@@ -285,7 +265,7 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 			if(rlen == 0)
 				continue;
 			/* // ssl_error();
-				printf("[ ] Core: Warning: nothing read from socket\n");
+				printf("[ ] core: Warning: nothing read from socket\n");
 				diep("[-] core: recv");
 			} */
 				
@@ -306,7 +286,6 @@ int main(void) {
 		.filename = "./libz03.so",
 		.handler  = NULL,
 		.main     = NULL,
-		.destruct = NULL,
 	};
 	
 	printf("[+] core: loading...\n");

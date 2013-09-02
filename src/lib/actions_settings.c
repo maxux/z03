@@ -27,6 +27,44 @@
 #include "settings.h"
 #include "actions_settings.h"
 
+//
+// registering commands
+//
+
+static request_t __action_set = {
+	.match    = ".set",
+	.callback = action_set,
+	.man      = "set a variable value",
+	.hidden   = 0,
+	.syntaxe  = ".set <variable name> <value>",
+};
+
+static request_t __action_get = {
+	.match    = ".get",
+	.callback = action_get,
+	.man      = "get a variable value",
+	.hidden   = 0,
+	.syntaxe  = ".get <nick> <variable name>, .get <variable name>",
+};
+
+static request_t __action_unset = {
+	.match    = ".unset",
+	.callback = action_unset,
+	.man      = "unset a variable value",
+	.hidden   = 0,
+	.syntaxe  = ".unset <variable name>",
+};
+
+__registrar actions_settings() {
+	request_register(&__action_set);
+	request_register(&__action_get);
+	request_register(&__action_unset);
+}
+
+//
+// commands implementation
+//
+
 void action_set(ircmessage_t *message, char *args) {
 	char *match, *key, answer[512];
 	

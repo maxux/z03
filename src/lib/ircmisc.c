@@ -466,7 +466,6 @@ time_t today() {
 }
 
 char *list_nick_implode(list_t *list) {
-	list_node_t *node;
 	char *implode = NULL;
 	char buffer[128];
 	size_t length = 0;
@@ -475,10 +474,9 @@ char *list_nick_implode(list_t *list) {
 		return strdup(" ");
 	
 	/* allocating string and re-iterate list */
-	node = list->nodes;
 	implode = (char *) calloc(1, sizeof(char));
 	
-	while(node) {
+	list_foreach(list, node) {
 		implode = (char *) realloc(implode, length + strlen(node->name) + 3);
 		
 		// appending anti-hled nick

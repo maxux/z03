@@ -52,30 +52,20 @@
 #include "periodic.h"
 
 #include "actions.h"
-#include "actions_binutils.h"
-#include "actions_logs.h"
 #include "actions_services.h"
-#include "actions_lastfm.h"
-#include "actions_settings.h"
-#include "actions_webservices.h"
-#include "actions_run.h"
-#include "actions_useless.h"
-
-#include "request_list.h"
-unsigned int __request_count = sizeof(__request) / sizeof(request_t);
+#include "actions_whatcd.h"
 
 #define NICK_LASTTIME_CHECK     5 * 24 * 60 * 60 // 5 days
 
 global_lib_t global_lib = {
 	.channels = NULL,
 	.threads  = NULL,
+	.commands = NULL,
 };
-
-
 
 pthread_t __periodic_thread;
 
-/* Signals */
+// signals
 void lib_sighandler(int signal) {
 	switch(signal) {
 		case SIGUSR1:
@@ -392,11 +382,11 @@ void command_prepare_thread(ircmessage_t *message, char *args) {
 }
 
 int handle_commands(char *content, ircmessage_t *message) {
-	unsigned int i;
 	unsigned int callback_count = 0;
 	char *callback_temp = NULL;
 	char *command, *match;
 	request_t *callback_request = NULL;
+	request_t *request;
 	
 	if(*content == ' ')
 		return 1;
@@ -410,15 +400,17 @@ int handle_commands(char *content, ircmessage_t *message) {
 		match = "";
 	}
 	
-	for(i = 0; i < __request_count; i++) {
-		if(!strncmp(command, __request[i].match, strlen(command))) {
-			printf("[+] commands: match for: <%s>\n", __request[i].match);
+	list_foreach(global_lib.commands, node) {
+		request = (request_t *) node->data;
+		
+		if(!strncmp(command, request->match, strlen(command))) {
+			printf("[+] commands: match for: <%s>\n", request->match);
 			callback_count++;
 			callback_temp    = match;
-			callback_request = &__request[i];
+			callback_request = request;
 			
 			/* check for exact matching */
-			if(!strcmp(command, __request[i].match)) {
+			if(!strcmp(command, request->match)) {
 				callback_count = 1;
 				break;
 			}
@@ -705,6 +697,9 @@ void main_core(char *data, char *request) {
 	if(!strncmp(request, "376", 3)) {
 		if(IRC_NICKSERV) {
 			raw_socket("PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
+			
+			// little sleep to wait vhost to be applicated
+			usleep(500000);
 		
 		/* if(IRC_OPER)
 			raw_socket("OPER " IRC_NICK " " IRC_OPER_PASS); */
@@ -715,7 +710,7 @@ void main_core(char *data, char *request) {
 	}
 }
 
-void main_construct(void) {
+void lib_construct() {
 	global_lib.channels = list_init(NULL);
 	global_lib.threads  = list_init(NULL);
 	
@@ -738,9 +733,7 @@ void main_construct(void) {
 	pthread_create(&__periodic_thread, NULL, periodic_each_minutes, NULL);
 }
 
-void main_destruct(void) {
-	list_node_t *node;
-	
+void lib_destruct() {
 	// closing sqitite
 	db_sqlite_close(sqlite_db);
 	
@@ -751,11 +744,8 @@ void main_destruct(void) {
 	pthread_join(__periodic_thread, NULL);
 	
 	// FIXME: iterate node
-	while((node = global_lib.threads->nodes)) {	
+	list_foreach(global_lib.threads, node) {
 		// pthread_cancel(((thread_cmd_t *) node)->thread);
 		pthread_join(((thread_cmd_t *) node)->thread, NULL);
 	}
-	
-	list_free(global_lib.channels);
-	list_free(global_lib.threads);
 }
