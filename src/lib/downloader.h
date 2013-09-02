@@ -54,6 +54,6 @@
 	int curl_download_text(char *url, curl_data_t *data);
 	int curl_download_text_post(char *url, curl_data_t *data, char *post);
 	
-	
+	charset_t curl_extract_charset(char *line);
 	char *curl_gethost(char *url);
 #endif

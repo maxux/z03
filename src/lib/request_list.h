@@ -244,4 +244,11 @@ request_t __request[] = {
 		.hidden   = 1,
 		.syntaxe  = "",
 	},
+	{
+		.match    = ".ba",
+		.callback = action_useless_ba,
+		.man      = "",
+		.hidden   = 1,
+		.syntaxe  = "",
+	},
 };

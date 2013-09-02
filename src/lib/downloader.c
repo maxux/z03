@@ -116,12 +116,12 @@ static char *curl_cookie(char *url) {
 	return cookie;
 }
 
-static charset_t curl_extract_charset(char *line) {
+charset_t curl_extract_charset(char *line) {
 	char *charset;
 	
-	if((charset = strcasestr(line, "; charset="))) {
+	if((charset = strcasestr(line, " charset="))) {
 		// skipping match
-		charset += 10;
+		charset += 9;
 		
 		if(!strncasecmp(charset, "iso-8859", 8))
 			return ISO_8859;

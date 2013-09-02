@@ -126,8 +126,13 @@ void action_wiki(ircmessage_t *message, char *args) {
 	
 	if(google->length) {
 		if((data = wiki_head(google->result[0].url))) {			
-			if(strlen(data) > 290)
-				strcpy(data + 280, " [...]");
+			if(strlen(data) > 290) {
+				match = data + 280;
+				while(*match && *match != ' ')
+					match--;
+					
+				strcpy(match, " [...]");
+			}
 			
 			zsnprintf(reply, "Wiki (%s): %s [%s]",
 			                 lang, data, google->result[0].url);

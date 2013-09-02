@@ -128,11 +128,18 @@ static char *url_extract_title(char *body, char *title) {
 int url_magic(curl_data_t *curl, ircmessage_t *message) {
 	char *magicstr = NULL;
 	char buffer[1024];
+	size_t length;
 	
 	// magic file
 	magicstr = magic(curl->data, curl->length);
+	
+	length = ((!curl->http_length) ? curl->length : curl->http_length);
+	
+	if(length < 1024 * 2048)
+		zsnprintf(buffer, "File: [%.2f Ko, %s]", length / 1024.0, magicstr);
 		
-	zsnprintf(buffer, "File: [%.2f Mo, %s]", curl->http_length / 1024 / 1024.0, magicstr);
+	else zsnprintf(buffer, "File: [%.2f Mo, %s]", length / 1024 / 1024.0, magicstr);
+	
 	irc_privmsg(message->chan, buffer);
 	
 	free(magicstr);
@@ -163,7 +170,7 @@ static int url_process_image(char *url, ircmessage_t *message, repost_t *repost)
 		printf("[+] urlmanager/image: %s\n", filename);		
 	
 		length = file_write(filename, curl->data, curl->length);		
-		printf("[+] urlmanager/image: file saved: %d bytes", length);
+		printf("[+] urlmanager/image: file saved: %d bytes\n", length);
 		
 		url_magic(curl, message);
 		url_repost_advanced(curl, message, repost);
@@ -188,6 +195,7 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 		fprintf(stderr, "[-] urlmanager/html: something wrong with download\n");
 	
 	if(curl->data && curl->length && (title = url_extract_title(curl->data, title))) {
+		
 		// useless/easteregg check
 		if(!strncasecmp(message->nick, "malabar", 7) && 
 		   (strstr(title, "Boiler Room") || strstr(title, "BOILER ROOM")))
@@ -196,6 +204,11 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 		// FIXME: wtf -_-
 		length = strlen(title) + 256;
 		request = (char *) malloc(sizeof(char) * length);
+		
+		if(curl->charset == UNKNOWN_CHARSET) {
+			curl->charset = curl_extract_charset(curl->data);
+			printf("[+] urlmanager/charset fixed: %d\n", curl->charset);
+		}
 		
 		// highlight preventing on title
 		repost->title = anti_hl_each_words(title, strlen(title), curl->charset);
@@ -221,7 +234,8 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 		
 		sqlite3_free(sqlquery);
 		
-		url_repost_advanced(curl, message, repost);
+		if(curl->curlcode == 200)
+			url_repost_advanced(curl, message, repost);
 		
 	} else fprintf(stderr, "[-] urlmanager/title: cannot extract title\n");
 	
@@ -306,13 +320,23 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 		return url_error(1, curl);
 	}
 	
-	if(curl->http_length) {	
+	if(curl->type == IMAGE_ALL && curl->http_length) {
 		// warning on big image
-		if(curl->type == IMAGE_ALL && curl->http_length > CURL_WARN_SIZE) {
-			zsnprintf(buffer, "Warning: image size: %.2f Mo, downloading...",
-			                  curl->http_length / 1024 / 1024.0);
-			                
+		if(curl->http_length > CURL_WARN_SIZE && curl->http_length < CURL_MAX_SIZE) {
+			zsnprintf(buffer, "[Warning: image size: %.2f Mo, mirroring anyway...]",
+					  curl->http_length / 1024 / 1024.0);
+					
 			irc_privmsg(message->chan, buffer);
+		
+		// file too large, will not be downloaded
+		// skipping repost process because checksum will not be made
+		} else if(curl->http_length > CURL_MAX_SIZE) {
+			zsnprintf(buffer, "[Warning: image size: %.2f Mo, this file will not be mirrored]",
+					  curl->http_length / 1024 / 1024.0);
+					
+			irc_privmsg(message->chan, buffer);
+			
+			return url_error(1, curl);
 		}
 		
 	} else fprintf(stderr, "[-] urlmanager/url httplength is not set, deal with it.\n");

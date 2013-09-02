@@ -183,7 +183,7 @@ void action_chart(ircmessage_t *message, char *args) {
 
 void action_count(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery, *nick;
+	char *sqlquery, *nick, nicked[64];
 	char output[256];
 	int words, lines, twords, tlines;
 	time_t since;
@@ -212,7 +212,7 @@ void action_count(ircmessage_t *message, char *args) {
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] action/count: sql error\n");
 	
-	while(sqlite3_step(stmt) == SQLITE_ROW) {		
+	while(sqlite3_step(stmt) == SQLITE_ROW) {
 		words  = sqlite3_column_int(stmt, 0);
 		
 		if(words) {
@@ -232,14 +232,15 @@ void action_count(ircmessage_t *message, char *args) {
 		
 		// avoid divide by zero
 		if(tlines && twords) {
-			if(!*args)
-				nick = message->nickhl;
+			if(*args) {
+				strcpy(nicked, args);
+				anti_hl(nicked);
 				
-			else nick = anti_hl(args);
+			} else strcpy(nicked, message->nickhl);
 		
 			zsnprintf(output,
 			          "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per lines) since %s",
-				  nick,
+				  nicked,
 				  lines, ((float) lines / tlines) * 100, tlines,
 				  words, ((float) words / twords) * 100, twords,
 				  ((float) words / lines),

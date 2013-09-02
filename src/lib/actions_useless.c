@@ -24,6 +24,7 @@
 #include "actions_useless.h"
 #include "settings.h"
 #include "downloader.h"
+#include "actions_logs.h"
 
 /*
 void action_sudo(ircmessage_t *message, char *args) {
@@ -31,6 +32,11 @@ void action_sudo(ircmessage_t *message, char *args) {
 	irc_privmsg(message->chan, "sudo: you are not sudoers");
 }
 */
+
+void action_useless_ba(ircmessage_t *message, char *args) {
+	irc_privmsg(message->chan, ".ba .ba .ba... .ba .ba .bibel...");	
+	action_backlog(message, args);
+}
 
 void action_blowjob(ircmessage_t *message, char *args) {
 	(void) args;

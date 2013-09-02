@@ -30,7 +30,7 @@
 #include "downloader.h"
 #include "ircmisc.h"
 
-char * wiki_head(char *url) {
+char *wiki_head(char *url) {
 	curl_data_t *curl;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
