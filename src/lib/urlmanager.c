@@ -166,7 +166,7 @@ static int url_process_image(char *url, ircmessage_t *message, repost_t *repost)
 		clean_filename(temp);
 		
 		// building filename
-		sprintf(filename, "%s/%s", OUTPUT_PATH, temp);
+		sprintf(filename, "%s/%s", MIRROR_PATH, temp);
 		printf("[+] urlmanager/image: %s\n", filename);		
 	
 		length = file_write(filename, curl->data, curl->length);		
@@ -344,8 +344,13 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_free(curl);
 	
 	/* dispatching process */
-	if(curl->type == IMAGE_ALL)
+	if(curl->type == IMAGE_ALL) {
+		#ifdef ENABLE_MIRRORING
 		return url_process_image(url, message, repost);
+		#else
+		return 0;
+		#endif
+	}
 		
 	if(curl->type == TEXT_HTML)
 		return url_process_html(url, message, repost);

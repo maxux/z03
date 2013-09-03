@@ -1,0 +1,99 @@
+z03 (Zoé) is a modulable irc bot written in C
+
+ Configuration
+---------------
+
+	The config file is a c-header file: src/common/bot.h
+	There is no run-time arguments or configuration file
+
+ Features
+----------
+
+	- full text log on sqlite database (backlog, stats, count, ...)
+	- custom user settings
+	- full thread support
+	- weather support from meteobelgique/wunderground
+	- lastfm support (current playing track, mark current track as loved track)
+	- google search and google calculator result
+	- dns resolution
+	- stats based on logs with ascii-charts and other funny stuff
+	- html title grabber
+	- image local mirroring
+	- repost of image/html page based on title/url/checksum
+	- wiki header support
+	- memoserv on unregistered nick
+	- ...
+
+	- on-the-fly lib-code reloading
+	- c/php/python/haskell code exection on remote machine
+	- ...
+
+ Database
+----------
+
+	The database is managed by sqlite3.
+	The schema is availide on src/sql/
+	
+	Before starting the bot, please create the database required.
+	Everything will run properly without it (sqlite will create an
+	empty database on startup process) but nothing will be saved
+	(each sql query will fail, the tables does not exists)
+	
+	To prepare en empty database just do:
+	$ sqlite3 bin/z03.sqlite3 < src/sql/z03-create.sql
+
+ How does it works
+-------------------
+
+	There is two main part on the project: core part and lib part
+	The core contains the lowest code possible and just handle basic 
+	request and socket management. The core can dynamically load the
+	libz03 which contains the biggest part of the code.
+	
+	With this feature, you can change/rebuild the lib and reload the
+	code without restarting the whole bot code (and not disconnect the
+	bot from the network).
+	
+	The bot will not exit on segmentation fault, it will unload then
+	reload the library. When the library is reloaded, all the heap
+	allocated to it is free'd.
+	
+	Except if the core-stack is altered, reloading the lib must be
+	suffisant to get another instance properly working.
+
+ How code a module
+-------------------
+
+	A module is just a c-file on the lib folder.
+	
+	This is a simple hello world module:
+	
+	////////////////////////////////////////////////////////////
+	#include <stdio.h>
+	#include <stdlib.h>
+	#include "../common/bot.h"
+	#include "core.h"
+	#include "actions.h"
+	
+	void action_hello(ircmessage_t *message, char *args);
+
+	static request_t __action_hello = {
+		.match    = ".hello",
+		.callback = action_hello,
+		.man      = "print a hello world message",
+		.hidden   = 0,
+		.syntaxe  = ".hello (no arguments)",
+	};
+
+	__registrar reg_hello() {
+		request_register(&__action_hello);
+	}
+
+	void action_hello(ircmessage_t *message, char *args) {
+		irc_privmsg(message->chan, "Hello world !");
+	}
+	////////////////////////////////////////////////////////////
+	
+	The __registrar function register the command on lib's load-time
+	There is nothing more to do to get a simple module works.
+	

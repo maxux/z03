@@ -3,12 +3,6 @@
 
 	#include <sqlite3.h>
 	
-	#ifdef __DEBUG__
-		#define SQL_DATABASE_FILE	"sp0wimg-test.sqlite3"
-	#else
-		#define SQL_DATABASE_FILE	"sp0wimg.sqlite3"
-	#endif
-	
 	extern sqlite3 *sqlite_db;
 	
 	sqlite3 *db_sqlite_init();

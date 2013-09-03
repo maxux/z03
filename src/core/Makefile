@@ -9,13 +9,13 @@ options: config.mk
 	@echo "CC      = $(CC)"
 	@echo "CFLAGS  = $(CFLAGS)"
 	@echo "LDFLAGS = $(LDFLAGS)"
-	@echo "EXTRA   = $(EXTRA_CFLAGS)"
 
 $(EXEC): $(OBJ)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	mkdir -p $(BINPATH)
+	$(CC) -o $(BINPATH)$@ $^ $(LDFLAGS)
 
 $(OBJ):
-	$(CC) -c $(CFLAGS) $(EXTRA_CFLAGS) $*.c
+	$(CC) -c $(CFLAGS) $*.c
 
 clean:
 	rm -fv *.o

@@ -6,9 +6,6 @@
 	#include <pthread.h>
 	#include "list.h"
 	
-	#define OUTPUT_PATH             "/var/www/perso/imagespawn/data/"
-	#define TIME_FORMAT             "%A %d %B %X %Y UTC%z (%Z)"
-	
 	typedef struct nick_t {
 		size_t lines;
 		size_t words;
@@ -34,10 +31,9 @@
 		char host[64];
 		char nickhl[36];
 		
-		/* Warning: not clear:
-			- chan is channel name (retrocompatibility)
-			- channel is channel_t object
-		*/
+		// warning: not clear:
+		//  - chan is channel name (retrocompatibility)
+		//  - channel is channel_t object
 		char chan[64];
 		struct channel_t *channel;
 		

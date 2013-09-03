@@ -28,9 +28,6 @@
 
 sqlite3 *sqlite_db;
 
-/*
- * sqlite Management
- */
 sqlite3 *db_sqlite_init() {
 	sqlite3 *db;
 	

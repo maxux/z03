@@ -1,6 +1,8 @@
 include config.mk
 
+# reading all .c
 _SRC = $(wildcard *.c)
+# setting registrar at first and removing it from list
 SRC  = registrar.c $(filter-out registrar.c, $(_SRC))
 OBJ  = $(SRC:.c=.o)
 
@@ -10,7 +12,6 @@ options: config.mk
 	@echo "CC      = $(CC)"
 	@echo "CFLAGS  = $(CFLAGS)"
 	@echo "LDFLAGS = $(LDFLAGS)"
-	@echo "EXTRA   = $(EXTRA_CFLAGS)"
 
 $(EXEC): $(OBJ)
 	mkdir -p $(BINPATH)

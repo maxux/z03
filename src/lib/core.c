@@ -55,8 +55,6 @@
 #include "actions_services.h"
 #include "actions_whatcd.h"
 
-#define NICK_LASTTIME_CHECK     5 * 24 * 60 * 60 // 5 days
-
 global_lib_t global_lib = {
 	.channels = NULL,
 	.threads  = NULL,
@@ -152,12 +150,13 @@ int pre_handle(char *data, ircmessage_t *message) {
 	data = skip_server(data);
 	extract_chan(data, message->chan, sizeof(message->chan));
 	
-	/* Check Nick Length */
+	#ifdef ENABLE_NICK_MAX_LENGTH
 	if(nick_length_check(message->nick, message->chan))
 		return 1;
+	#endif
 	
 	if(!(message->channel = list_search(global_lib.channels, message->chan))) {
-		printf("[-] lib/PreHandle: cannot find channel, reloading.\n");
+		printf("[-] lib/preHandle: cannot find channel, reloading.\n");
 		channel = stats_channel_load(message->chan);
 		
 		list_append(global_lib.channels, message->chan, channel);
@@ -177,7 +176,7 @@ void handle_nick(char *data) {
 	/* Skipping ':' */
 	nick++;
 	
-	printf("[+] handle/nick: new nick: <%s>\n", nick);
+	printf("[+] lib/handlenick: new nick: <%s>\n", nick);
 }
 
 void handle_join(char *data) {
@@ -248,7 +247,7 @@ void handle_part(char *data) {
 	
 	/* Extracting data */
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
-		printf("[-] lib/Part: extract data info failed\n");
+		printf("[-] lib/part: extract data info failed\n");
 		free(chan);
 		return;
 	}
@@ -339,7 +338,7 @@ int handle_query(char *data) {
 	return 0;
 }
 
-void * command_thread(void *_thread) {
+void *command_thread(void *_thread) {
 	thread_cmd_t *thread = (thread_cmd_t *) _thread;
 	
 	thread->message->request->callback(thread->message, thread->args);
@@ -533,12 +532,14 @@ int handle_message(char *data, ircmessage_t *message) {
 		       message->chan, message->nickhl, nick->lines, message->channel->lines,
 		       nick->words, nick->lasttime);
 		
-		if(nick->lasttime < now - NICK_LASTTIME_CHECK) {
+		#ifdef ENABLE_NICK_LASTTIME
+		if(nick->lasttime < now - NICK_LASTTIME) {
 			temp = time_elapsed(now - nick->lasttime);
 			zsnprintf(buffer, "%s had not been seen on this channel for %s", message->nickhl, temp);
 			irc_privmsg(message->chan, buffer);
 			free(temp);
 		}
+		#endif
 		
 		nick->lasttime = now;
 		
@@ -588,7 +589,7 @@ void handle_notice(char *data, ircmessage_t *message) {
 	
 	/* Extracting data */
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
-		printf("[-] lib/Part: Extract data info failed\n");
+		printf("[-] lib/part: extract data info failed\n");
 		return;
 	}
 	
