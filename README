@@ -6,6 +6,23 @@ z03 (Zoé) is a modulable irc bot written in C
 	The config file is a c-header file: src/common/bot.h
 	There is no run-time arguments or configuration file
 
+ Dependancies
+--------------
+
+	Compilation dependancies (and not optional):
+	  libcurl, openssl, libxml2, jansson, sqlite3, libmagic
+
+ Compiling
+-----------
+
+	Just type make on root directory.
+	To rebuild the lib only, type make on src/lib/ directory
+	
+	To rehash the code when the bot is running, just send a query/msg
+	to the bot (you must be declared as admin): .rehash
+	
+	Don't forget to build a valid database (see Database point below)
+
  Features
 ----------
 
