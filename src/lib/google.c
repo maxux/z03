@@ -82,13 +82,78 @@ google_search_t * google_search(char *keywords) {
 	return search;
 }
 
+static char *__calc_match1[] = {
+	"//div[@class='vk_ans vk_bk']",
+	"//div[@class='vk_bk vk_ans']",
+	"//div[@class='vk_ans vk_bk curtgt']",
+	"//span[@id='cwos']",
+	NULL
+};
+
+static char *__calc_match2[] = {
+	"//input[@id='ucw_rhs_d']",
+	"//input[@id='pair_targ_input']",
+	NULL
+};
+
+static char *google_calc_value(xmlXPathObject *xpathObj) {
+	char *value = NULL;
+	xmlNode *node = NULL;
+	int i;
+	
+	for(i = 0; i < xpathObj->nodesetval->nodeNr; i++) {
+		node = xpathObj->nodesetval->nodeTab[i];
+		
+		if(xmlNodeGetContent(node)) {
+			value = strdup((char *) xmlNodeGetContent(node));
+			printf("[+] google/calc: value: %s\n", value);
+			return value;
+		}
+	}
+	
+	return NULL;
+}
+
+static char *google_calc_input_value(xmlXPathObject *xpathObj) {
+	char *value = NULL;
+	xmlNode *node = NULL;
+	
+	node = xpathObj->nodesetval->nodeTab[0];
+	value = strdup((char *) xmlGetProp(node, (const xmlChar *) "value"));
+	printf("[+] google/calc: value: %s\n", value);
+	
+	return value;
+}
+
+static char *google_calc_unit(xmlXPathObject *xpathObj, char *value) {
+	xmlNode *node = NULL;
+	char *unit = NULL, *final = NULL;
+	
+	node = xpathObj->nodesetval->nodeTab[0];
+	
+	if(xmlNodeGetContent(node))
+		unit = strdup((char *) xmlNodeGetContent(node));
+	
+	if(value && unit) {
+		final = (char *) malloc(sizeof(char) * (strlen(value) + strlen(unit) + 32));
+		
+		sprintf(final, "%s %s", value, unit);
+		free(unit);
+		free(value);
+		
+		printf("[+] google/calc: final: %s\n", final);
+	}
+	
+	return final;
+}
+
 char *google_calc(char *keywords) {
 	curl_data_t *curl;
 	xmlDoc *doc = NULL;
 	xmlXPathContext *ctx = NULL;
 	xmlXPathObject *xpathObj = NULL;
-	xmlNode *node = NULL;
-	char url[2048], *value = NULL, *request;
+	char url[2048], *request, **match;
+	char *value = NULL;
 	int i;
 	
 	curl = curl_data_new();
@@ -107,37 +172,36 @@ char *google_calc(char *keywords) {
 	/* creating xpath request */
 	ctx = xmlXPathNewContext(doc);
 	
-	/* trying some method to catch response */
-	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_ans vk_bk']", ctx);
-	
-	if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
-		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_bk vk_ans']", ctx);
-	
-	else if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
-		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//div[@class='vk_ans vk_bk curtgt']", ctx);
-	
-	else if(xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
-		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//span[@id='cwos']", ctx);
-	
-	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-		for(i = 0; i < xpathObj->nodesetval->nodeNr; i++) {
-			node = xpathObj->nodesetval->nodeTab[i];
-			
-			if(xmlNodeGetContent(node)) {
-				value = strdup((char *) xmlNodeGetContent(node));
-				printf("[+] google/calc: value: %s\n", value);
-			}
-		}
-	
-	/* maybe a <input> answer */
-	} else {
-		xpathObj = xmlXPathEvalExpression((const xmlChar *) "//input[@id='ucw_rhs_d']", ctx);
+	// trying first method of detection
+	match = __calc_match1;
+	i = 0;
+	while(match[i]) {
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) match[i++], ctx);
+		
 		if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
-			node = xpathObj->nodesetval->nodeTab[0];
-			value = strdup((char *) xmlGetProp(node, (const xmlChar *) "value"));
-			printf("[+] google/calc: value: %s\n", value);
+			value = google_calc_value(xpathObj);
+			goto unit_check;
 		}
 	}
+	
+	// trying second method
+	match = __calc_match2;
+	i = 0;
+	while(match[i]) {
+		xpathObj = xmlXPathEvalExpression((const xmlChar *) match[i++], ctx);
+		
+		if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval)) {
+			value = google_calc_input_value(xpathObj);
+			goto unit_check;
+		}
+	}
+	
+	unit_check:
+	
+	// grab the unit
+	xpathObj = xmlXPathEvalExpression((const xmlChar *) "//select[@id='target_list']/option[@selected='1']", ctx);
+	if(!xmlXPathNodeSetIsEmpty(xpathObj->nodesetval))
+		value = google_calc_unit(xpathObj, value);
 
 	xmlXPathFreeObject(xpathObj);
 	xmlXPathFreeContext(ctx);	
