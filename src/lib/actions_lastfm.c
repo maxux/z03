@@ -69,14 +69,14 @@ void action_lastfm(ircmessage_t *message, char *args) {
 	if(strlen((args = action_check_args(args)))) {
 		user = args;
 	
-	// check if it's a settings to grab
-	if(!strncmp(user, "$(", 2) && (temp = strchr(user, ')'))) {
-		temp = strndup(user + 2, temp - user - 2);
-		if((user2 = settings_get(temp, "lastfm", PUBLIC)))
-			user = user2;
-		
-		free(temp);
-	}
+		// check if it's a settings to grab
+		if(!strncmp(user, "$(", 2) && (temp = strchr(user, ')'))) {
+			temp = strndup(user + 2, temp - user - 2);
+			if((user2 = settings_get(temp, "lastfm", PUBLIC)))
+				user = user2;
+			
+			free(temp);
+		}
 		
 	} else if(!(user = settings_get(message->nick, "lastfm", PUBLIC))) {
 		irc_privmsg(message->chan, "Lastfm username not set. Please set it with: .set lastfm <username>");

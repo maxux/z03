@@ -95,8 +95,9 @@ char *extract_url(char *url) {
 // grab <title></title> from a html page
 // don't use libxml to works with crappy invalid html page
 // 
-static char *url_extract_title(char *body, char *title) {
+static char *url_extract_title(char *body) {
 	char *read, *end;
+	char *title;
 	
 	if((read = strcasestr(body, "<title"))) {
 		while(*read != '>')
@@ -105,12 +106,8 @@ static char *url_extract_title(char *body, char *title) {
 		if(!(end = strcasestr(++read, "</")))
 			return NULL;
 			
-		*end = '\0';
-		
-		title = rtrim(ltrim(crlftrim(read)));
-		
-		if(strlen(title) > 250)
-			strcpy(title + 240, " [...]");
+		title = strndup(read, end - read);		
+		title = rtrim(ltrim(crlftrim(title)));
 		
 		if(!strlen(title))
 			return NULL;
@@ -184,9 +181,8 @@ static int url_process_image(char *url, ircmessage_t *message, repost_t *repost)
 
 static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_t *curl;
-	char *title = NULL;
-	char *request = NULL;
-	unsigned int length;
+	char *title = NULL, *print = NULL;
+	char request[256];
 	char *sqlquery;
 	
 	curl = curl_data_new();
@@ -194,39 +190,43 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 	if(curl_download(url, curl, 0)) // force dl is useless with custom wrapper
 		fprintf(stderr, "[-] urlmanager/html: something wrong with download\n");
 	
-	if(curl->data && curl->length && (title = url_extract_title(curl->data, title))) {
-		
+	if(curl->data && curl->length && (title = url_extract_title(curl->data))) {
 		// useless/easteregg check
 		if(!strncasecmp(message->nick, "malabar", 7) && 
 		   (strstr(title, "Boiler Room") || strstr(title, "BOILER ROOM")))
 			irc_kick(message->chan, message->nick, "ON S'EN *BRANLE* DE TA PUTAIN DE BOILER ROOM");
 		
-		// FIXME: wtf -_-
-		length = strlen(title) + 256;
-		request = (char *) malloc(sizeof(char) * length);
-		
+		// if charset is not set on http header, trying to find it
+		// by reading html content (ie: <meta> tag)
 		if(curl->charset == UNKNOWN_CHARSET) {
 			curl->charset = curl_extract_charset(curl->data);
 			printf("[+] urlmanager/charset fixed: %d\n", curl->charset);
 		}
 		
+		// setting title repost, duplicating
+		repost->title = strdup(title);
+		
 		// highlight preventing on title
-		repost->title = anti_hl_each_words(title, strlen(title), curl->charset);
-		decode_html_entities_utf8(repost->title, NULL);
+		print = anti_hl_each_words(title, strlen(title), curl->charset);
+		decode_html_entities_utf8(print, NULL);
+		
+		// truncate too long title
+		if(strlen(print) > 250)
+			strcpy(print + 240, " [...]");
 		
 		// print title with error code if any
 		if(curl->code != 200) {
-			snprintf(request, length, "URL (Error: %ld): %s", curl->code, repost->title);
+			zsnprintf(request, "URL (Error: %ld): %s", curl->code, print);
 			
-		} else snprintf(request, length, "URL: %s", repost->title);
+		} else zsnprintf(request, "URL: %s", print);
 		
 		irc_privmsg(message->chan, request);
-		free(request);
+		free(print);
 		
 		// updating title on database
 		sqlquery = sqlite3_mprintf(
 			"UPDATE url SET title = '%q' WHERE url = '%q'",
-			repost->title, url
+			title, url
 		);
 		
 		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
@@ -234,8 +234,10 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 		
 		sqlite3_free(sqlquery);
 		
-		if(curl->curlcode == 200)
+		if(curl->code == 200)
 			url_repost_advanced(curl, message, repost);
+		
+		free(title);
 		
 	} else fprintf(stderr, "[-] urlmanager/title: cannot extract title\n");
 	
