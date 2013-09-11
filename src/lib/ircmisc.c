@@ -189,12 +189,15 @@ char *anti_hl_each_words(char *str, size_t len, charset_t charset) {
 				iconvme.inchar = "iso-8859-1";
 		}
 		
-		if(!iconvit(&iconvme))
+		if(!iconvit(&iconvme)) {
+			free(convert);
+			free(stripped);
 			return NULL;
+		}
 			
 		read = convert;
 
-	} else read  = str;
+	} else read = str;
 	
 	write = stripped;
 	

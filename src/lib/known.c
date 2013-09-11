@@ -26,6 +26,7 @@
 #include "known.h"
 #include "ircmisc.h"
 
+/*
 char *irc_knownuser(char *nick, char *host) {
 	sqlite3_stmt *stmt;
 	char *sqlquery;
@@ -33,13 +34,11 @@ char *irc_knownuser(char *nick, char *host) {
 	list_t *nicklist;
 	int row;
 	
-	/* Query database */
 	sqlquery = sqlite3_mprintf(
 		"SELECT nick FROM hosts WHERE host = '%q'",
 		host
 	);
 	
-	/* Building list */
 	nicklist = list_init(NULL);
 	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
@@ -73,12 +72,13 @@ char *irc_knownuser(char *nick, char *host) {
 	
 	return thisnick;
 }
+*/
 
+/*
 void __action_known_add(char *nick, char *username, char *host, char *chan) {
 	char *sqlquery, nick2[64];
 	char output[1024], *list;
 	
-	/* Insert to db */
 	sqlquery = sqlite3_mprintf("INSERT INTO hosts (nick, username, host, chan) VALUES ('%q', '%q', '%q', '%q')", nick, username, host, chan);
 
 	if(db_sqlite_simple_query(sqlite_db, sqlquery)) {
@@ -94,6 +94,7 @@ void __action_known_add(char *nick, char *username, char *host, char *chan) {
 		
 	} else printf("[-] lib/Join: cannot update db, probably because nick already exists.\n");
 		
-	/* Clearing */
+	
 	sqlite3_free(sqlquery);
 }
+*/

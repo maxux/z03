@@ -102,17 +102,21 @@ static char *url_extract_title(char *body) {
 	if((read = strcasestr(body, "<title"))) {
 		while(*read != '>')
 			read++;
-			
-		if(!(end = strcasestr(++read, "</")))
-			return NULL;
-			
-		title = strndup(read, end - read);		
-		title = rtrim(ltrim(crlftrim(title)));
 		
-		if(!strlen(title))
-			return NULL;
+		read = ltrim(++read);
 			
-		printf("[+] urlmanager/title: <%s>\n", title);
+		if(!(end = strstr(read, "</")))
+			return NULL;
+		
+		title = strndup(read, end - read);
+		title = rtrim(crlftrim(title));
+		
+		if(!strlen(title)) {
+			free(title);
+			return NULL;
+		}
+		
+		printf("[+] urlmanager/rawtitle: <%s>\n", title);
 		
 	} else return NULL;
 	
@@ -233,11 +237,10 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 			printf("[-] urlmanager/title: cannot update title on db\n");
 		
 		sqlite3_free(sqlquery);
+		free(title);
 		
 		if(curl->code == 200)
 			url_repost_advanced(curl, message, repost);
-		
-		free(title);
 		
 	} else fprintf(stderr, "[-] urlmanager/title: cannot extract title\n");
 	
@@ -356,10 +359,10 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 		#endif
 	}
 		
-	if(curl->type == TEXT_HTML)
+	if(type == TEXT_HTML)
 		return url_process_html(url, message, repost);
 		
-	if(curl->type == UNKNOWN_TYPE)
+	if(type == UNKNOWN_TYPE)
 		return url_process_unknown(url, message, repost);
 	
 	return 0;
@@ -375,7 +378,7 @@ void url_manager(ircmessage_t *message, char *args) {
 	repost_t *repost;
 	(void) args;
 	
-	url = message->args;
+	url = args;
 	
 	printf("[+] urlmanager/parser: %s\n", url);
 		

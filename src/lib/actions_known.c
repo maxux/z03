@@ -48,6 +48,10 @@ __registrar actions_known() {
 // commands implementation
 //
 
+void action_known_free(void *data) {
+	free(data);
+}
+
 void action_known(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
 	char *sqlquery, *parsed, *implode;
@@ -63,7 +67,7 @@ void action_known(ircmessage_t *message, char *args) {
 		args, message->chan
 	);
 	
-	nicklist = list_init(NULL);
+	nicklist = list_init(action_known_free);
 	
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
 		fprintf(stderr, "[-] action/count: sql error\n");

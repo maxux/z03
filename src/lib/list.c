@@ -25,7 +25,7 @@
 #include "core.h"
 #include "ircmisc.h"
 
-list_t * list_init(void (*destruct)(void *)) {
+list_t *list_init(void (*destruct)(void *)) {
 	list_t *list;
 	
 	if(!(list = (list_t*) malloc(sizeof(list_t))))
@@ -57,7 +57,7 @@ void list_free(list_t *list) {
 	free(list);
 }
 
-void * list_append(list_t *list, char *name, void *data) {
+void *list_append(list_t *list, char *name, void *data) {
 	list_node_t *node;
 	
 	if(!(node = (list_node_t*) malloc(sizeof(list_node_t))))
@@ -74,7 +74,7 @@ void * list_append(list_t *list, char *name, void *data) {
 	return data;
 }
 
-void * list_search(list_t *list, char *name) {
+void *list_search(list_t *list, char *name) {
 	list_node_t *node = list->nodes;
 	
 	while(node && strcmp(node->name, name))

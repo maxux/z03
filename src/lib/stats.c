@@ -36,7 +36,7 @@ list_t *stats_words_read(char *chan) {
 	nick_t *nick;
 	
 	/* Creating nick list */
-	nicks = list_init(NULL);
+	nicks = list_init(nick_free);
 	
 	/* Reading nick list */
 	sqlquery = sqlite3_mprintf(
@@ -51,8 +51,8 @@ list_t *stats_words_read(char *chan) {
 			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
 				diep("malloc");
 				
-			nickname       = (char *) sqlite3_column_text(stmt, 0);
-			nick->words    = (size_t) sqlite3_column_int(stmt, 1);;
+			nickname    = (char *) sqlite3_column_text(stmt, 0);
+			nick->words = (size_t) sqlite3_column_int(stmt, 1);
 			
 			list_append(nicks, nickname, nick);
 		}
@@ -73,7 +73,7 @@ list_t *stats_nick_read(char *chan) {
 	nicks2 = stats_words_read(chan);
 	
 	/* Creating nick list */
-	nicks = list_init(NULL);
+	nicks = list_init(nick_free);
 	
 	/* Reading nick list */
 	sqlquery = sqlite3_mprintf(
@@ -89,7 +89,7 @@ list_t *stats_nick_read(char *chan) {
 	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			if(!(nick = (nick_t*) malloc(sizeof(nick_t))))
-				diep("malloc");
+				diep("[-] malloc");
 				
 			nickname       = (char *) sqlite3_column_text(stmt, 0);
 			nick->lines    = (size_t) sqlite3_column_int(stmt, 1);
@@ -118,7 +118,7 @@ channel_t *stats_channel_read(char *chan) {
 	char *sqlquery;
 	
 	if(!(channel = (channel_t*) calloc(1, sizeof(channel_t))))
-		diep("malloc");
+		diep("[-] malloc");
 	
 	/* Reading channel stats */
 	sqlquery = sqlite3_mprintf(

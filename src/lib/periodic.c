@@ -30,6 +30,10 @@
 #include "settings.h"
 #include "whatcd.h"
 
+//
+// FIXME: rewrite me.
+//
+
 void periodic_whatcd(list_t *tracking) {
 	whatcd_t *whatcd;
 	list_node_t *node2;
@@ -141,13 +145,13 @@ void periodic_delay() {
 }
 
 void *periodic_each_minutes(void *dummy) {
-	list_t *tracking;
+	// list_t *tracking;
 	
 	// FIXME: add destructor
-	if(!(tracking = list_init(NULL))) {
+	/* if(!(tracking = list_init(NULL))) {
 		fprintf(stderr, "[-] periodic: cannot init list\n");
 		return dummy;
-	}
+	} */
 	
 	while(1) {
 		sleep(60);
@@ -155,8 +159,8 @@ void *periodic_each_minutes(void *dummy) {
 		printf("[+] periodic/minute: starting cycle\n");
 		global_core->extraclient++;
 		
-		periodic_whatcd(tracking);
-		periodic_delay();
+		// periodic_whatcd(tracking);
+		// periodic_delay();
 		
 		global_core->extraclient--;
 		printf("[+] periodic/minute: end of cycle\n");

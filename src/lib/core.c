@@ -70,6 +70,10 @@ void lib_sighandler(int signal) {
 			pthread_mutex_unlock(&global_core->mutex_ssl);
 			stats_daily_update();
 		break;
+		
+		case SIGINT:
+			exit(EXIT_SUCCESS);
+		break;
 	}
 }
 
@@ -346,7 +350,6 @@ void *command_thread(void *_thread) {
 	
 	// freeing process
 	free(thread->message->command);
-	free(thread->message->args);
 	free(thread->message);
 	free(thread->args);
 	
@@ -366,15 +369,14 @@ void command_prepare_thread(ircmessage_t *message, char *args) {
 	
 	// reallocating dynamic contents
 	thread->message->command = strdup(message->command);
-	thread->message->args    = strdup(message->args);
-	
 	thread->args = strdup(args);
 	
 	zsnprintf(thread->myid, "%p", (void *) &thread->thread);
 	
 	if(!pthread_create(&thread->thread, NULL, command_thread, thread)) {
 		printf("[+] core/thread: created\n");
-		list_append(global_lib.threads, strdup(thread->myid), thread);
+		list_append(global_lib.threads, thread->myid, thread);
+		pthread_detach(thread->thread);
 		
 	} else perror("[-] core/thread");
 }
@@ -573,7 +575,7 @@ int handle_message(char *data, ircmessage_t *message) {
 	if((url = strstr(data, "http://")) || (url = strstr(data, "https://"))) {
 		if((trueurl = extract_url(url))) {
 			message->request = &__url_request;
-			message->args    = trueurl;
+			message->command = ".http";
 			command_prepare_thread(message, trueurl);
 			free(trueurl);
 			
@@ -710,8 +712,21 @@ void main_core(char *data, char *request) {
 	}
 }
 
+//
+// core inner handlers
+//
+void nick_free(void *data) {
+	free(data);
+}
+
+static void channel_free(void *data) {
+	channel_t *channel = (channel_t *) data;
+	list_free(channel->nicks);
+	free(channel);
+}
+
 void lib_construct() {
-	global_lib.channels = list_init(NULL);
+	global_lib.channels = list_init(channel_free);
 	global_lib.threads  = list_init(NULL);
 	
 	// init libcurl
@@ -727,25 +742,32 @@ void lib_construct() {
 	
 	// grabbing SIGUSR1 for daily update
 	signal_intercept(SIGUSR1, lib_sighandler);
+	signal_intercept(SIGINT, lib_sighandler);
 	
 	// starting timing thread
 	printf("[+] lib: init deferred threads\n");
 	pthread_create(&__periodic_thread, NULL, periodic_each_minutes, NULL);
 }
 
-void lib_destruct() {
-	// closing sqitite
-	db_sqlite_close(sqlite_db);
-	
+void lib_destruct() {	
 	// cleaning threads
 	pthread_cancel(__periodic_thread);
 	
 	printf("[+] lib: waiting theads...\n");
 	pthread_join(__periodic_thread, NULL);
 	
-	// FIXME: iterate node
 	list_foreach(global_lib.threads, node) {
 		// pthread_cancel(((thread_cmd_t *) node)->thread);
 		pthread_join(((thread_cmd_t *) node)->thread, NULL);
 	}
+	
+	// freeing global lists
+	printf("[+] freeing channels...\n");
+	list_free(global_lib.channels);
+	
+	printf("[+] freeing threads...\n");
+	list_free(global_lib.threads);
+	
+	// closing sqitite
+	db_sqlite_close(sqlite_db);
 }

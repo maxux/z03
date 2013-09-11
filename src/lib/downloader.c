@@ -123,6 +123,9 @@ charset_t curl_extract_charset(char *line) {
 		// skipping match
 		charset += 9;
 		
+		if(*charset == '"')
+			charset++;
+		
 		if(!strncasecmp(charset, "iso-8859", 8))
 			return ISO_8859;
 		
@@ -207,7 +210,7 @@ size_t curl_body(char *ptr, size_t size, size_t nmemb, void *userdata) {
 		return 0;
 	
 	/* Resize data */
-	curl->data  = (char *) realloc(curl->data, (curl->length + 1));
+	curl->data = (char *) realloc(curl->data, (curl->length + 1));
 	
 	/* Appending data */
 	memcpy(curl->data + prev, ptr, size * nmemb);

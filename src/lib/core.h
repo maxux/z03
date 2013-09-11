@@ -38,7 +38,6 @@
 		struct channel_t *channel;
 		
 		char *command;
-		char *args;
 		
 		struct request_t *request;
 		
@@ -99,4 +98,5 @@
 	#include "registrar.h"
 	void lib_construct();
 	void lib_destruct();
+	void nick_free(void *data);
 #endif

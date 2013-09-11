@@ -11,21 +11,23 @@
 #include "list.h"
 #include "core.h"
 
+static void registrar_free(void *data) {
+	free(data);
+}
+
 __attribute__ ((constructor (101)))
 void main_construct() {
 	printf("[+] lib: initializing...\n");
 
-	global_lib.commands = list_init(NULL);	
+	global_lib.commands = list_init(registrar_free);
 	lib_construct();
 }
 
 __attribute__ ((destructor))
 void main_destruct() {
 	printf("[+] lib: destructing...\n");
-	lib_destruct();
 	
-	list_free(global_lib.channels);
-	list_free(global_lib.threads);
+	lib_destruct();
 }
 
 void request_register(request_t *request) {
