@@ -304,6 +304,7 @@ int url_error(int errcode, curl_data_t *curl) {
 //
 static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_t *curl;
+	document_type_t type;
 	char buffer[1024];
 	
 	curl = curl_data_new();
@@ -343,10 +344,11 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 		
 	} else fprintf(stderr, "[-] urlmanager/url httplength is not set, deal with it.\n");
 	
+	type = curl->type;
 	curl_data_free(curl);
 	
 	/* dispatching process */
-	if(curl->type == IMAGE_ALL) {
+	if(type == IMAGE_ALL) {
 		#ifdef ENABLE_MIRRORING
 		return url_process_image(url, message, repost);
 		#else

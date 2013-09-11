@@ -145,7 +145,8 @@ int pre_handle(char *data, ircmessage_t *message) {
 	strcpy(message->nickhl, message->nick);
 	anti_hl(message->nickhl);
 	
-	/* Extracting channel */
+	// extract channel
+	// skip_server twice (skipping 2 words)
 	data = skip_server(data);
 	data = skip_server(data);
 	extract_chan(data, message->chan, sizeof(message->chan));
@@ -344,7 +345,6 @@ void *command_thread(void *_thread) {
 	thread->message->request->callback(thread->message, thread->args);
 	
 	// freeing process
-	free(thread->message->message);
 	free(thread->message->command);
 	free(thread->message->args);
 	free(thread->message);
@@ -365,7 +365,6 @@ void command_prepare_thread(ircmessage_t *message, char *args) {
 	memcpy(thread->message, message, sizeof(ircmessage_t));
 	
 	// reallocating dynamic contents
-	thread->message->message = strdup(message->message);
 	thread->message->command = strdup(message->command);
 	thread->message->args    = strdup(message->args);
 	

@@ -37,8 +37,6 @@
 		char chan[64];
 		struct channel_t *channel;
 		
-		char *message;
-		
 		char *command;
 		char *args;
 		

@@ -222,8 +222,8 @@ curl_data_t *curl_data_new() {
 	if(!(data = (curl_data_t *) calloc(1, sizeof(curl_data_t))))
 		return NULL;
 	
-	data->type        = UNKNOWN_TYPE;
-	data->charset     = UNKNOWN_CHARSET;
+	data->type    = UNKNOWN_TYPE;
+	data->charset = UNKNOWN_CHARSET;
 	
 	return data;
 }
