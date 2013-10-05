@@ -77,47 +77,80 @@ ssl_socket_t *init_socket_ssl(int sockfd, ssl_socket_t *ssl) {
 	ssl->sslContext = NULL;
 	ssl->sockfd = sockfd;
 	
-	// Register the error strings for libcrypto & libssl
+	// register the error strings for libcrypto & libssl
 	SSL_load_error_strings();
 	
-	// Register the available ciphers and digests
+	// register the available ciphers and digests
 	SSL_library_init();
 	
 	init_locks();
 
-	// New context saying we are a client, and using SSL 2 or 3
+	// new context saying we are a client, and using SSL 2 or 3
 	ssl->sslContext = SSL_CTX_new(SSLv23_client_method());
 	if(ssl->sslContext == NULL)
 		ERR_print_errors_fp(stderr);
 
-	// Create an SSL struct for the connection
+	// create an SSL struct for the connection
 	ssl->socket = SSL_new(ssl->sslContext);
 	if(ssl->socket == NULL)
 		ERR_print_errors_fp(stderr);
 
-	// Connect the SSL struct to our connection
+	// connect the SSL struct to our connection
 	if(!SSL_set_fd(ssl->socket, ssl->sockfd))
 		ERR_print_errors_fp(stderr);
 
-	// Initiate SSL handshake
+	// initiate SSL handshake
 	if(SSL_connect(ssl->socket) != 1)
 		ERR_print_errors_fp(stderr);
+	
+	// avoid manuel ssl retry
+	SSL_set_mode(ssl->socket, SSL_MODE_AUTO_RETRY);
+	
+	pthread_mutex_init(&ssl->mutwrite, NULL);
 
 	return ssl;
 }
 
 int ssl_read(ssl_socket_t *ssl, char *data, int max) {
-	if(ssl)
-		return SSL_read(ssl->socket, data, max);
+	int errcode, error;
+	char errstr[1024];
+	
+	if(!ssl)
+		return 0;
 		
-	else return 0;
+	if((errcode = SSL_read(ssl->socket, data, max)) < 0) {
+		error = SSL_get_error(ssl->socket, errcode);
+		
+		if(error == SSL_ERROR_SYSCALL)
+			perror("[-] core: ssl read");
+			
+		printf("[-] core: ssl read: %d, %s\n", error, ERR_error_string(error, errstr));
+	}
+	
+	return errcode;
 }
 
 int ssl_write(ssl_socket_t *ssl, char *data) {
-	if(ssl)
-		return SSL_write(ssl->socket, data, strlen(data));
+	int errcode, error;
+	char errstr[1024];
+	
+	if(!ssl)
+		return 0;
+	
+	pthread_mutex_lock(&ssl->mutwrite);
+	
+	if((errcode = SSL_write(ssl->socket, data, strlen(data))) < 0) {
+		error = SSL_get_error(ssl->socket, errcode);
 		
-	else return 0;
+		printf("[-] core: ssl write: %d, %s\n", error, ERR_error_string(error, errstr));
+		
+		if(error == SSL_ERROR_SYSCALL)
+			perror("[-] core: ssl write");
+	}
+	
+	pthread_mutex_unlock(&ssl->mutwrite);
+	
+	return errcode;
 }
 
 void ssl_close(ssl_socket_t *ssl) {
@@ -130,7 +163,6 @@ void ssl_close(ssl_socket_t *ssl) {
 		SSL_CTX_free(ssl->sslContext);
 
 	free(ssl);
-	
 	kill_locks();
 }
 

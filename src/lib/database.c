@@ -40,7 +40,7 @@ sqlite3 *db_sqlite_init() {
 		return NULL;
 	}
 	
-	sqlite3_busy_timeout(db, 10000);
+	sqlite3_busy_timeout(db, 30000);
 	
 	printf("[+] sqlite: database loaded\n");
 	

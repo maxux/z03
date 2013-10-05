@@ -216,8 +216,7 @@ void raw_socket(char *message) {
 	strcpy(sending, message);
 	strcat(sending, "\r\n");
 	
-	if(ssl_write(ssl, sending) == -1)
-		perror("[-] IRC: send");
+	ssl_write(ssl, sending);
 	
 	free(sending);
 }
@@ -271,8 +270,10 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 				
 			buff[rlen] = '\0';
 			
-		} else if(errno != EAGAIN)
+		} else if(errno != EAGAIN) {
+			printf("[-] core: read error\n");
 			ssl_error();
+		}
 	}
 	
 	return 0;

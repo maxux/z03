@@ -451,24 +451,13 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
-	if(!strncasecmp(message->nick, "malabar", 7) && (
-		strcasestr(content, "boiler") ||
-		strcasestr(content, "b0iler") ||
-		strcasestr(content, "bo!ler") ||
-		!strcasecmp(content, "BR")   ||
-		!strcasecmp(content, "8R")   ||
-		strcasestr(content, "BR ")   || 
-		strcasestr(content, "8R ")   ||
-		strcasestr(content, "chaufferie")
-	)) {
-		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM");
+	if(strstr(content, "sait passé")) {
+		irc_kick(message->chan, message->nick, "Aprans a ékrir èspaisse d'illètré");
 		return 0;
 	}
 	
-	if(!strncasecmp(message->nick, "malabar", 7) && ((rand() % 42) == 21)) {
-		irc_kick(message->chan, message->nick, "ON S'EN BRANLE DE TA BOILER ROOM, MEME SI T'EN PARLAIS PAS.");
-		return 0;
-	}
+	if((rand() % 1337) == 42)
+		irc_privmsg(message->chan, "TOI TA GUEULE");
 	
 	return 0;
 }

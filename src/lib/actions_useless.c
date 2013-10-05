@@ -30,14 +30,6 @@
 // registering commands
 //
 
-static request_t __action_ba = {
-	.match    = ".ba",
-	.callback = action_useless_ba,
-	.man      = "",
-	.hidden   = 1,
-	.syntaxe  = "",
-};
-
 static request_t __action_blowjob = {
 	.match    = ".blowjob",
 	.callback = action_useless_blowjob,
@@ -55,7 +47,6 @@ static request_t __action_ovh = {
 };
 
 __registrar actions_useless() {
-	request_register(&__action_ba);
 	request_register(&__action_blowjob);
 	request_register(&__action_ovh);
 }
@@ -63,11 +54,6 @@ __registrar actions_useless() {
 //
 // commands implementation
 //
-
-void action_useless_ba(ircmessage_t *message, char *args) {
-	irc_privmsg(message->chan, ".ba .ba .ba... .ba .ba .bibel...");	
-	action_backlog(message, args);
-}
 
 void action_useless_blowjob(ircmessage_t *message, char *args) {
 	(void) args;

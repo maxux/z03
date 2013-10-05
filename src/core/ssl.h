@@ -2,11 +2,13 @@
 	#define __Z03_CORE_SSL_HEADER
 
 	#include <openssl/ssl.h>
+	#include <pthread.h>
 
 	typedef struct {
 		int sockfd;
 		SSL *socket;
 		SSL_CTX *sslContext;
+		pthread_mutex_t mutwrite;
 		
 	} ssl_socket_t;
 	

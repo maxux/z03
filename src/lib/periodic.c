@@ -127,12 +127,8 @@ void periodic_delay() {
 			
 			zsnprintf(output, "[alarm] %s: %s", nick, message);
 			irc_privmsg(chan, output);
-		}
-		
-		sqlite3_free(sqlquery);
-		sqlite3_finalize(stmt);
-		
-		if(id > 0) {		
+			
+			
 			sqlquery = sqlite3_mprintf("UPDATE delay SET finished = 1 WHERE id = %d", id);
 			
 			if(!db_sqlite_simple_query(sqlite_db, sqlquery))
@@ -140,6 +136,9 @@ void periodic_delay() {
 			
 			sqlite3_free(sqlquery);
 		}
+		
+		sqlite3_free(sqlquery);
+		sqlite3_finalize(stmt);
 	
 	} else fprintf(stderr, "[-] lib/delay: sql error\n");
 }
@@ -160,7 +159,7 @@ void *periodic_each_minutes(void *dummy) {
 		global_core->extraclient++;
 		
 		// periodic_whatcd(tracking);
-		// periodic_delay();
+		periodic_delay();
 		
 		global_core->extraclient--;
 		printf("[+] periodic/minute: end of cycle\n");

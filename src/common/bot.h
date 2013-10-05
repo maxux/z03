@@ -66,4 +66,7 @@
 	// notificate when a user has not been seen since this time
 	#define ENABLE_NICK_LASTTIME
 	#define NICK_LASTTIME     5 * 24 * 60 * 60   // 5 days
+	
+	// enable extended .bible support
+	#define ENABLE_HOLY_BIBLE
 #endif

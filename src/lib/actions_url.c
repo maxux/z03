@@ -36,7 +36,7 @@ static request_t __action_url = {
 	.callback = action_url,
 	.man      = "search on url database, by url or title. Use % as wildcard",
 	.hidden   = 0,
-	.syntaxe  = ".url <keywords> (use %% as wildcard)",	
+	.syntaxe  = ".url <keywords> (use % as wildcard)",	
 };
 
 __registrar actions_url() {
