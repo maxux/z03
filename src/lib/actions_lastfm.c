@@ -117,6 +117,7 @@ void action_lastfm(ircmessage_t *message, char *args) {
 		
 		zsnprintf(answer, "Also listened by: %s", userlist);
 		irc_privmsg(message->chan, answer);
+		free(userlist);
 		
 		list_free(backlog);
 	}

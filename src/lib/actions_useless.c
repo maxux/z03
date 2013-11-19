@@ -38,17 +38,8 @@ static request_t __action_blowjob = {
 	.syntaxe  = "",
 };
 
-static request_t __action_ovh = {
-	.match    = ".ovh",
-	.callback = action_useless_ovh,
-	.man      = "",
-	.hidden   = 0,
-	.syntaxe  = "",
-};
-
 __registrar actions_useless() {
 	request_register(&__action_blowjob);
-	request_register(&__action_ovh);
 }
 
 //
@@ -58,36 +49,6 @@ __registrar actions_useless() {
 void action_useless_blowjob(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_kick(message->chan, message->nick, "Tu vois, ça marche, connard !");
-}
-
-void action_useless_ovh(ircmessage_t *message, char *args) {
-	char *id = NULL, *pass = NULL, url[1024];
-	curl_data_t *curl = NULL;
-	(void) args;
-	
-	curl = curl_data_new();
-	
-	if(!(id = settings_get(message->nick, "ovh_orderid", PUBLIC))) {
-		irc_privmsg(message->chan, "ovh_orderid not found");
-		goto freeall;
-	}
-	
-	if(!(pass = settings_get(message->nick, "ovh_orderpass", PUBLIC))) {
-		irc_privmsg(message->chan, "ovh_orderpass not found");
-		goto freeall;
-	}
-	
-	zsnprintf(url, "http://www.maxux.net/perso/ovh/status.php?id=%s&pass=%s", id, pass);
-		
-	if(curl_download_text(url, curl))
-		return;
-	
-	irc_privmsg(message->chan, curl->data);
-	
-	freeall:
-		free(id);
-		free(pass);
-		curl_data_free(curl);
 }
 
 /* void action_sudo(ircmessage_t *message, char *args) {

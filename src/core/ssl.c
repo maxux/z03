@@ -26,6 +26,7 @@
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <unistd.h>
 
 #include "ssl.h"
 
@@ -118,13 +119,20 @@ int ssl_read(ssl_socket_t *ssl, char *data, int max) {
 	if(!ssl)
 		return 0;
 		
-	if((errcode = SSL_read(ssl->socket, data, max)) < 0) {
+	while((errcode = SSL_read(ssl->socket, data, max)) < 0) {
 		error = SSL_get_error(ssl->socket, errcode);
 		
 		if(error == SSL_ERROR_SYSCALL)
 			perror("[-] core: ssl read");
-			
+		
+		if(error == SSL_ERROR_WANT_READ) {
+			usleep(10000);
+			continue;
+		}
+		
 		printf("[-] core: ssl read: %d, %s\n", error, ERR_error_string(error, errstr));
+		
+		break;
 	}
 	
 	return errcode;
@@ -139,13 +147,20 @@ int ssl_write(ssl_socket_t *ssl, char *data) {
 	
 	pthread_mutex_lock(&ssl->mutwrite);
 	
-	if((errcode = SSL_write(ssl->socket, data, strlen(data))) < 0) {
+	while((errcode = SSL_write(ssl->socket, data, strlen(data))) < 0) {
 		error = SSL_get_error(ssl->socket, errcode);
 		
-		printf("[-] core: ssl write: %d, %s\n", error, ERR_error_string(error, errstr));
+		if(error == SSL_ERROR_WANT_WRITE) {
+			usleep(10000);
+			continue;
+		}
 		
 		if(error == SSL_ERROR_SYSCALL)
 			perror("[-] core: ssl write");
+		
+		printf("[-] core: ssl write: %d, %s\n", error, ERR_error_string(error, errstr));
+		
+		break;
 	}
 	
 	pthread_mutex_unlock(&ssl->mutwrite);

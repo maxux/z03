@@ -480,7 +480,7 @@ char *list_nick_implode(list_t *list) {
 	implode = (char *) calloc(1, sizeof(char));
 	
 	list_foreach(list, node) {
-		implode = (char *) realloc(implode, length + strlen(node->name) + 3);
+		implode = (char *) realloc(implode, length + strlen(node->name) + 32);
 		
 		// appending anti-hled nick
 		zsnprintf(buffer, "%s", node->name);
@@ -490,7 +490,6 @@ char *list_nick_implode(list_t *list) {
 		strcat(implode, ", ");
 		
 		length = strlen(implode);
-		node = node->next;
 	}
 	
 	// removing last coma

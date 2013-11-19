@@ -137,7 +137,6 @@ void periodic_delay() {
 			sqlite3_free(sqlquery);
 		}
 		
-		sqlite3_free(sqlquery);
 		sqlite3_finalize(stmt);
 	
 	} else fprintf(stderr, "[-] lib/delay: sql error\n");
