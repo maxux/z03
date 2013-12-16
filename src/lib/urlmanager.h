@@ -11,4 +11,6 @@
 	int url_error(int errcode, curl_data_t *curl);
 	
 	int url_magic(curl_data_t *curl, ircmessage_t *message);
+	
+	int url_format_log(char *sqlquery, ircmessage_t *message);
 #endif

@@ -404,3 +404,55 @@ void url_manager(ircmessage_t *message, char *args) {
 	// freeing stuff
 	repost_free(repost);
 }
+
+
+int url_format_log(char *sqlquery, ircmessage_t *message) {
+	sqlite3_stmt *stmt;
+	char *output = NULL, *title, *url, *nick;
+	time_t time;
+	struct tm * timeinfo;
+	char date[128], *url_nick;
+	int row, len, count = 0;
+	char *titlehl;
+
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
+			url   = (char *) sqlite3_column_text(stmt, 0);
+			title = (char *) sqlite3_column_text(stmt, 1);
+			nick  = (char *) sqlite3_column_text(stmt, 2);
+			time  = (time_t) sqlite3_column_int(stmt, 3);
+			
+			timeinfo = localtime(&time);
+			strftime(date, sizeof(date), "%d/%m/%Y %X", timeinfo);
+			
+			if(!title)
+				title = "Unknown title";				
+			
+			url_nick = (char *) malloc(sizeof(char) * strlen((char *) nick) + 4);
+			strcpy(url_nick, nick);
+			
+			if(!(titlehl = anti_hl_each_words(title, strlen(title), UTF_8)))
+				continue;
+				
+			len = strlen(url) + strlen(title) + strlen(nick) + 128;
+			output = (char *) malloc(sizeof(char) * len);
+			
+			snprintf(output, len, "[%s] <%s> %s | %s", date, anti_hl(url_nick), url, titlehl);
+			irc_privmsg(message->chan, output);
+			
+			free(titlehl);
+			free(output);
+			free(url_nick);
+			
+			count++;
+		}
+	
+	} else irc_privmsg(message->chan, "Something went wrong with the sql query, sorry :/");
+	
+	if(!output)
+		irc_privmsg(message->chan, "No match found");
+	
+	sqlite3_finalize(stmt);
+	
+	return count;
+}

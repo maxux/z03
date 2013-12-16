@@ -23,6 +23,8 @@
 #include "../core/init.h"
 #include "database.h"
 #include "core.h"
+#include "downloader.h"
+#include "urlmanager.h"
 #include "actions.h"
 #include "ircmisc.h"
 #include "actions_bored.h"
@@ -39,8 +41,17 @@ static request_t __action_bored = {
 	.syntaxe  = ".bored",	
 };
 
+static request_t __action_boiler = {
+	.match    = ".br",
+	.callback = action_boiler,
+	.man      = "pick randomly a boiler-room-url into the database",
+	.hidden   = 0,
+	.syntaxe  = ".br",
+};
+
 __registrar actions_bored() {
 	request_register(&__action_bored);
+	request_register(&__action_boiler);
 }
 
 //
@@ -48,65 +59,32 @@ __registrar actions_bored() {
 //
 
 void action_bored(ircmessage_t *message, char *args) {
-	sqlite3_stmt *stmt;
 	char *sqlquery;
-	char *output = NULL, *title, *url, *nick;
-	time_t time;
-	struct tm * timeinfo;
-	char date[128], *url_nick;
-	int row, len;
-	char *titlehl;
+	(void) args;
 	
-/*	if(!action_parse_args(message, args))
-		return;
-*/
-
 	sqlquery = sqlite3_mprintf(
 		"SELECT url, title, nick, time "
 		"FROM url WHERE chan = '%q' "
 		"ORDER BY RANDOM() LIMIT 1",
 		message->chan
 	);
-
-	//	Faire une fonction qui formatte la sortie, ca éviterais de réutiliser deux fois le même code
-
-	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
-
-		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {	//	TODO: the loop here seem useless (only one answer)
-			url   = (char *) sqlite3_column_text(stmt, 0);
-			title = (char *) sqlite3_column_text(stmt, 1);
-			nick  = (char *) sqlite3_column_text(stmt, 2);
-			time  = (time_t) sqlite3_column_int(stmt, 3);
-			
-			timeinfo = localtime(&time);
-			strftime(date, sizeof(date), "%d/%m/%Y %X", timeinfo);
-			
-			if(!title)
-				title = "Unknown title";				
-			
-			url_nick = (char *) malloc(sizeof(char) * strlen((char *) nick) + 4);
-			strcpy(url_nick, nick);
-			
-			if(!(titlehl = anti_hl_each_words(title, strlen(title), UTF_8)))
-				continue;
-				
-			len = strlen(url) + strlen(title) + strlen(nick) + 128;
-			output = (char *) malloc(sizeof(char) * len);
-			
-			snprintf(output, len, "[%s] <%s> %s | %s", date, anti_hl(url_nick), url, titlehl);
-			irc_privmsg(message->chan, output);
-			
-			free(titlehl);
-			free(output);
-			free(url_nick);
-		}
 	
-	} else fprintf(stderr, "[-] Action/URL: SQL Error\n");
-	
-	if(!output)
-		irc_privmsg(message->chan, "No match found");
-	
-	/* Clearing */
+	url_format_log(sqlquery, message);
 	sqlite3_free(sqlquery);
-	sqlite3_finalize(stmt);
+}
+
+void action_boiler(ircmessage_t *message, char *args) {
+	char *sqlquery;
+	(void) args;
+
+	sqlquery = sqlite3_mprintf(
+		"SELECT url, title, nick, time       "
+		"FROM url WHERE chan = '%q'          "
+		" AND UPPER(title) LIKE '%%BOILER%%' "
+		"ORDER BY RANDOM() LIMIT 1           ",
+		message->chan
+	);
+
+	url_format_log(sqlquery, message);
+	sqlite3_free(sqlquery);
 }
