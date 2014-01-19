@@ -428,7 +428,7 @@ int url_format_log(char *sqlquery, ircmessage_t *message) {
 			if(!title)
 				title = "Unknown title";				
 			
-			url_nick = (char *) malloc(sizeof(char) * strlen((char *) nick) + 4);
+			url_nick = (char *) malloc(sizeof(char) * strlen((char *) nick) + 8);
 			strcpy(url_nick, nick);
 			
 			if(!(titlehl = anti_hl_each_words(title, strlen(title), UTF_8)))

@@ -403,7 +403,7 @@ int handle_commands(char *content, ircmessage_t *message) {
 	list_foreach(global_lib.commands, node) {
 		request = (request_t *) node->data;
 		
-		if(!strncmp(command, request->match, strlen(command))) {
+		if(!strncasecmp(command, request->match, strlen(command))) {
 			printf("[+] commands: match for: <%s>\n", request->match);
 			callback_count++;
 			callback_temp    = match;
@@ -433,6 +433,8 @@ int handle_commands(char *content, ircmessage_t *message) {
 	return 0;
 }
 
+static char *__question_answers[] = {"Yes.", "No.", "Maybe."};
+
 int handle_precommands(char *content, ircmessage_t *message) {
 	/* special check for BELL */
 	if(strchr(content, '\x07')) {
@@ -456,8 +458,10 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
-	if((rand() % 1337) == 42)
-		irc_privmsg(message->chan, "TOI TA GUEULE");
+	if(!strncmp(content, IRC_NICK, sizeof(IRC_NICK) - 1) && content[strlen(content) - 1] == '?') {
+		irc_privmsg(message->chan, __question_answers[rand() % (sizeof(__question_answers) / sizeof(char *))]);
+		return 1;
+	}
 	
 	return 0;
 }

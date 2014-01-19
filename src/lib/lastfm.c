@@ -94,7 +94,7 @@ char *lastfm_ampersand(char *original) {
 	char *work, *save;
 	
 	// FIXME: poor method
-	original = (char *) malloc(sizeof(char) * strlen(original) * 4);
+	original = (char *) calloc(sizeof(char), strlen(original) * 4);
 	
 	save = temp;
 	work = original;

@@ -69,4 +69,7 @@
 	
 	// enable extended .bible support
 	#define ENABLE_HOLY_BIBLE
+	
+	// enable extended .3filles (book Trois Filles de leur Mère)
+	#define ENABLE_3FILLES_BOOK
 #endif

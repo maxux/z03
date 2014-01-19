@@ -83,7 +83,11 @@ void sighandler(int signal) {
 			fprintf(stderr, "[-] --- Segmentation fault ---\n");
 			calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
 			backtrace_symbols_fd(buffer, calls, 1);
-	
+			
+			#ifdef __DEBUG__
+				exit(EXIT_FAILURE);
+			#endif
+			
 			sprintf(raw, "PRIVMSG %s :[System] Warning: segmentation fault, reloading.", lastchan);
 			raw_socket(raw);
 			

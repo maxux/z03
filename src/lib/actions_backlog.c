@@ -90,12 +90,12 @@ void action_backlog(ircmessage_t *message, char *args) {
 		);
 		
 		sqlquery2 = sqlite3_mprintf(
-			"SELECT nick, timestamp, message FROM (     "
-			"   SELECT nick, timestamp, message         "
-			"   FROM logs                               "
-			"   WHERE chan = '%q'                       "
-			"   ORDER BY timestamp DESC LIMIT 20        "
-			") ORDER BY timestamp ASC                   ",
+			"SELECT nick, timestamp, message, id FROM (   "
+			"   SELECT nick, timestamp, message, id       "
+			"   FROM logs                                 "
+			"   WHERE chan = '%q'                         "
+			"   ORDER BY timestamp DESC, id DESC LIMIT 20 "
+			") ORDER BY timestamp ASC, id ASC             ",
 			message->chan, message->chan, message->nick, time(NULL) - 2
 		);
 	}

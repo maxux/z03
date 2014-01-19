@@ -1,5 +1,6 @@
 /* z03 - bible based actions (backlog, url search, ...)
- * Author: Somic (g.somic@gmail.com)
+ * Author: Somic (g.somic@gmail.com),
+ * Contributor: Maxux
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
