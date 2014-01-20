@@ -4,9 +4,6 @@
 	// nickserv password
 	#define PRIVATE_NICKSERV	""
 	
-	// ircd operator password
-	#define PRIVATE_OPERSERV	""
-	
 	// cookies (variable1=value1; variable2=value2; ...)
 	#define PRIVATE_FBCOOK		""
 	#define PRIVATE_WHATCD          ""

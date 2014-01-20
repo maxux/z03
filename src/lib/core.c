@@ -696,9 +696,6 @@ void main_core(char *data, char *request) {
 			// little sleep to wait vhost to be applicated
 			usleep(500000);
 		
-		/* if(IRC_OPER)
-			raw_socket("OPER " IRC_NICK " " IRC_OPER_PASS); */
-		
 		} else irc_joinall();
 		
 		return;
