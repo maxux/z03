@@ -35,9 +35,9 @@
 static request_t __action_backlog = {
 	.match    = ".backlog",
 	.callback = action_backlog,
-	.man      = "print last lines",
+	.man      = "notice last lines from chan/someone ('public' flag send text to channel)",
 	.hidden   = 0,
-	.syntaxe  = ".backlog, .backlog <nick>",
+	.syntaxe  = ".backlog, .backlog <nick> [public]",
 };
 
 __registrar actions_backlog() {
@@ -49,47 +49,39 @@ __registrar actions_backlog() {
 //
 
 void action_backlog(ircmessage_t *message, char *args) {
-	sqlite3_stmt *stmt1, *stmt2;
-	char *sqlquery1, *sqlquery2, *msg;
+	sqlite3_stmt *stmt;
+	char *sqlquery, *msg, *match, *asknick;
 	const unsigned char *row_nick, *row_msg;
 	time_t row_time;
 	struct tm * timeinfo;
 	char date[128], *log_nick;
 	char temp[256];
-	unsigned int nrows, found = 0;
+	unsigned int found = 0;
 	size_t len, row;
+	char public = 0;
 	
 	if(strlen((args = action_check_args(args)))) {
-		sqlquery1 = NULL;
+		if((match = strchr(args, ' '))) {
+			if(!strcasecmp(match + 1, "public"))
+				public = 1;
+			
+			// isolating nick
+			asknick = strndup(args, match - args);
 		
-		sqlquery2 = sqlite3_mprintf(
+		// duplicate full-args		
+		} else asknick = strdup(args);
+		
+		sqlquery = sqlite3_mprintf(
 			"SELECT nick, timestamp, message FROM "
 			"  (SELECT nick, timestamp, message FROM logs "
 			"   WHERE chan = '%q' AND nick = '%q' "
-			"   ORDER BY id DESC LIMIT 4) "
+			"   ORDER BY id DESC LIMIT 10) "
 			"ORDER BY timestamp ASC",
-			message->chan, args
+			message->chan, asknick
 		);
 				   
 	} else {
-		/* if(time(NULL) - (60 * 10) < message->channel->last_backlog_request) {
-			irc_privmsg(message->chan, "Avoiding flood, bitch !");
-			return;
-			
-		} else message->channel->last_backlog_request = time(NULL); */
-		
-		sqlquery1 = sqlite3_mprintf(
-			"   SELECT COUNT(*) FROM logs               "
-			"   WHERE chan = '%q' AND timestamp > (     "
-			"      SELECT MAX(timestamp)                "
-			"      FROM logs                            "
-			"      WHERE chan = '%q' AND nick = '%q'    "
-			"      AND timestamp < %d                   "
-			"   )                                       ",
-			message->chan, message->chan, message->nick, time(NULL) - 2
-		);
-		
-		sqlquery2 = sqlite3_mprintf(
+		sqlquery = sqlite3_mprintf(
 			"SELECT nick, timestamp, message, id FROM (   "
 			"   SELECT nick, timestamp, message, id       "
 			"   FROM logs                                 "
@@ -100,30 +92,13 @@ void action_backlog(ircmessage_t *message, char *args) {
 		);
 	}
 	
-	if((stmt2 = db_sqlite_select_query(sqlite_db, sqlquery2))) {
-		if(sqlquery1) {
-			if((stmt1 = db_sqlite_select_query(sqlite_db, sqlquery1))) {
-				nrows = sqlite3_column_int(stmt1, 0);
-				if(nrows > 1) {
-					zsnprintf(temp, "%s: %u lines since last talk, noticing last 20 lines...", 
-							message->nickhl, nrows);
-
-				} else zsnprintf(temp, "%s: noticing last 20 lines...",  message->nickhl);
-				
-				irc_privmsg(message->chan, temp);
-				
-			} else fprintf(stderr, "[-] backlog: cannot select\n");
-			
-			sqlite3_finalize(stmt1);
-			sqlite3_free(sqlquery1);
-		}
-	
-		while((row = sqlite3_step(stmt2)) == SQLITE_ROW) {
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery))) {
+		while((row = sqlite3_step(stmt)) == SQLITE_ROW) {
 			found = 1;
 			
-			row_nick  = sqlite3_column_text(stmt2, 0);
-			row_time  = sqlite3_column_int(stmt2, 1);
-			row_msg   = sqlite3_column_text(stmt2, 2);
+			row_nick  = sqlite3_column_text(stmt, 0);
+			row_time  = sqlite3_column_int(stmt, 1);
+			row_msg   = sqlite3_column_text(stmt, 2);
 			
 			/* Date formating */
 			timeinfo = localtime(&row_time);
@@ -137,10 +112,10 @@ void action_backlog(ircmessage_t *message, char *args) {
 				
 			snprintf(msg, len, "[%s] <%s> %s", date, anti_hl(log_nick), row_msg);
 			
-			if(sqlquery1)
-				irc_notice(message->nick, msg);
+			if(public)
+				irc_privmsg(message->chan, msg);
 				
-			else irc_privmsg(message->chan, msg);
+			else irc_notice(message->nick, msg);
 			
 			free(log_nick);
 			free(msg);
@@ -153,7 +128,12 @@ void action_backlog(ircmessage_t *message, char *args) {
 		irc_privmsg(message->chan, temp);
 	}
 	
+	if(found && !public) {
+		zsnprintf(temp, "Backlog noticed");
+		irc_privmsg(message->chan, temp);
+	}
+	
 	/* Clearing */
-	sqlite3_finalize(stmt2);
-	sqlite3_free(sqlquery2);
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
 }

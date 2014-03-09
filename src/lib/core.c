@@ -436,6 +436,8 @@ int handle_commands(char *content, ircmessage_t *message) {
 static char *__question_answers[] = {"Yes.", "No.", "Maybe."};
 
 int handle_precommands(char *content, ircmessage_t *message) {
+	char *temp;
+	
 	/* special check for BELL */
 	if(strchr(content, '\x07')) {
 		irc_kick(message->chan, message->nick, "Please, do not use BELL on this chan, fucking biatch !");
@@ -453,14 +455,29 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
+	if(strstr(content, "la nutella") || strstr(content, "la wifi")) {
+		irc_kick(message->chan, message->nick, "Apprends à écrire, yllètrayé");
+		return 0;
+	}
+	
 	if(strstr(content, "sait passé")) {
 		irc_kick(message->chan, message->nick, "Aprans a ékrir èspaisse d'illètré");
 		return 0;
 	}
 	
+	// ask question to bot
 	if(!strncmp(content, IRC_NICK, sizeof(IRC_NICK) - 1) && content[strlen(content) - 1] == '?') {
 		irc_privmsg(message->chan, __question_answers[rand() % (sizeof(__question_answers) / sizeof(char *))]);
 		return 1;
+	}
+	
+	// end with ":D"
+	temp = content + strlen(content) - 2;
+	if(!strcmp(temp, ":D") || !strcmp(temp, "xD")) {
+		if((rand() % 21) == 16)
+			irc_privmsg(message->chan, ":D");
+			
+		return 0;
 	}
 	
 	return 0;

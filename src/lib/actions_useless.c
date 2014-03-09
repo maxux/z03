@@ -38,8 +38,17 @@ static request_t __action_blowjob = {
 	.syntaxe  = "",
 };
 
+static request_t __action_km = {
+	.match    = ".km",
+	.callback = action_useless_km,
+	.man      = "kick Malabar without any reasons",
+	.hidden   = 1,
+	.syntaxe  = "",
+};
+
 __registrar actions_useless() {
 	request_register(&__action_blowjob);
+	request_register(&__action_km);
 }
 
 //
@@ -49,6 +58,14 @@ __registrar actions_useless() {
 void action_useless_blowjob(ircmessage_t *message, char *args) {
 	(void) args;
 	irc_kick(message->chan, message->nick, "Tu vois, ça marche, connard !");
+}
+
+void action_useless_km(ircmessage_t *message, char *args) {
+	(void) args;
+	char buffer[1024];
+	
+	zsnprintf(buffer, "requested by %s", message->nick);
+	irc_kick(message->chan, "Malabar", buffer);
 }
 
 /* void action_sudo(ircmessage_t *message, char *args) {

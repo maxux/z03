@@ -54,15 +54,6 @@ request_t __url_request = {
 	.syntaxe  = "",
 };
 
-char *__title_host_exceptions[] = {
-	"facebook.com",
-	"imgur.com",
-	"soundcloud.com",
-	"ecolevirtuelle.provincedeliege.be",
-	"gifsound.com",
-	"instagr.am",
-};
-
 //
 // return a malloc'ed url from a string
 // the string must begin by "http(s)://" 
@@ -89,6 +80,25 @@ char *extract_url(char *url) {
 	out[i] = '\0';
 	
 	return out;
+}
+
+//
+// return the host part of an url
+// string must be free'd after use
+//
+char *extract_host(char *url) {
+	char *from, *to;
+	
+	if(!(from = strchr(url, '/')))
+		return NULL;
+	
+	if(*(from + 1) == '/')
+		from += 2;
+	
+	if(!(to = strchr(from, '/')))
+		return NULL;
+	
+	return strndup(from, to - from);
 }
 
 //
@@ -216,7 +226,7 @@ static int url_process_html(char *url, ircmessage_t *message, repost_t *repost) 
 		
 		// truncate too long title
 		if(strlen(print) > 250)
-			strcpy(print + 240, " [...]");
+			spacetrunc(print, 250);
 		
 		// print title with error code if any
 		if(curl->code != 200) {

@@ -38,4 +38,6 @@
 	char *sha1_string(unsigned char *sha1_hexa, char *sha1_char);
 	
 	int file_write(const char *filename, char *buffer, size_t length);
+	
+	char *spacetrunc(char *str, size_t maxlen);
 #endif

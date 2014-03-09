@@ -550,3 +550,23 @@ int file_write(const char *filename, char *buffer, size_t length) {
 	
 	return written;
 }
+
+char *spacetrunc(char *str, size_t maxlen) {
+	size_t length = strlen(str);
+	
+	if(length <= maxlen)
+		return str;
+	
+	// fallback truncating
+	maxlen -= 7;
+	strcpy(str + maxlen, " [...]");
+	
+	// reading back to find a space
+	while(*(str + maxlen) != ' ' && maxlen)
+		maxlen--;
+	
+	if(maxlen > 0)
+		strcpy(str + maxlen, " [...]");
+	
+	return str;
+}

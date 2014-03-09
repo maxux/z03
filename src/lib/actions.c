@@ -117,7 +117,11 @@ void action_man(ircmessage_t *message, char *args) {
 	list_foreach(global_lib.commands, node) {
 		request = (request_t *) node->data;
 		
-		if(!strcmp(args, request->match + 1) && !request->hidden) {
+		if(request->hidden)
+			continue;
+		
+		// match with prefix or without
+		if((!strcmp(args, request->match + 1) || !strcmp(args, request->match))) {
 			zsnprintf(buffer, "%s: %s", args, request->man);
 			irc_privmsg(message->chan, buffer);
 			

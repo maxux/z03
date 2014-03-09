@@ -6,7 +6,9 @@
 	extern char *__host_ignore[];
 	extern request_t __url_request;
 	
-	char *extract_url(char *url);	
+	char *extract_url(char *url);
+	char *extract_host(char *url);
+		
 	void url_manager(ircmessage_t *message, char *args);
 	int url_error(int errcode, curl_data_t *curl);
 	

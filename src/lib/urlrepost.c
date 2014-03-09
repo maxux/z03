@@ -29,6 +29,18 @@
 #include "urlrepost.h"
 #include "ircmisc.h"
 
+static char *__title_host_exceptions[] = {
+	"facebook.com",
+	"youtube.com",
+	"youtu.be",
+	"imgur.com",
+	"soundcloud.com",
+	"ecolevirtuelle.provincedeliege.be",
+	"gifsound.com",
+	"instagram.com",
+	"instagr.am",
+};
+
 repost_t *repost_new() {
 	return calloc(1, sizeof(repost_t));
 }
@@ -129,11 +141,12 @@ repost_t *url_repost_hit(char *url, ircmessage_t *message, repost_t *repost) {
 
 repost_t *url_repost_advanced(curl_data_t *curl, ircmessage_t *message, repost_t *repost) {
 	sqlite3_stmt *stmt;
-	char *sqlquery, timing[128];
+	char *sqlquery, timing[128], *host;
 	char buffer[512], ophl[64];
 	repost_t *newrepost;
 	unsigned char sha1_hexa[SHA_DIGEST_LENGTH];
 	char sha1_char[(SHA_DIGEST_LENGTH * 2) + 1];
+	unsigned int i;
 
 	// saving sha1 for the url, if it's not already a repost
 	if(repost->type == NOT_REPOST) {
@@ -239,7 +252,14 @@ repost_t *url_repost_advanced(curl_data_t *curl, ircmessage_t *message, repost_t
 		repost_free(newrepost);
 		return repost;
 	}
-
+	
+	// checking if url host is not on exception list
+	if((host = extract_host(repost->url))) {
+		for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++)
+			if(!strcmp(__title_host_exceptions[i], host))
+				return repost;
+	}
+	
 	// there is only the title match possibility
 	// skipping string compar
 	zsnprintf(buffer,

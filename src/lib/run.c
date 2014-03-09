@@ -121,7 +121,7 @@ void lib_run_init(ircmessage_t *msg, char *code, action_run_lang_t lang) {
 	int fd;
 	
 	if((fd = init_socket(SRV_RUN_CLIENT, SRV_RUN_PORT)) < 0) {
-		irc_privmsg(msg->chan, "Build machine seems te be down");
+		irc_privmsg(msg->chan, "Build machine seems down");
 		return;
 	}
 	
