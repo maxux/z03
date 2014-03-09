@@ -37,6 +37,7 @@
 #define TARGET_FILE	"execute-code.template"
 #define TARGET_FILE_HS	"execute-code-hs.template"
 #define TARGET_FILE_PHP	"execute-code-php.template"
+#define TARGET_FILE_PY	"execute-code-py.template"
 
 typedef struct thread_data_t {
 	int sockfd;
@@ -152,12 +153,26 @@ char *fileread_light(const char *file, char *buffer, size_t bufflen) {
 }
 
 void execute_py(thread_data_t *thread_data, char *code) {
-	FILE *cmd;
+	FILE *cmd, *out;
 	char buffer[4096];
-	char cmdline[1024];
+	char cmdline[1024], tmpfile[128];
 	
+	/* Writing python file */
+	if(!fileread_light(TARGET_FILE_PY, buffer, sizeof(buffer)))
+		return;
+	
+	sprintf(tmpfile, "/tmp/z03.code-%d.py", rand());
+	
+	if(!(out = fopen(tmpfile, "w"))) {
+		perror("[-] fopen");
+		return;
+	}
+	
+	fprintf(out, buffer, code);
+	fclose(out);
+
 	/* Compiling */
-	sprintf(cmdline, "python -c \"%s\" 2>&1", code);
+	sprintf(cmdline, "timeout 10 python %s 2>&1", tmpfile);
 	printf("[+] Running: %s\n", cmdline);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
@@ -172,6 +187,7 @@ void execute_py(thread_data_t *thread_data, char *code) {
 	}
 	
 	pclose(cmd);
+	unlink(tmpfile);
 }
 
 void execute_hs(thread_data_t *thread_data, char *code) {
@@ -179,7 +195,7 @@ void execute_hs(thread_data_t *thread_data, char *code) {
 	char buffer[4096];
 	char tmpfile[128], cmdline[256];
 	
-	/* Writing C file */
+	/* Writing haskell file */
 	if(!fileread_light(TARGET_FILE_HS, buffer, sizeof(buffer)))
 		return;
 	
@@ -194,7 +210,8 @@ void execute_hs(thread_data_t *thread_data, char *code) {
 	fclose(out);
 	
 	/* Executing */
-	sprintf(cmdline, "runghc %s 2>&1", tmpfile);
+	sprintf(cmdline, "timeout 10 runghc %s 2>&1", tmpfile);
+	// sprintf(cmdline, "runghc %s %s 2>&1", code, tmpfile);
 	printf("[+] Running: %s\n", cmdline);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
@@ -219,7 +236,7 @@ void execute_php(thread_data_t *thread_data, char *code) {
 	char buffer[4096];
 	char tmpfile[128], cmdline[256];
 	
-	/* Writing C file */
+	/* Writing php file */
 	if(!fileread_light(TARGET_FILE_PHP, buffer, sizeof(buffer)))
 		return;
 	
@@ -234,7 +251,7 @@ void execute_php(thread_data_t *thread_data, char *code) {
 	fclose(out);
 	
 	/* Executing */
-	sprintf(cmdline, "php %s 2>&1", tmpfile);
+	sprintf(cmdline, "timeout 10 php %s 2>&1", tmpfile);
 	printf("[+] Running: %s\n", cmdline);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
@@ -274,7 +291,7 @@ void execute_c(thread_data_t *thread_data, char *code) {
 	fclose(out);
 	
 	/* Compiling */
-	sprintf(cmdline, "gcc -W -Wall -O2 -g -std=gnu99 %s -o %s.run 2>&1", tmpfile, tmpfile);
+	sprintf(cmdline, "gcc -W -Wall -O2 -lm -std=gnu99 %s -o %s.run 2>&1", tmpfile, tmpfile);
 	printf("[+] Compiling: %s\n", cmdline);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
@@ -297,7 +314,7 @@ void execute_c(thread_data_t *thread_data, char *code) {
 	fclose(out);
 	
 	/* Executing */
-	sprintf(cmdline, "%s.run 2>&1", tmpfile);
+	sprintf(cmdline, "timeout 10 %s.run 2>&1", tmpfile);
 	printf("[+] Running: %s\n", tmpfile);
 	
 	if(!(cmd = popen(cmdline, "r"))) {
