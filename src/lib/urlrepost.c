@@ -30,15 +30,19 @@
 #include "ircmisc.h"
 
 static char *__title_host_exceptions[] = {
+	"www.facebook.com",
 	"facebook.com",
-	"youtube.com",
+	"www.youtube.com",
 	"youtu.be",
+	"www.imgur.com",
 	"imgur.com",
 	"soundcloud.com",
 	"ecolevirtuelle.provincedeliege.be",
 	"gifsound.com",
+	"www.instagram.com",
 	"instagram.com",
 	"instagr.am",
+	"git.maxux.net",
 };
 
 repost_t *repost_new() {
@@ -255,9 +259,15 @@ repost_t *url_repost_advanced(curl_data_t *curl, ircmessage_t *message, repost_t
 	
 	// checking if url host is not on exception list
 	if((host = extract_host(repost->url))) {
-		for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++)
-			if(!strcmp(__title_host_exceptions[i], host))
+		for(i = 0; i < sizeof(__title_host_exceptions) / sizeof(char *); i++) {
+			printf("[ ] matching debug <%s> <%s>\n", __title_host_exceptions[i], host);
+			
+			if(!strcmp(__title_host_exceptions[i], host)) {
+				printf("[+] host is on exception list\n");
+				repost_free(newrepost);
 				return repost;
+			}
+		}
 	}
 	
 	// there is only the title match possibility
