@@ -161,6 +161,13 @@ size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata
 			return size * nmemb;
 		}
 		
+		if(!strncmp(ptr + 14, "video/webm", 10)) {
+			printf("[+] urlmanager/header: <video webm> mime type detected\n");
+			curl->type = WEBM;
+			
+			return size * nmemb;
+		}
+		
 		// reading charset
 		curl->charset = curl_extract_charset(ptr + 14);
 		printf("[+] urlmanager/header: charset: %d\n", curl->charset);

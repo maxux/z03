@@ -9,7 +9,8 @@
 	typedef enum document_type_t {
 		UNKNOWN_TYPE,
 		TEXT_HTML,
-		IMAGE_ALL
+		IMAGE_ALL,
+		WEBM
 		
 	} document_type_t;
 	

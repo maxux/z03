@@ -164,7 +164,7 @@ int url_magic(curl_data_t *curl, ircmessage_t *message) {
 //
 static int url_process_image(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_t *curl;
-	char filename[512], temp[512];
+	char filename[512], temp[512], *sqlquery;
 	int length;
 	
 	curl = curl_data_new();
@@ -182,6 +182,18 @@ static int url_process_image(char *url, ircmessage_t *message, repost_t *repost)
 	
 		length = file_write(filename, curl->data, curl->length);		
 		printf("[+] urlmanager/image: file saved: %d bytes\n", length);
+		
+		// updating database
+		sqlquery = sqlite3_mprintf(
+			"INSERT INTO images (nick, chan, url, date, filename, size) VALUES "
+			"('%q', '%q', '%q', '%u', '%q', '%u')",
+			message->nick, message->chan, url, time(NULL), temp, length
+		);
+		
+		if(!db_sqlite_simple_query(sqlite_db, sqlquery))
+			printf("[-] urlmanager/mirroring: cannot insert image\n");
+		
+		sqlite3_free(sqlquery);
 		
 		url_magic(curl, message);
 		url_repost_advanced(curl, message, repost);
@@ -336,7 +348,7 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 		return url_error(1, curl);
 	}
 	
-	if(curl->type == IMAGE_ALL && curl->http_length) {
+	if((curl->type == IMAGE_ALL || curl->type == WEBM) && curl->http_length) {
 		// warning on big image
 		if(curl->http_length > CURL_WARN_SIZE && curl->http_length < CURL_MAX_SIZE) {
 			zsnprintf(buffer, "[Warning: image size: %.2f Mo, mirroring anyway...]",
@@ -361,7 +373,7 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 	curl_data_free(curl);
 	
 	/* dispatching process */
-	if(type == IMAGE_ALL) {
+	if(type == IMAGE_ALL || type == WEBM) {
 		#ifdef ENABLE_MIRRORING
 		return url_process_image(url, message, repost);
 		#else

@@ -43,6 +43,7 @@ static char *__title_host_exceptions[] = {
 	"instagram.com",
 	"instagr.am",
 	"git.maxux.net",
+	"www.speedtest.net",
 };
 
 repost_t *repost_new() {
