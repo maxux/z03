@@ -46,9 +46,18 @@ static request_t __action_km = {
 	.syntaxe  = "",
 };
 
+static request_t __action_hodor = {
+	.match    = ".hodor",
+	.callback = action_useless_hodor,
+	.man      = "hodor hodor hodor",
+	.hidden   = 1,
+	.syntaxe  = "",
+};
+
 __registrar actions_useless() {
 	request_register(&__action_blowjob);
 	request_register(&__action_km);
+	request_register(&__action_hodor);
 }
 
 //
@@ -66,6 +75,25 @@ void action_useless_km(ircmessage_t *message, char *args) {
 	
 	zsnprintf(buffer, "requested by %s", message->nick);
 	irc_kick(message->chan, "Malabar", buffer);
+}
+
+void action_useless_hodor(ircmessage_t *message, char *args) {
+	(void) args;
+	char output[2048];
+	unsigned int i, value;
+	
+	// initializing
+	value = (rand() % 10) + 1;
+	*output = '\0';
+	
+	// copy hodor random time
+	for(i = 0; i < value; i++)
+		strcat(output, "hodor ");
+	
+	// trim last space
+	*(output + strlen(output) - 1) = '\0';
+	
+	irc_privmsg(message->chan, output);
 }
 
 /* void action_sudo(ircmessage_t *message, char *args) {

@@ -76,6 +76,7 @@ void action_time(ircmessage_t *message, char *args) {
 
 	strftime(date, sizeof(date), TIME_FORMAT, timeinfo);	
 	irc_privmsg(message->chan, date);
+	// irc_privmsg(message->chan, "May the force be with you today...");
 }
 
 void action_uptime(ircmessage_t *message, char *args) {
