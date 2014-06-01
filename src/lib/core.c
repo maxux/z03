@@ -485,7 +485,7 @@ int handle_precommands(char *content, ircmessage_t *message) {
 
 int handle_message(char *data, ircmessage_t *message) {
 	char *content, *temp;
-	char *url, *trueurl, *search;
+	char *url, *trueurl;
 	nick_t *nick;
 	char buffer[256];
 	time_t now;
@@ -576,25 +576,35 @@ int handle_message(char *data, ircmessage_t *message) {
 		}
 	}
 	
-	/* saving log */
+	// saving log
 	log_privmsg(message->chan, message->nick, content);
 	
 	// commit sql
 	db_sqlite_simple_query(sqlite_db, "END TRANSACTION");
 	
-	search = data;
-	while((url = strstr(search, "http://")) || (url = strstr(search, "https://"))) {
+	// copy data to a modifiable string
+	temp = strdup(data);
+	
+	// checking if url exists
+	while((url = strstr(temp, "http://")) || (url = strstr(temp, "https://"))) {
+		printf("[+] url found: %s\n", url);
+		
 		if((trueurl = extract_url(url))) {
+			printf("[+] url cleared found: %s\n", trueurl);
+			
 			message->request = &__url_request;
 			message->command = ".http";
 			command_prepare_thread(message, trueurl);
+			
+			// clearing url from base string
+			memset(url, ' ', strlen(trueurl));
+			
 			free(trueurl);
 			
 		} else fprintf(stderr, "[-] URL: Cannot extact url\n");
-		
-		// skip the http prefix and searching another url
-		search = url + 4;
 	}
+	
+	free(temp);
 	
 	return 1;
 }
