@@ -105,7 +105,7 @@ void action_count(ircmessage_t *message, char *args) {
 			} else strcpy(nicked, message->nickhl);
 		
 			zsnprintf(output,
-			          "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per lines) since %s",
+			          "%s: %d (%.2f%% of %d) lines and %d (%.2f%% of %d) words (avg: %.2f words per line) since %s",
 				  nicked,
 				  lines, ((float) lines / tlines) * 100, tlines,
 				  words, ((float) words / twords) * 100, twords,

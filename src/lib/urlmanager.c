@@ -166,7 +166,7 @@ static int url_process_image(char *url, ircmessage_t *message, repost_t *repost)
 	curl_data_t *curl;
 	char filename[512], temp[512], *sqlquery;
 	int length;
-	
+
 	curl = curl_data_new();
 	
 	if(curl_download(url, curl, 0)) // force dl is useless with custom wrapper
@@ -377,7 +377,7 @@ static int url_process(char *url, ircmessage_t *message, repost_t *repost) {
 		#ifdef ENABLE_MIRRORING
 		return url_process_image(url, message, repost);
 		#else
-		return 0;
+		return url_process_unknown(url, message, repost);
 		#endif
 	}
 		
@@ -477,4 +477,16 @@ int url_format_log(char *sqlquery, ircmessage_t *message) {
 	sqlite3_finalize(stmt);
 	
 	return count;
+}
+
+//
+// return a copy of a well formated url from raw html code
+//
+char *url_ender(char *src) {
+	char *end;
+	
+	if(!(end = strchr(src, '"')))
+		return NULL;
+	
+	return strndup(src, end - src);
 }

@@ -21,7 +21,6 @@
 	
 	char *time_elapsed(time_t time);
 	
-	char *irc_mstrncpy(char *src, size_t len);
 	char *skip_header(char *data);
 	
 	int irc_extract_userdata(char *data, char **nick, char **username, char **host);
@@ -40,4 +39,8 @@
 	int file_write(const char *filename, char *buffer, size_t length);
 	
 	char *spacetrunc(char *str, size_t maxlen);
+	
+	char *facebook_remove_size(char *src);
+	
+	const char *strcheck(const char *str);
 #endif

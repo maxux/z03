@@ -15,4 +15,6 @@
 	int url_magic(curl_data_t *curl, ircmessage_t *message);
 	
 	int url_format_log(char *sqlquery, ircmessage_t *message);
+	
+	char *url_ender(char *src);
 #endif

@@ -418,12 +418,15 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 	json_t *root;
 	char *artist, *title;
 	
-	curl = curl_data_new();
-	
 	// signature with original names
 	sig = lastfm_sig_love(lastfm);
 	
 	// fix artist and title name (ampersand on request)
+	if(!lastfm->track->artist || !lastfm->track->title) {
+		request->error = strdup("Malformed artist/track");
+		return request;
+	}
+	
 	artist = lastfm_ampersand(lastfm->track->artist);
 	title  = lastfm_ampersand(lastfm->track->title);
 	
@@ -433,6 +436,8 @@ lastfm_request_t *lastfm_api_love(lastfm_t *lastfm, lastfm_request_t *request) {
 	free(sig);
 	free(artist);
 	free(title);
+	
+	curl = curl_data_new();
 	
 	if(curl_download_text_post(LASTFM_API_BASE, curl, space_encode(post)))
 		return request;

@@ -49,27 +49,18 @@
 	#endif
 	
 	// mirroring images to this path
-	#define ENABLE_MIRRORING
-	#define MIRROR_PATH             "/tmp/"
+	#define MIRROR_PATH             "/var/www/perso/imagespawn/data/"
 	
 	// time format used by strftime (man 3 strftime)
 	#define TIME_FORMAT             "%A %d %B %X %Y UTC%z (%Z)"
 	
 	// admin format: nick!username@host
 	// admin is able to sent bot remote raw command
-	#define IRC_ADMIN_HOST          ""
+	#define IRC_ADMIN_HOST          "Maxux!maxux@ff404::-702526CE"
 	
 	// kickban nick longer than this limit
-	#define ENABLE_NICK_MAX_LENGTH
 	#define NICK_MAX_LENGTH		15           // 15 bytes
 	
 	// notificate when a user has not been seen since this time
-	#define ENABLE_NICK_LASTTIME
 	#define NICK_LASTTIME     5 * 24 * 60 * 60   // 5 days
-	
-	// enable extended .bible support
-	#define ENABLE_HOLY_BIBLE
-	
-	// enable extended .3filles (book Trois Filles de leur Mère)
-	#define ENABLE_3FILLES_BOOK
 #endif

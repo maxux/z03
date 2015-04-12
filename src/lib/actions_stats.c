@@ -123,5 +123,5 @@ void action_stats(ircmessage_t *message, char *args) {
 	sqlite3_finalize(stmt);
 			
 	zsnprintf(msg, "Today: %d urls and %d lines for %d nicks", count, lines, cnick);
-	irc_privmsg(message->chan, msg);	
+	irc_privmsg(message->chan, msg);
 }

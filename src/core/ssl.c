@@ -79,7 +79,7 @@ ssl_socket_t *init_socket_ssl(int sockfd, ssl_socket_t *ssl) {
 	ssl->sockfd = sockfd;
 	
 	// register the error strings for libcrypto & libssl
-	SSL_load_error_strings();
+	SSL_load_error_strings();	
 	
 	// register the available ciphers and digests
 	SSL_library_init();

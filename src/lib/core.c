@@ -465,6 +465,11 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
+	if(strstr(content, "twitch.tv/t4g1") && !strcmp(message->nick, "T4g1")) {
+		irc_kick(message->chan, message->nick, "Nope");
+		return 0;
+	}
+	
 	// ask question to bot
 	if(!strncmp(content, IRC_NICK, sizeof(IRC_NICK) - 1) && content[strlen(content) - 1] == '?') {
 		irc_privmsg(message->chan, __question_answers[rand() % (sizeof(__question_answers) / sizeof(char *))]);
@@ -720,7 +725,7 @@ void main_core(char *data, char *request) {
 		return;
 	}
 	
-	if(!strncmp(request, "376", 3)) {
+	if(!strncmp(request, "376", 3) || !strncmp(request, "422", 3)) {
 		if(IRC_NICKSERV) {
 			raw_socket("PRIVMSG NickServ :IDENTIFY " IRC_NICKSERV_PASS);
 			

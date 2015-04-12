@@ -42,6 +42,7 @@ weather_station_t weather_stations[] = {
 	{.id = 80,  .ref = "seraing",      .type = STATION_STATION, .name = "Boncelles (Seraing)"},
 	{.id = 106, .ref = "namur",        .type = STATION_STATION, .name = "Floriffoux (Namur)"},
 	{.id = 48,  .ref = "spa",          .type = STATION_STATION, .name = "Spa"},
+	{.id = 32,  .ref = "limelette",    .type = STATION_STATION, .name = "Limelette"},
 	{.id = 13,  .ref = "beauvechain",  .type = STATION_METAR,   .name = "Beauvechain"},
 	{.id = 36,  .ref = "vaux",         .type = STATION_STATION, .name = "Vaux-sous-Chèvremont"},
 	{.id = 59,  .ref = "herve",        .type = STATION_STATION, .name = "Herve (Outre-Cour)"},

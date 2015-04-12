@@ -50,7 +50,7 @@ __registrar actions_backlog() {
 
 void action_backlog(ircmessage_t *message, char *args) {
 	sqlite3_stmt *stmt;
-	char *sqlquery, *msg, *match, *asknick;
+	char *sqlquery, *msg, *match, *asknick = NULL;
 	const unsigned char *row_nick, *row_msg;
 	time_t row_time;
 	struct tm * timeinfo;
@@ -124,7 +124,7 @@ void action_backlog(ircmessage_t *message, char *args) {
 	} else fprintf(stderr, "[-] URL Parser: cannot select logs\n");
 	
 	if(!found) {
-		zsnprintf(temp, "No match found for <%s>", args);
+		zsnprintf(temp, "No match found for <%s>", (asknick) ? asknick : args);
 		irc_privmsg(message->chan, temp);
 	}
 	

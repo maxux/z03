@@ -274,9 +274,10 @@ int read_socket(ssl_socket_t *ssl, char *data, char *next) {
 				
 			buff[rlen] = '\0';
 			
-		} else if(errno != EAGAIN) {
+		} else if(errno != EAGAIN && errno != EINTR) {
 			printf("[-] core: read error\n");
 			ssl_error();
+			exit(EXIT_FAILURE);
 		}
 	}
 	

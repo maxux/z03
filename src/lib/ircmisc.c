@@ -303,18 +303,6 @@ char *time_elapsed(time_t time) {
 	return output;
 }
 
-char *irc_mstrncpy(char *src, size_t len) {
-	char *str;
-	
-	if(!(str = (char *) malloc(sizeof(char) * len + 1)))
-		return NULL;
-	
-	strncpy(str, src, len);
-	str[len] = '\0';
-	
-	return str;
-}
-
 int irc_extract_userdata(char *data, char **nick, char **username, char **host) {
 	char *match;
 	
@@ -322,7 +310,7 @@ int irc_extract_userdata(char *data, char **nick, char **username, char **host) 
 	if(!(match = strchr(data, '!')))
 		return 0;
 	
-	*nick = irc_mstrncpy(data, match - data);
+	*nick = strndup(data, match - data);
 	data = match + 1;
 	
 	/* Extract Username */
@@ -331,7 +319,7 @@ int irc_extract_userdata(char *data, char **nick, char **username, char **host) 
 		return 0;
 	}
 	
-	*username = irc_mstrncpy(data, match - data);
+	*username = strndup(data, match - data);
 	data = match + 1;
 	
 	/* Extract Host */
@@ -341,7 +329,7 @@ int irc_extract_userdata(char *data, char **nick, char **username, char **host) 
 		return 0;
 	}
 	
-	*host = irc_mstrncpy(data, match - data);
+	*host = strndup(data, match - data);
 	
 	return 1;
 }
@@ -359,9 +347,9 @@ char *string_index(char *str, unsigned int index) {
 	
 	if(strlen(str) > 0) {
 		if((match = strchr(str, ' '))) {
-			match = irc_mstrncpy(str, match - str);
+			match = strndup(str, match - str);
 			
-		} else match = irc_mstrncpy(str, strlen(str));
+		} else match = strdup(str);
 		
 		printf("[+] Index: <%s>\n", match);
 		
@@ -569,4 +557,11 @@ char *spacetrunc(char *str, size_t maxlen) {
 		strcpy(str + maxlen, " [...]");
 	
 	return str;
+}
+
+//
+// check is char pointer is null or not
+//
+const char *strcheck(const char *str) {
+	return str ? str : "Unknown";
 }
