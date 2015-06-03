@@ -23,7 +23,7 @@
 #include "downloader.h"
 #include "shurl.h"
 
-static char *baseurl = "http://x.maxux.net/index.php?url=";
+static char *baseurl = "http://tny.im/yourls-api.php?action=shorturl&format=simple&url=";
 
 char *shurl(char *url) {
 	char *request;

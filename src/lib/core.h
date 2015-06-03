@@ -19,6 +19,7 @@
 		time_t last_chart_request;
 		time_t last_backurl_request;
 		time_t last_backlog_request;
+		char *topic;
 		
 		list_t *nicks;
 		
@@ -84,6 +85,8 @@
 	int handle_message(char *data, ircmessage_t *message);
 	void handle_nick(char *data);
 	void handle_join(char *data);
+	
+	void topic_update();
 	
 	void irc_kick(char *chan, char *nick, char *reason);
 	

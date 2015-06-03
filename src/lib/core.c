@@ -69,6 +69,7 @@ void lib_sighandler(int signal) {
 		case SIGUSR1:
 			pthread_mutex_unlock(&global_core->mutex_ssl);
 			stats_daily_update();
+			topic_update();
 		break;
 		
 		case SIGINT:
@@ -221,6 +222,103 @@ void handle_join(char *data) {
 	free(username);
 	free(host);
 	free(nick);
+}
+
+void handle_topic(char *data) {
+	char *chan, *topic;
+	channel_t *channel;
+	char buffer[64];
+	
+	// topic is set by ourself, ignore
+	sprintf(buffer, "%s!", IRC_NICK);
+	if(!strncmp(data, buffer, strlen(buffer)))
+		return;
+	
+	data = skip_server(data);
+	chan = string_index(data, 1);
+	topic = skip_header(data);
+	
+	printf("[+] topic [%s]: %s\n", chan, topic);
+	
+	if((channel = list_search(global_lib.channels, chan))) {
+		printf("[+] topic: channel found, current topic: %s\n", channel->topic);
+		
+		// updating topic
+		free(channel->topic);
+		channel->topic = strdup(topic);
+		
+		printf("[+] topic: channel found, topic set: %s\n", channel->topic);
+	}
+	
+	free(chan);
+}
+
+//
+// FIXME: private function for custom topic set
+//
+void topic_update() {
+	char *chan = "#inpres";
+	char *topic, buffer[2048], request[2440];
+	char *begin, *start, *next;
+	channel_t *channel;
+	time_t now;
+	struct tm reach;
+	double seconds, days;
+	
+	if(!(channel = list_search(global_lib.channels, chan))) {
+		printf("[-] topic: update: channel <%s> not found\n", chan);
+		return;
+	}
+	
+	if(!channel->topic) {
+		printf("[-] topic: update: i don't have the topic right now, sorry\n");
+		return;
+	}
+	
+	topic = channel->topic;
+	printf("[+] topic: channel found, current topic: %s\n", channel->topic);
+	
+	// find pattern
+	if(!(start = strstr(topic, "Dour J-"))) {
+		printf("[-] topic: update: pattern not found\n");
+		return;
+	}
+	
+	begin = strndup(topic, start - topic);
+	
+	if(!(next = strchr(start + 7, ' '))) {
+		printf("[-] topic: update: end pattern not found ?!\n");
+		return;
+	}
+	
+	// set new date countdown
+	time(&now);
+	reach = *localtime(&now);
+	
+	reach.tm_hour = 0;
+	reach.tm_min = 0;
+	reach.tm_sec = 0;
+	
+	// 15 july
+	reach.tm_mon = 6;
+	reach.tm_mday = 15;
+	
+	seconds = difftime(mktime(&reach), now);
+	days = seconds / (60 * 60 * 24);
+	
+	// building the new topic
+	sprintf(buffer, "%sDour J-%.0f%s", begin, days, next);
+	free(begin);
+	
+	// clearing previous one and set the new one
+	free(channel->topic);
+	channel->topic = strdup(buffer);
+	
+	// send to the server
+	sprintf(request, "TOPIC %s :%s", chan, channel->topic);
+	raw_socket(request);
+	
+	printf("[+] topic: new topic: %s\n", channel->topic);
 }
 
 void handle_kick(char *data) {
@@ -722,6 +820,11 @@ void main_core(char *data, char *request) {
 	
 	if(!strncmp(request, "KICK", 4)) {
 		handle_kick(data + 1);
+		return;
+	}
+	
+	if(!strncmp(request, "TOPIC", 5)) {
+		handle_topic(data + 1);
 		return;
 	}
 	
