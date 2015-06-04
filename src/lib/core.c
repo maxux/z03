@@ -130,7 +130,7 @@ int nick_length_check(char *nick, char *channel) {
 
 int pre_handle(char *data, ircmessage_t *message) {
 	char *nick, *username, *host;
-	channel_t *channel;
+	channel_t *channel = NULL;
 	
 	if(!irc_extract_userdata(data, &nick, &username, &host)) {
 		printf("[-] lib/prehandle: extract data info failed\n");
@@ -162,7 +162,7 @@ int pre_handle(char *data, ircmessage_t *message) {
 	#endif
 	
 	if(!(message->channel = list_search(global_lib.channels, message->chan))) {
-		printf("[-] lib/preHandle: cannot find channel, reloading.\n");
+		printf("[-] lib/prehandle: cannot find channel, reloading.\n");
 		channel = stats_channel_load(message->chan);
 		
 		list_append(global_lib.channels, message->chan, channel);
@@ -224,25 +224,29 @@ void handle_join(char *data) {
 	free(nick);
 }
 
-void handle_topic(char *data) {
-	char *chan, *topic;
-	channel_t *channel;
-	char buffer[64];
-	
-	// topic is set by ourself, ignore
-	sprintf(buffer, "%s!", IRC_NICK);
-	if(!strncmp(data, buffer, strlen(buffer)))
-		return;
+void handle_new_topic(char *data) {
+	char *chan, buffer[256];
 	
 	data = skip_server(data);
 	chan = string_index(data, 1);
+	
+	printf("[+] topic: new topic for <%s>, requesting info\n", chan);
+	
+	zsnprintf(buffer, "TOPIC %s", chan);
+	raw_socket(buffer);
+}
+
+void handle_topic(char *data) {
+	char *chan, *topic;
+	channel_t *channel;
+	
+	data = skip_server(data);
+	chan = string_index(data, 2);
 	topic = skip_header(data);
 	
-	printf("[+] topic [%s]: %s\n", chan, topic);
+	printf("[+] topic <%s>: %s\n", chan, topic);
 	
 	if((channel = list_search(global_lib.channels, chan))) {
-		printf("[+] topic: channel found, current topic: %s\n", channel->topic);
-		
 		// updating topic
 		free(channel->topic);
 		channel->topic = strdup(topic);
@@ -824,6 +828,11 @@ void main_core(char *data, char *request) {
 	}
 	
 	if(!strncmp(request, "TOPIC", 5)) {
+		handle_new_topic(data + 1);
+		return;
+	}
+	
+	if(!strncmp(request, "332", 3)) {
 		handle_topic(data + 1);
 		return;
 	}

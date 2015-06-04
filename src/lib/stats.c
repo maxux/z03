@@ -318,7 +318,7 @@ void stats_rebuild_all(list_t *channels) {
 
 void stats_load_all(list_t *root) {
 	sqlite3_stmt *stmt;
-	char *channel;
+	char *channel, buffer[512];
 	channel_t *newchan;
 	
 	printf("[ ] lib/stats: reloading all...\n");
@@ -327,6 +327,10 @@ void stats_load_all(list_t *root) {
 		while(sqlite3_step(stmt) == SQLITE_ROW) {
 			channel = (char *) sqlite3_column_text(stmt, 0);
 			newchan = stats_channel_load(channel);
+			
+			// request current topic of the channel
+			zsnprintf(buffer, "TOPIC %s", channel);
+			raw_socket(buffer);
 			
 			list_append(root, channel, newchan);
 		}
