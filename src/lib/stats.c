@@ -367,7 +367,7 @@ void stats_daily_update() {
 			lines = sqlite3_column_int(stmt, 1);
 			nicks = sqlite3_column_int(stmt, 2);
 			
-			zsnprintf(buffer, "Day changed, yesterday: %d nicks said %d lines", nicks, lines);			
+			zsnprintf(buffer, "Hey guys, today is another day. Yesterday, %d nicks said %d lines. Have a nice day !", nicks, lines);			
 			irc_privmsg(chan, buffer);
 		}
 	}

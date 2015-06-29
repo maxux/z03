@@ -81,7 +81,7 @@ static char *curl_useragent(char *url) {
 	
 	/* Checking host */
 	if((host = curl_gethost(url))) {
-		printf("[+] urlmanager/host: <%s>\n", host);
+		printf("[+] urlmanager/useragent: <%s>\n", host);
 		
 		for(i = 0; i < sizeof(__user_agent_hosts) / sizeof(char *); i++) {
 			if(!strcmp(host, __user_agent_hosts[i]))

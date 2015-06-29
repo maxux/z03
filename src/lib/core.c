@@ -68,8 +68,8 @@ void lib_sighandler(int signal) {
 	switch(signal) {
 		case SIGUSR1:
 			pthread_mutex_unlock(&global_core->mutex_ssl);
-			stats_daily_update();
 			topic_update();
+			stats_daily_update();
 		break;
 		
 		case SIGINT:

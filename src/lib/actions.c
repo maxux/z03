@@ -126,7 +126,7 @@ void action_man(ircmessage_t *message, char *args) {
 			irc_privmsg(message->chan, buffer);
 			
 			if(*(request->syntaxe)) {
-				zsnprintf(buffer, "Syntaxe: %s", request->syntaxe);
+				zsnprintf(buffer, "Syntax: %s", request->syntaxe);
 				irc_privmsg(message->chan, buffer);
 			}
 			
