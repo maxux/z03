@@ -29,6 +29,8 @@
 		pthread_mutex_t mutex_client;
 		int extraclient;
 		
+		codemap_t *codemap;
+		
 	} global_core_t;
 	
 	extern ssl_socket_t *ssl;
@@ -45,4 +47,5 @@
 	void handle_private_message(char *data);
 	
 	int signal_intercept(int signal, void (*function)(int));
+	void loadlib(codemap_t *codemap);
 #endif

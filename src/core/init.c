@@ -97,6 +97,10 @@ void sighandler(int signal) {
 			
 			siglongjmp(segfault_env, 1);
 		break;
+		
+		case SIGUSR2:
+			loadlib(global_core->codemap);
+		break;
 	}
 }
 
@@ -137,7 +141,7 @@ void loadlib(codemap_t *codemap) {
 	printf("[+] core: link ready\n");
 }
 
-void core_handle_private_message(char *data, codemap_t *codemap) {
+void core_handle_private_message(char *data) {
 	char remote[256], *request;
 	char *diff = NULL;
 	unsigned char length;
@@ -158,7 +162,7 @@ void core_handle_private_message(char *data, codemap_t *codemap) {
 			
 			if(!strncmp(request, ".rehash", 7)) {
 				printf("[+] core: rehashing code...\n");
-				loadlib(codemap);
+				loadlib(global_core->codemap);
 				
 			} else if(request[0] != '.')
 				raw_socket(request);
@@ -316,11 +320,13 @@ int main(void) {
 	global_core->rehash_count = 0;
 	global_core->auth         = 0;
 	global_core->extraclient  = 0;
+	global_core->codemap      = &codemap;
 	
 	/* signals */
 	signal_intercept(SIGSEGV, sighandler);
 	signal_intercept(SIGCHLD, sighandler);
 	signal_intercept(SIGPIPE, sighandler);
+	signal_intercept(SIGUSR2, sighandler);
 	
 	/* Loading dynamic code */
 	loadlib(&codemap);
@@ -361,7 +367,7 @@ int main(void) {
 		}
 		
 		if(!strncmp(request, "PRIVMSG " IRC_NICK, sizeof("PRIVMSG " IRC_NICK) - 1))
-			core_handle_private_message(data + 1, &codemap);
+			core_handle_private_message(data + 1);
 		
 		if(!global_core->auth && !strncmp(request, "NOTICE AUTH", 11)) {
 			raw_socket("NICK " IRC_NICK);
