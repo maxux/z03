@@ -44,6 +44,8 @@ static char *__title_host_exceptions[] = {
 	"instagr.am",
 	"git.maxux.net",
 	"www.speedtest.net",
+	"prntscr.com",
+	"maps.google.com",
 };
 
 repost_t *repost_new() {

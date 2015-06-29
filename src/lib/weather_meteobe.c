@@ -55,7 +55,7 @@ int weather_default_station = 0;
 char *__weather_internal_station_url[] = {
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datametar.php&Itemid=69&id=%d",
 	"http://www.meteobelgique.be/observation/station-meteo.html?staticfile=realtime-datastation.php&Itemid=69&id=%d&lg=2",
-	"https://www.maxux.net/devs/rasp/z03.php?%d",
+	"http://arya.maxux.net/cassie/z03.php?%d",
 };
 
 int weather_get_station(char *name) {
