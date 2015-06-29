@@ -42,11 +42,17 @@
 #include "downloader.h"
 #include "ircmisc.h"
 
-char *__user_agent_hosts[] = {
+static char *__user_agent_hosts[] = {
 	"t.co", "gks.gs", "google.com"
 };
 
-host_cookies_t __host_cookies[] = {
+static char *__proxy_hosts[] = {
+	"youtu.be", "youtube.com", "www.youtube.com"
+};
+
+static char *__proxy_host = "10.242.1.4:8888";
+
+static host_cookies_t __host_cookies[] = {
 	{.host = "facebook.com",    .cookie = PRIVATE_FBCOOK},
 	{.host = "what.cd",         .cookie = PRIVATE_WHATCD},
 	{.host = "gks.gs",          .cookie = PRIVATE_GKS},
@@ -139,6 +145,28 @@ charset_t curl_extract_charset(char *line) {
 	}
 	
 	return UNKNOWN_CHARSET;
+}
+
+static int curl_proxify(char *url) {
+	char *host;
+	unsigned int i, proxy = 0;
+	
+	/* Checking host */
+	if((host = curl_gethost(url))) {
+		printf("[+] urlmanager/proxy: <%s>\n", host);
+		
+		for(i = 0; i < sizeof(__proxy_hosts) / sizeof(char *); i++) {
+			if(!strcmp(host, __proxy_hosts[i])) {
+				printf("[+] urlmanager/proxy: requested\n");
+				proxy = 1;
+				break;
+			}
+		}
+			
+		free(host);
+	}
+	
+	return proxy;
 }
 
 size_t curl_header_validate(char *ptr, size_t size, size_t nmemb, void *userdata) {
@@ -284,13 +312,16 @@ static int curl_download_process(char *url, curl_data_t *data, char forcedl, cha
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
 		
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 180); // 180 seconds at 4 Mo/s = 720 Mo of data
-		/* curl_easy_setopt(curl, CURLOPT_VERBOSE, 1); */
+		// curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 		
 		if(post) {
 			curl_easy_setopt(curl, CURLOPT_POST, 1);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post);
 			printf("[+] urlmanager/post: <%s>\n", post);
 		}
+		
+		if(curl_proxify(url))
+			curl_easy_setopt(curl, CURLOPT_PROXY, __proxy_host);
 		
 		/* Checking Host for specific Cookies */
 		if(data->cookie) {
