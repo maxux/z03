@@ -102,4 +102,6 @@
 	void lib_construct();
 	void lib_destruct();
 	void nick_free(void *data);
+	
+	int isadmin(char *host);
 #endif

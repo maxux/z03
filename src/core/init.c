@@ -128,8 +128,14 @@ void loadlib(codemap_t *codemap) {
 		exit(EXIT_FAILURE);
 	}
 	
-	/* Linking main */
+	/* Linking required functions */
 	codemap->main = dlsym(codemap->handler, "main_core");
+	if((error = dlerror()) != NULL) {
+		fprintf(stderr, "[-] core: dlsym: %s\n", error);
+		exit(EXIT_FAILURE);
+	}
+	
+	codemap->isadmin = dlsym(codemap->handler, "isadmin");
 	if((error = dlerror()) != NULL) {
 		fprintf(stderr, "[-] core: dlsym: %s\n", error);
 		exit(EXIT_FAILURE);
@@ -154,11 +160,16 @@ void core_handle_private_message(char *data) {
 		
 	} else return;
 	
-	if(!strcmp(remote, IRC_ADMIN_HOST)) {
+	if(!global_core->codemap->handler) {
+		printf("[-] core: lib not loaded, cannot detect admin\n");
+		return;
+	}
+	
+	if(global_core->codemap->isadmin(remote)) {
 		request = strstr(data, ":");
 		
 		if(request++) {
-			printf("[+] Admin <%s> request: <%s>\n", remote, request);
+			printf("[+] core/admin: [%s] %s\n", remote, request);
 			
 			if(!strncmp(request, ".rehash", 7)) {
 				printf("[+] core: rehashing code...\n");
@@ -168,7 +179,7 @@ void core_handle_private_message(char *data) {
 				raw_socket(request);
 		}
 		
-	} else printf("[-] Host <%s> is not admin\n", remote);
+	} else printf("[-] core/admin: <%s> is not admin\n", remote);
 }
 
 /*
@@ -296,6 +307,7 @@ int main(void) {
 		.filename = "./libz03.so",
 		.handler  = NULL,
 		.main     = NULL,
+		.isadmin  = NULL,
 	};
 	
 	printf("[+] core: loading...\n");

@@ -54,10 +54,6 @@
 	// time format used by strftime (man 3 strftime)
 	#define TIME_FORMAT             "%A %d %B %X %Y UTC%z (%Z)"
 	
-	// admin format: nick!username@host
-	// admin is able to sent bot remote raw command
-	#define IRC_ADMIN_HOST          "Maxux!maxux@ff404::-702526CE"
-	
 	// kickban nick longer than this limit
 	#define NICK_MAX_LENGTH		15           // 15 bytes
 	

@@ -428,7 +428,7 @@ int handle_query(char *data) {
 		
 	} else return 0;
 	
-	if(!strcmp(remote, IRC_ADMIN_HOST)) {
+	if(isadmin(remote)) {
 		request = strstr(data, ":");
 		
 		if(request++) {
@@ -908,4 +908,30 @@ void lib_destruct() {
 	
 	// closing sqitite
 	db_sqlite_close(sqlite_db);
+}
+
+//
+// administrator
+//
+int isadmin(char *host) {
+	sqlite3_stmt *stmt;
+	char *sqlquery;
+	int admin = 0;
+	
+	/* select backlog */
+	sqlquery = sqlite3_mprintf(
+		"SELECT * FROM admin WHERE host = '%q'",
+		host
+	);
+
+	if((stmt = db_sqlite_select_query(sqlite_db, sqlquery)) == NULL)
+		fprintf(stderr, "[-] lib/admin: sql select error\n");
+	
+	if(sqlite3_step(stmt) == SQLITE_ROW)
+		admin = 1;
+	
+	sqlite3_finalize(stmt);
+	sqlite3_free(sqlquery);
+	
+	return admin;
 }

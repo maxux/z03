@@ -11,6 +11,7 @@
 		char *filename;                /* library filename */
 		void *handler;                 /* library handler */
 		void (*main)(char *, char *);  /* main library function */
+		int (*isadmin)(char *);        /* isadmin library function */
 		
 	} codemap_t;
 	
