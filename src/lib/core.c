@@ -303,15 +303,23 @@ void topic_update() {
 	reach.tm_min = 0;
 	reach.tm_sec = 0;
 	
-	// 15 july
+	// 13 jul
+	reach.tm_year = 2016 - 1900;
 	reach.tm_mon = 6;
-	reach.tm_mday = 15;
+	reach.tm_mday = 13;
 	
 	seconds = difftime(mktime(&reach), now);
 	days = seconds / (60 * 60 * 24);
 	
 	// building the new topic
-	sprintf(buffer, "%sDour J-%.0f%s", begin, days, next);
+	if(days > 0) {
+		sprintf(buffer, "%sDour J-%.0f%s", begin, days, next);
+		
+	} else if(days > -6) {
+		sprintf(buffer, "%sDourééééééé%s", begin, next);
+	
+	} else sprintf(buffer, "%sDour, see you next year !%s", begin, next);
+	
 	free(begin);
 	
 	// clearing previous one and set the new one
