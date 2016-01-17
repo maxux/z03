@@ -560,6 +560,11 @@ int handle_precommands(char *content, ircmessage_t *message) {
 		return 0;
 	}
 	
+	if((strstr(content, "cupper") || strstr(content, "cvpper")) && !strcmp(message->nick, "Malabar")) {
+		irc_kick(message->chan, message->nick, "On s'en branle de ton kveupeurre, taggle.");
+		return 0;
+	}
+	
 	if(strstr(content, "une kernel") || strstr(content, "la kernel") || strstr(content, "kernelle")) {
 		irc_kick(message->chan, message->nick, "On dit *un* *kernel*, espèce d'yllaytray");
 		return 0;
