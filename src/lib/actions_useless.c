@@ -131,8 +131,8 @@ void action_useless_km(ircmessage_t *message, char *args) {
 	(void) args;
 	char buffer[1024];
 	
-	zsnprintf(buffer, "Nope, ça ne marche plus ça...");
-	irc_kick(message->chan, message->nick, buffer);
+	zsnprintf(buffer, "take that biatch");
+	irc_kick(message->chan, "Malabar", buffer);
 }
 
 
