@@ -56,8 +56,8 @@ void action_just_ping(ircmessage_t *message, char *args) {
 	time(&t);
 	timeinfo = localtime(&t);
 	
-	zsnprintf(buffer, "Pong. Ping request received at %02d:%02d:%02d.",
-	                  timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+	zsnprintf(buffer, "Pong. Ping request received at %02d:%02d:%02d by %s.",
+	                  timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, message->nick);
 	
 	irc_privmsg(message->chan, buffer);
 }
