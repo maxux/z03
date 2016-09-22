@@ -46,6 +46,7 @@ weather_station_t weather_stations[] = {
 	{.id = 13,  .ref = "beauvechain",  .type = STATION_METAR,   .name = "Beauvechain"},
 	{.id = 36,  .ref = "vaux",         .type = STATION_STATION, .name = "Vaux-sous-Chèvremont"},
 	{.id = 59,  .ref = "herve",        .type = STATION_STATION, .name = "Herve (Outre-Cour)"},
+	{.id = 69,  .ref = "andenne",      .type = STATION_STATION, .name = "Andenne"},
 	{.id = 42,  .ref = "maxux",        .type = STATION_MAXUX,   .name = "M​axux (local)"},
 };
 

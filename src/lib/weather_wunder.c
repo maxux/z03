@@ -66,6 +66,41 @@ static char *wunder_json_checkerror(json_t *root) {
 	return NULL;
 }
 
+static char * wunder_multiple(json_t *root, char *chan) {
+	json_t *node, *subnode;
+	char temp[128];
+	
+	node = json_object_get(root, "response");
+	if(!json_is_object(root)) {
+		printf("[+] wunder/parse: no response found\n");
+		return NULL;
+	}
+	
+	subnode = json_object_get(node, "results");
+	if(!json_is_array(subnode)) {
+		printf("[+] wunder/parse: not a multiple results, skipping\n");
+		return NULL;
+	}
+	
+	size_t index;
+	json_t *value;
+	list_t *rlist = list_init(NULL);
+
+	json_array_foreach(subnode, index, value) {
+		const char *name = json_string_value(json_object_get(value, "name"));
+		const char *country = json_string_value(json_object_get(value, "country_name"));
+		const char *link = json_string_value(json_object_get(value, "l"));
+		
+		sprintf(temp, "%s/%s: %s", country, name, link + 3);
+		list_append(rlist, temp, temp);
+	}
+
+	char *implode = list_implode(rlist, 10);
+	list_free(rlist);
+	
+	return implode;
+}
+
 static int wunder_parse(json_t *root, weather_data_t *weather) {
 	json_t *node, *subnode;
 	
@@ -153,6 +188,12 @@ int wunder_handle(char *chan, char *location, curl_data_t *curl) {
 		weather_error(chan, error);
 		free(error);
 		return 1;
+	}
+	
+	if((error = wunder_multiple(root, chan))) {
+		weather_error(chan, error);
+		free(error);
+		return 0;
 	}
 	
 	if(!wunder_parse(root, &weather)) {
