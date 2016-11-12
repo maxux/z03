@@ -130,9 +130,13 @@ void action_useless_blowjob(ircmessage_t *message, char *args) {
 void action_useless_km(ircmessage_t *message, char *args) {
 	(void) args;
 	char buffer[1024];
-	
+
 	zsnprintf(buffer, "take that biatch");
 	irc_kick(message->chan, "Malabar", buffer);
+	irc_kick(message->chan, "MalabarAndroid", buffer);
+	irc_kick(message->chan, "Thomas", buffer);
+	irc_kick(message->chan, "Malabar_", buffer);
+	irc_kick(message->chan, "Malabar__", buffer);
 }
 
 
