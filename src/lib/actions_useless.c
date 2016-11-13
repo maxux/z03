@@ -127,16 +127,23 @@ void action_useless_blowjob(ircmessage_t *message, char *args) {
 	irc_kick(message->chan, message->nick, __blowjobs_messages[index]);
 }
 
+static char *__malanicks[] = {"Malabar", "MalabarAndroid", "Thomas"};
 void action_useless_km(ircmessage_t *message, char *args) {
 	(void) args;
-	char buffer[1024];
+	char buffer[1024], nick[64];
+	unsigned int i, j;
 
 	zsnprintf(buffer, "take that biatch");
-	irc_kick(message->chan, "Malabar", buffer);
-	irc_kick(message->chan, "MalabarAndroid", buffer);
-	irc_kick(message->chan, "Thomas", buffer);
-	irc_kick(message->chan, "Malabar_", buffer);
-	irc_kick(message->chan, "Malabar__", buffer);
+
+	for(i = 0; i < (sizeof(__malanicks) / sizeof(char *)); i++) {
+		strcpy(nick, __malanicks[i]);
+		irc_kick(message->chan, nick, buffer);
+
+		for(j = 0; j < 4; j++) {
+			strcat(nick, "_");
+			irc_kick(message->chan, nick, buffer);
+		}
+	}
 }
 
 
